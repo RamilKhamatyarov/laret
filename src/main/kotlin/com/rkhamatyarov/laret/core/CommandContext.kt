@@ -1,0 +1,19 @@
+package com.rkhamatyarov.laret.core
+
+import com.rkhamatyarov.laret.model.Command
+
+/**
+ * Context passed to command actions
+ */
+class CommandContext(
+    val command: Command,
+    val app: CliApp? = null
+) {
+    val arguments = mutableMapOf<String, String>()
+    val options = mutableMapOf<String, String>()
+
+    fun argument(name: String): String = arguments[name] ?: ""
+    fun option(name: String): String = options[name] ?: ""
+    fun optionBool(name: String): Boolean = options[name]?.toBoolean() ?: false
+    fun optionInt(name: String): Int = options[name]?.toIntOrNull() ?: 0
+}
