@@ -13,7 +13,11 @@ class BashCompletionGenerator : CompletionGenerator {
             }
 
         val allOptions =
-            app.groups.flatMap { it.commands }.flatMap { it.options }.map { "--${it.long}" }.distinct()
+            app.groups
+                .flatMap { it.commands }
+                .flatMap { it.options }
+                .map { "--${it.long}" }
+                .distinct()
                 .joinToString(" ")
 
         return """

@@ -175,7 +175,8 @@ fun main(args: Array<String>) {
                         println(cyanBold("📁 Listing: $path"))
 
                         val files = dir.listFiles() ?: emptyArray()
-                        files.filter { all || !it.isHidden }
+                        files
+                            .filter { all || !it.isHidden }
                             .sortedBy { it.name }
                             .forEach { file ->
                                 if (long) {
