@@ -354,22 +354,22 @@ import com.rkhamatyarov.*
 import java.io.File
 
 fun main(args: Array<String>) {
-val app = cli(
-name = "laret",
-version = "1.0.0",
-description = "Laret - A Cobra-like CLI framework for Kotlin"
-) {
-group(
-name = "file",
-description = "File operations"
-) {
-command(
-name = "create",
-description = "Create a new file"
-) {
-argument("path", "File path", required = true)
-option("c", "content", "File content", "", true)
-option("f", "force", "Overwrite if exists", "", false)
+    val app = cli(
+        name = "laret",
+        version = "1.0.0",
+        description = "Laret - A Cobra-like CLI framework for Kotlin"
+    ) {
+        group(
+            name = "file",
+            description = "File operations"
+        ) {
+            command(
+                name = "create",
+                description = "Create a new file"
+                ) {
+                    argument("path", "File path", required = true)
+                    option("c", "content", "File content", "", true)
+                    option("f", "force", "Overwrite if exists", "", false)
 
                 action { ctx ->
                     val path = ctx.argument("path")
@@ -520,6 +520,7 @@ group(
 
 ## 🏗️ Project Structure
 
+```ascii
 com.rkhamatyarov.laret/
 ├── core/
 │   ├── CliApp.kt              # Main application class
@@ -536,14 +537,16 @@ com.rkhamatyarov.laret/
 │   ├── Argument.kt           # Argument model
 │   └── Option.kt             # Option model
 ├── completion/
-│   ├── CompletionGenerator.kt       # Base interface
-│   ├── BashCompletionGenerator.kt   # Bash implementation
-│   ├── ZshCompletionGenerator.kt    # Zsh implementation
-│   └── PowerShellCompletionGenerator.kt
+│   ├── CompletionGenerator.kt          # Base interface
+│   ├── BashCompletionGenerator.kt      # Bash implementation
+│   ├── ZshCompletionGenerator.kt       # Zsh implementation
+│   ├── PowerShellCompletionGenerator.kt # PowerShell implementation
+│   └── CompletionExtensions.kt         # Extension functions
 └── ui/
     ├── Colors.kt             # ANSI color codes
     ├── ColorHelpers.kt       # Color helper functions
     └── HelpFormatter.kt      # Help text formatting
+```
 
 ## 🎨 Design Philosophy
 
