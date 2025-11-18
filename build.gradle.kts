@@ -1,6 +1,6 @@
 plugins {
     kotlin("jvm") version "2.2.20"
-    id("org.graalvm.buildtools.native") version "0.10.4"
+    id("org.graalvm.buildtools.native") version "0.11.3"
     id("com.github.johnrengelman.shadow") version "8.1.1"
     id("org.jlleitschuh.gradle.ktlint") version "13.1.0"
     `maven-publish`
