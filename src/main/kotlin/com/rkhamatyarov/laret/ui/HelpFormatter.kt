@@ -9,7 +9,6 @@ object HelpFormatter {
             "  ${name.padEnd(20)} $desc"
         }
 
-
     fun formatOptionsList(options: List<Triple<String, String, String>>): String =
         options.joinToString("\n") { (short, long, desc) ->
             val flags = "-$short, --$long".padEnd(25)

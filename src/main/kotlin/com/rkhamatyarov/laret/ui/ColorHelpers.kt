@@ -25,7 +25,6 @@ fun yellowBold(text: String): String =
         text
     }
 
-
 fun blueBold(text: String): String =
     if (Colors.isColorSupported()) {
         "${Colors.BLUE_BOLD}$text${Colors.RESET}"
