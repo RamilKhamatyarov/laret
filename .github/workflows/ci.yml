@@ -32,7 +32,7 @@ jobs:
       - name: Set up GraalVM
         uses: graalvm/setup-graalvm@v1
         with:
-          java-version: '21'
+          java-version: '24'
           distribution: 'graalvm-community'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           native-image-job-reports: 'true'
@@ -92,7 +92,7 @@ jobs:
         with:
           files: |
             build/test-results/**/*.xml
-          check_name: "Unit Test Results (Ubuntu Latest, JDK 21)"
+          check_name: "Unit Test Results (Ubuntu Latest, JDK 24)"
           comment_mode: "always"
           report_individual_runs: true
 
