@@ -9,7 +9,6 @@ import com.rkhamatyarov.laret.completion.installPowerShellCompletion
 import com.rkhamatyarov.laret.dsl.cli
 import com.rkhamatyarov.laret.ui.redBold
 import com.rkhamatyarov.laret.ui.yellowItalic
-import java.awt.SystemColor.text
 import java.io.File
 
 fun main(args: Array<String>) {
@@ -30,12 +29,37 @@ fun main(args: Array<String>) {
                     if (ctx.app != null) {
                         println(ctx.app.generateCompletion("bash"))
                     } else {
-                        println(redBold("Error: app not available"))
+                        println(redBold("laretError: app not available"))
                     }
                 }
             }
 
-            text
+            command(
+                name = "zsh",
+                description = "Generate zsh completion script"
+            ) {
+                action { ctx ->
+                    if (ctx.app != null) {
+                        println(ctx.app.generateCompletion("zsh"))
+                    } else {
+                        println(redBold("laretError: app not available"))
+                    }
+                }
+            }
+
+            command(
+                name = "powershell",
+                description = "Generate PowerShell completion script"
+            ) {
+                action { ctx ->
+                    if (ctx.app != null) {
+                        println(ctx.app.generateCompletion("powershell"))
+                    } else {
+                        println(redBold("laretError: app not available"))
+                    }
+                }
+            }
+
             command(
                 name = "install",
                 description = "Install completion script"
@@ -48,12 +72,13 @@ fun main(args: Array<String>) {
                             "bash" -> ctx.app.installCompletion("bash")
                             "zsh" -> ctx.app.installCompletion("zsh")
                             "powershell" -> ctx.app.installPowerShellCompletion()
-                            else -> println(redBold("Unsupported shell: $shell"))
+                            else -> println(redBold("laretUnsupported shell: $shell"))
                         }
                     }
                 }
             }
         }
+
 
         group(
             name = "file",

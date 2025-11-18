@@ -2,7 +2,6 @@ package com.rkhamatyarov.laret.core
 
 import com.rkhamatyarov.laret.model.CommandGroup
 import com.rkhamatyarov.laret.ui.redBold
-import java.awt.SystemColor
 
 /**
  * Represents a complete CLI application
@@ -25,7 +24,6 @@ data class CliApp(
     private fun executeCommand(args: Array<String>) {
         val groupName = args.getOrNull(0) ?: return
 
-        SystemColor.text
         if (args.size == 2 && (args[1] == "-h" || args[1] == "--help")) {
             val group = groups.find { it.name == groupName }
             if (group != null) {
