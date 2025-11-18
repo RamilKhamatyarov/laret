@@ -5,5 +5,5 @@ data class Argument(
     val description: String = "",
     val required: Boolean = true,
     val optional: Boolean = false,
-    val default: String = ""
+    val default: String = "",
 )

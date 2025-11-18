@@ -2,18 +2,17 @@ package com.rkhamatyarov.laret
 
 import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.dsl.cli
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
-import org.junit.After
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class CliTest {
-
     private lateinit var app: CliApp
     private val testDir = File("test_laret_tmp")
     private val originalOut = System.out
@@ -31,146 +30,147 @@ class CliTest {
         System.setErr(PrintStream(outputStream))
 
         // Initialize CLI app
-        app = cli(
-            name = "laret",
-            version = "1.0.0",
-            description = "Test CLI framework"
-        ) {
-            group(
-                name = "file",
-                description = "File operations"
+        app =
+            cli(
+                name = "laret",
+                version = "1.0.0",
+                description = "Test CLI framework",
             ) {
-                command(
-                    name = "create",
-                    description = "Create a new file"
+                group(
+                    name = "file",
+                    description = "File operations",
                 ) {
-                    argument("path", "File path", required = true)
-                    option("c", "content", "File content", "", true)
-                    option("f", "force", "Overwrite if exists", "", false)
+                    command(
+                        name = "create",
+                        description = "Create a new file",
+                    ) {
+                        argument("path", "File path", required = true)
+                        option("c", "content", "File content", "", true)
+                        option("f", "force", "Overwrite if exists", "", false)
 
-                    action { ctx ->
-                        val path = ctx.argument("path")
-                        val content = ctx.option("content")
-                        val force = ctx.optionBool("force")
+                        action { ctx ->
+                            val path = ctx.argument("path")
+                            val content = ctx.option("content")
+                            val force = ctx.optionBool("force")
 
-                        val file = File(path)
+                            val file = File(path)
 
-                        if (file.exists() && !force) {
-                            println("File already exists: $path (use --force to overwrite)")
-                            return@action
-                        }
-
-                        file.writeText(content)
-                        println("✓ File created: $path")
-                    }
-                }
-
-                command(
-                    name = "delete",
-                    description = "Delete a file"
-                ) {
-                    argument("path", "File path", required = true)
-                    option("f", "force", "Force deletion", "", false)
-
-                    action { ctx ->
-                        val path = ctx.argument("path")
-                        val file = File(path)
-
-                        if (!file.exists()) {
-                            println("File not found: $path")
-                            return@action
-                        }
-
-                        if (file.delete()) {
-                            println("✓ File deleted: $path")
-                        } else {
-                            println("Failed to delete file: $path")
-                        }
-                    }
-                }
-
-                command(
-                    name = "read",
-                    description = "Read file contents"
-                ) {
-                    argument("path", "File path", required = true)
-
-                    action { ctx ->
-                        val path = ctx.argument("path")
-                        val file = File(path)
-
-                        if (!file.exists()) {
-                            println("File not found: $path")
-                            return@action
-                        }
-
-                        println(file.readText())
-                    }
-                }
-            }
-
-            group(
-                name = "dir",
-                description = "Directory operations"
-            ) {
-                command(
-                    name = "create",
-                    description = "Create a new directory"
-                ) {
-                    argument("path", "Directory path", required = true)
-                    option("p", "parents", "Create parent directories", "", false)
-
-                    action { ctx ->
-                        val path = ctx.argument("path")
-                        val parents = ctx.optionBool("parents")
-
-                        val dir = File(path)
-                        val success = if (parents) dir.mkdirs() else dir.mkdir()
-
-                        if (success) {
-                            println("✓ Directory created: $path")
-                        } else {
-                            println("Failed to create directory: $path")
-                        }
-                    }
-                }
-
-                command(
-                    name = "list",
-                    description = "List directory contents"
-                ) {
-                    argument("path", "Directory path", required = false, optional = true, default = ".")
-                    option("l", "long", "Long format", "", false)
-                    option("a", "all", "Show hidden files", "", false)
-
-                    action { ctx ->
-                        val path = ctx.argument("path").ifEmpty { "." }
-                        val long = ctx.optionBool("long")
-                        val all = ctx.optionBool("all")
-
-                        val dir = File(path)
-
-                        if (!dir.isDirectory) {
-                            println("Not a directory: $path")
-                            return@action
-                        }
-
-                        val files = dir.listFiles() ?: emptyArray()
-
-                        files.filter { all || !it.isHidden }
-                            .sortedBy { it.name }
-                            .forEach { file ->
-                                if (long) {
-                                    val size = if (file.isDirectory) "<dir>" else "${file.length()} B"
-                                    println("${if (file.isDirectory) "d" else "-"} $size ${file.name}")
-                                } else {
-                                    println(file.name)
-                                }
+                            if (file.exists() && !force) {
+                                println("File already exists: $path (use --force to overwrite)")
+                                return@action
                             }
+
+                            file.writeText(content)
+                            println("✓ File created: $path")
+                        }
+                    }
+
+                    command(
+                        name = "delete",
+                        description = "Delete a file",
+                    ) {
+                        argument("path", "File path", required = true)
+                        option("f", "force", "Force deletion", "", false)
+
+                        action { ctx ->
+                            val path = ctx.argument("path")
+                            val file = File(path)
+
+                            if (!file.exists()) {
+                                println("File not found: $path")
+                                return@action
+                            }
+
+                            if (file.delete()) {
+                                println("✓ File deleted: $path")
+                            } else {
+                                println("Failed to delete file: $path")
+                            }
+                        }
+                    }
+
+                    command(
+                        name = "read",
+                        description = "Read file contents",
+                    ) {
+                        argument("path", "File path", required = true)
+
+                        action { ctx ->
+                            val path = ctx.argument("path")
+                            val file = File(path)
+
+                            if (!file.exists()) {
+                                println("File not found: $path")
+                                return@action
+                            }
+
+                            println(file.readText())
+                        }
+                    }
+                }
+
+                group(
+                    name = "dir",
+                    description = "Directory operations",
+                ) {
+                    command(
+                        name = "create",
+                        description = "Create a new directory",
+                    ) {
+                        argument("path", "Directory path", required = true)
+                        option("p", "parents", "Create parent directories", "", false)
+
+                        action { ctx ->
+                            val path = ctx.argument("path")
+                            val parents = ctx.optionBool("parents")
+
+                            val dir = File(path)
+                            val success = if (parents) dir.mkdirs() else dir.mkdir()
+
+                            if (success) {
+                                println("✓ Directory created: $path")
+                            } else {
+                                println("Failed to create directory: $path")
+                            }
+                        }
+                    }
+
+                    command(
+                        name = "list",
+                        description = "List directory contents",
+                    ) {
+                        argument("path", "Directory path", required = false, optional = true, default = ".")
+                        option("l", "long", "Long format", "", false)
+                        option("a", "all", "Show hidden files", "", false)
+
+                        action { ctx ->
+                            val path = ctx.argument("path").ifEmpty { "." }
+                            val long = ctx.optionBool("long")
+                            val all = ctx.optionBool("all")
+
+                            val dir = File(path)
+
+                            if (!dir.isDirectory) {
+                                println("Not a directory: $path")
+                                return@action
+                            }
+
+                            val files = dir.listFiles() ?: emptyArray()
+
+                            files.filter { all || !it.isHidden }
+                                .sortedBy { it.name }
+                                .forEach { file ->
+                                    if (long) {
+                                        val size = if (file.isDirectory) "<dir>" else "${file.length()} B"
+                                        println("${if (file.isDirectory) "d" else "-"} $size ${file.name}")
+                                    } else {
+                                        println(file.name)
+                                    }
+                                }
+                        }
                     }
                 }
             }
-        }
     }
 
     @After
@@ -405,11 +405,12 @@ class CliTest {
 
     @Test
     fun multipleOperations_createAndDeleteMultipleFilesAllWork() {
-        val files = listOf(
-            File(testDir, "test1.txt"),
-            File(testDir, "test2.txt"),
-            File(testDir, "test3.txt")
-        )
+        val files =
+            listOf(
+                File(testDir, "test1.txt"),
+                File(testDir, "test2.txt"),
+                File(testDir, "test3.txt"),
+            )
         files.forEach { file ->
             app.run(arrayOf("file", "create", file.absolutePath, "-c", "Content of ${file.name}"))
         }

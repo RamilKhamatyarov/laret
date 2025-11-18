@@ -7,12 +7,14 @@ class BashCompletionGenerator : CompletionGenerator {
         val appName = app.name
         val groupNames = app.groups.joinToString(" ") { it.name }
 
-        val groupCommands = app.groups.joinToString("\n") { group ->
-            "    ${group.name}) commands=\"${group.commands.joinToString(" ") { it.name }}\" ;;"
-        }
+        val groupCommands =
+            app.groups.joinToString("\n") { group ->
+                "    ${group.name}) commands=\"${group.commands.joinToString(" ") { it.name }}\" ;;"
+            }
 
-        val allOptions = app.groups.flatMap { it.commands }.flatMap { it.options }.map { "--${it.long}" }.distinct()
-            .joinToString(" ")
+        val allOptions =
+            app.groups.flatMap { it.commands }.flatMap { it.options }.map { "--${it.long}" }.distinct()
+                .joinToString(" ")
 
         return """
             #!/bin/bash
@@ -49,6 +51,6 @@ class BashCompletionGenerator : CompletionGenerator {
             }
             
             complete -o bashdefault -o default -o nospace -F _${appName}_complete $appName
-        """.trimIndent()
+            """.trimIndent()
     }
 }

@@ -5,6 +5,5 @@ data class Option(
     val long: String,
     val description: String = "",
     val default: String = "",
-    val takesValue: Boolean = true
+    val takesValue: Boolean = true,
 )
-

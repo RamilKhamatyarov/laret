@@ -2,6 +2,7 @@ plugins {
     kotlin("jvm") version "2.2.20"
     id("org.graalvm.buildtools.native") version "0.10.4"
     id("com.github.johnrengelman.shadow") version "8.1.1"
+    id("org.jlleitschuh.gradle.ktlint") version "12.1.0"
     `maven-publish`
     application
 }
@@ -32,6 +33,16 @@ dependencies {
 
 kotlin {
     jvmToolchain(24)
+}
+
+ktlint {
+    version.set("1.0.1")
+    android.set(false)
+    ignoreFailures.set(false)
+    reporters {
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.PLAIN)
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.CHECKSTYLE)
+    }
 }
 
 graalvmNative {

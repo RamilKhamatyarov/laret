@@ -10,7 +10,7 @@ import com.rkhamatyarov.laret.model.Option
  */
 class CommandBuilder(
     val name: String,
-    val description: String = ""
+    val description: String = "",
 ) {
     private val arguments = mutableListOf<Argument>()
     private val options = mutableListOf<Option>()
@@ -24,7 +24,7 @@ class CommandBuilder(
         description: String = "",
         required: Boolean = true,
         optional: Boolean = false,
-        default: String = ""
+        default: String = "",
     ) {
         arguments.add(
             Argument(
@@ -32,8 +32,8 @@ class CommandBuilder(
                 description,
                 required,
                 optional,
-                default
-            )
+                default,
+            ),
         )
     }
 
@@ -45,7 +45,7 @@ class CommandBuilder(
         long: String,
         description: String = "",
         default: String = "",
-        takesValue: Boolean = true
+        takesValue: Boolean = true,
     ) {
         options.add(
             Option(
@@ -53,8 +53,8 @@ class CommandBuilder(
                 long,
                 description,
                 default,
-                takesValue
-            )
+                takesValue,
+            ),
         )
     }
 
@@ -65,6 +65,5 @@ class CommandBuilder(
         actionBlock = block
     }
 
-    fun build(): Command =
-        Command(name, description, arguments, options, actionBlock)
+    fun build(): Command = Command(name, description, arguments, options, actionBlock)
 }

@@ -6,7 +6,7 @@ package com.rkhamatyarov.laret.model
 data class CommandGroup(
     val name: String,
     val description: String = "",
-    val commands: List<Command> = emptyList()
+    val commands: List<Command> = emptyList(),
 ) {
     fun showHelp() {
         println("Group: $name - $description")

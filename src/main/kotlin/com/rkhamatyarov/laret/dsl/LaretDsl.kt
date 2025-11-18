@@ -9,7 +9,7 @@ fun cli(
     name: String,
     version: String = "1.0.0",
     description: String = "",
-    block: CliBuilder.() -> Unit
+    block: CliBuilder.() -> Unit,
 ): CliApp {
     val builder = CliBuilder(name, version, description)
     builder.block()

@@ -9,7 +9,7 @@ import com.rkhamatyarov.laret.model.CommandGroup
 class CliBuilder(
     val name: String,
     val version: String,
-    val description: String
+    val description: String,
 ) {
     private val groups = mutableListOf<CommandGroup>()
 
@@ -19,7 +19,7 @@ class CliBuilder(
     fun group(
         name: String,
         description: String = "",
-        block: GroupBuilder.() -> Unit
+        block: GroupBuilder.() -> Unit,
     ) {
         val groupBuilder = GroupBuilder(name, description)
         groupBuilder.block()

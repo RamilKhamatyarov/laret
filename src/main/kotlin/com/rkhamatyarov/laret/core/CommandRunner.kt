@@ -6,7 +6,10 @@ import com.rkhamatyarov.laret.ui.redBold
  * Handles command execution logic
  */
 object CommandRunner {
-    fun execute(app: CliApp, args: Array<String>) {
+    fun execute(
+        app: CliApp,
+        args: Array<String>,
+    ) {
         val groupName = args.getOrNull(0) ?: return
 
         // Handle group help
@@ -21,19 +24,21 @@ object CommandRunner {
         val commandName = args.getOrNull(1) ?: return
         val cmdArgs = args.drop(2)
 
-        val group = app.groups.find { it.name == groupName }
-            ?: run {
-                println(redBold("Group not found: $groupName"))
-                app.showHelp()
-                return
-            }
+        val group =
+            app.groups.find { it.name == groupName }
+                ?: run {
+                    println(redBold("Group not found: $groupName"))
+                    app.showHelp()
+                    return
+                }
 
-        val command = group.commands.find { it.name == commandName }
-            ?: run {
-                println(redBold("Command not found: $commandName"))
-                group.showHelp()
-                return
-            }
+        val command =
+            group.commands.find { it.name == commandName }
+                ?: run {
+                    println(redBold("Command not found: $commandName"))
+                    group.showHelp()
+                    return
+                }
 
         command.execute(cmdArgs.toTypedArray(), app)
     }

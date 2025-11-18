@@ -8,7 +8,7 @@ import com.rkhamatyarov.laret.model.CommandGroup
  */
 class GroupBuilder(
     val name: String,
-    val description: String = ""
+    val description: String = "",
 ) {
     private val commands = mutableListOf<Command>()
 
@@ -18,13 +18,12 @@ class GroupBuilder(
     fun command(
         name: String,
         description: String = "",
-        block: CommandBuilder.() -> Unit
+        block: CommandBuilder.() -> Unit,
     ) {
         val cmdBuilder = CommandBuilder(name, description)
         cmdBuilder.block()
         commands.add(cmdBuilder.build())
     }
 
-    fun build(): CommandGroup =
-        CommandGroup(name, description, commands)
+    fun build(): CommandGroup = CommandGroup(name, description, commands)
 }

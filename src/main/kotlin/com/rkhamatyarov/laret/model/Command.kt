@@ -12,9 +12,12 @@ data class Command(
     val description: String = "",
     val arguments: List<Argument> = emptyList(),
     val options: List<Option> = emptyList(),
-    val action: (CommandContext) -> Unit = {}
+    val action: (CommandContext) -> Unit = {},
 ) {
-    fun execute(args: Array<String>, app: CliApp? = null) {
+    fun execute(
+        args: Array<String>,
+        app: CliApp? = null,
+    ) {
         val context = CommandContext(this, app)
 
         try {
