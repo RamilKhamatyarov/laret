@@ -47,7 +47,14 @@ ktlint {
 
 graalvmNative {
     binaries {
-        named("main") {
+        create("windows") {
+            imageName.set("laret")
+            mainClass.set("com.rkhamatyarov.laret.example.MainKt")
+            buildArgs.add("--no-fallback")
+            buildArgs.add("-Ob")
+        }
+
+        create("linux") {
             imageName.set("laret")
             mainClass.set("com.rkhamatyarov.laret.example.MainKt")
             buildArgs.add("--no-fallback")

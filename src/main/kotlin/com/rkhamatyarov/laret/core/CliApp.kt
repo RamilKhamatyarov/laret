@@ -12,6 +12,7 @@ data class CliApp(
     val description: String = "",
     val groups: List<CommandGroup> = emptyList(),
 ) {
+
     fun run(args: Array<String>) {
         when {
             args.isEmpty() -> showHelp()

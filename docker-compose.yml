@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  laret-bash:
+    image: ubuntu:22.04
+    container_name: laret-bash-test
+    volumes:
+      - ./build/native/nativeCompile/laret:/usr/local/bin/laret:ro
+      - ./test-data:/test-data
+    environment:
+      - TERM=xterm-256color
+      - COLORTERM=truecolor
+    stdin_open: true
+    tty: true
+    working_dir: /test-data
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        apt-get update -qq && apt-get install -y -qq bash-completion > /dev/null 2>&1
+        chmod +x /usr/local/bin/laret
+        laret completion bash > /etc/bash_completion.d/laret
+        echo "source /etc/bash_completion" >> ~/.bashrc
+        echo "✅ Bash environment ready. Try: laret <TAB>"
+        exec /bin/bash
+
+  laret-zsh:
+    image: ubuntu:22.04
+    container_name: laret-zsh-test
+    volumes:
+      - ./build/native/nativeCompile/laret:/usr/local/bin/laret:ro
+      - ./test-data:/test-data
+    environment:
+      - TERM=xterm-256color
+      - COLORTERM=truecolor
+      - SHELL=/usr/bin/zsh
+    stdin_open: true
+    tty: true
+    working_dir: /test-data
+    command:
+      - /bin/bash
+      - -c
+      - |
+        set -e
+        apt-get update -qq && apt-get install -y -qq zsh >/dev/null 2>&1
+        mkdir -p ~/.zsh_completions
+        /usr/local/bin/laret completion zsh > ~/.zsh_completions/_laret
+        cat > ~/.zshrc << 'ZSHRC_EOF'
+        fpath=(~/.zsh_completions $fpath)
+        autoload -Uz compinit
+        compinit
+        ZSHRC_EOF
+        echo "✅ Zsh ready. Use: docker exec -it laret-zsh-test /usr/bin/zsh"
+        exec /usr/bin/zsh
+
+
+  laret-pwsh:
+    image: mcr.microsoft.com/powershell:latest
+    container_name: laret-pwsh-test
+    volumes:
+      - ./build/native/nativeCompile/laret:/usr/local/bin/laret:ro
+      - ./test-data:/test-data
+    environment:
+      - TERM=xterm-256color
+      - COLORTERM=truecolor
+    stdin_open: true
+    tty: true
+    working_dir: /test-data
+    command:
+      - pwsh
+      - -NoExit
+      - -Command
+      - |
+        $$env:COMPLETION_FILE = "$$env:HOME/.config/powershell/laret-completion.ps1"
+        New-Item -ItemType Directory -Force -Path (Split-Path $$env:COMPLETION_FILE) | Out-Null
+        /usr/local/bin/laret completion powershell | Out-File -FilePath $$env:COMPLETION_FILE -Encoding utf8
+        if (Test-Path $$env:COMPLETION_FILE) { . $$env:COMPLETION_FILE }
+        Write-Host "✅ PowerShell environment ready. Try: laret <TAB>" -ForegroundColor Green

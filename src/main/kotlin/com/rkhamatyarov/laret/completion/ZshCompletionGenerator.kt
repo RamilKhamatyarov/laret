@@ -8,19 +8,19 @@ class ZshCompletionGenerator : CompletionGenerator {
 
         val groupLines =
             app.groups.joinToString("\n") { group ->
-                "    '${group.name}:${group.description}'"
+                "            '${group.name}:${group.description}'"
             }
 
         val commandLines =
             app.groups.joinToString("\n") { group ->
+                val commands = group.commands.joinToString("\n") { cmd ->
+                    "                '${cmd.name}:${cmd.description}'"
+                }
                 """
                 ${group.name})
-                    _values 'commands' \
-                        ${
-                    group.commands.joinToString(" \\\n                ") { cmd ->
-                        "'${cmd.name}:${cmd.description}'"
-                    }
-                }
+                    _describe 'commands' '(
+                $commands
+                    )'
                     ;;
                 """.trimIndent()
             }
@@ -29,21 +29,19 @@ class ZshCompletionGenerator : CompletionGenerator {
             app.groups
                 .flatMap { it.commands }
                 .flatMap { it.options }
-                .map { "'--${it.long}:${it.description}'" }
+                .map { "'--${it.long}[${it.description}]'" }
                 .distinct()
 
         val globalOptions =
             listOf(
-                "'--help:Show help message'",
-                "'-h:Show help message'",
-                "'--version:Show version'",
-                "'-v:Show version'",
+                "'(--help -h)'{--help,-h}'[Show help message]'",
+                "'(--version -v)'{--version,-v}'[Show version]'",
             )
 
         val allOptions =
             (commandOptions + globalOptions)
                 .distinct()
-                .joinToString("\n        ")
+                .joinToString(" \\\n                ")
 
         return """
             #compdef $appName
@@ -57,8 +55,9 @@ class ZshCompletionGenerator : CompletionGenerator {
                 
                 case ${'$'}state in
                     group)
-                        _values 'groups' \
+                        _describe 'groups' '(
             $groupLines
+                        )'
                         ;;
                     command)
                         case ${'$'}line[1] in
@@ -66,13 +65,13 @@ class ZshCompletionGenerator : CompletionGenerator {
                         esac
                         ;;
                     options)
-                        _values 'options' \
-            $allOptions
+                        _arguments \
+                $allOptions
                         ;;
                 esac
             }
             
-            _$appName
+            _$appName "${'$'}@"
             """.trimIndent()
     }
 }
