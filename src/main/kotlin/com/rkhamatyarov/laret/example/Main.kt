@@ -9,7 +9,10 @@ import com.rkhamatyarov.laret.ui.cyanBold
 import com.rkhamatyarov.laret.ui.greenBold
 import com.rkhamatyarov.laret.ui.redBold
 import com.rkhamatyarov.laret.ui.yellowItalic
+import org.slf4j.LoggerFactory
 import java.io.File
+
+private val log = LoggerFactory.getLogger("laret.completion")
 
 fun main(args: Array<String>) {
     val app =
@@ -28,9 +31,9 @@ fun main(args: Array<String>) {
                 ) {
                     action { ctx ->
                         if (ctx.app != null) {
-                            println(ctx.app.generateCompletion("bash"))
+                            log.info(ctx.app.generateCompletion("bash"))
                         } else {
-                            println(redBold("laretError: app not available"))
+                            log.warn(redBold("laretError: app not available"))
                         }
                     }
                 }
@@ -41,9 +44,9 @@ fun main(args: Array<String>) {
                 ) {
                     action { ctx ->
                         if (ctx.app != null) {
-                            println(ctx.app.generateCompletion("zsh"))
+                            log.info(ctx.app.generateCompletion("zsh"))
                         } else {
-                            println(redBold("laretError: app not available"))
+                            log.warn(redBold("laretError: app not available"))
                         }
                     }
                 }
@@ -54,9 +57,9 @@ fun main(args: Array<String>) {
                 ) {
                     action { ctx ->
                         if (ctx.app != null) {
-                            println(ctx.app.generateCompletion("powershell"))
+                            log.info(ctx.app.generateCompletion("powershell"))
                         } else {
-                            println(redBold("laretError: app not available"))
+                            log.warn(redBold("laretError: app not available"))
                         }
                     }
                 }
@@ -73,7 +76,7 @@ fun main(args: Array<String>) {
                                 "bash" -> ctx.app.installCompletion("bash")
                                 "zsh" -> ctx.app.installCompletion("zsh")
                                 "powershell" -> ctx.app.installPowerShellCompletion()
-                                else -> println(redBold("laretUnsupported shell: $shell"))
+                                else -> log.warn(redBold("laretUnsupported shell: $shell"))
                             }
                         }
                     }
@@ -98,12 +101,12 @@ fun main(args: Array<String>) {
                         val file = File(path)
 
                         if (file.exists() && !force) {
-                            println(yellowItalic("⚠️  File already exists: $path (use --force to overwrite)"))
+                            log.warn(yellowItalic("⚠️  File already exists: $path (use --force to overwrite)"))
                             return@action
                         }
 
                         file.writeText(content)
-                        println(greenBold("File created: $path"))
+                        log.info(greenBold("File created: $path"))
                     }
                 }
 
@@ -118,14 +121,14 @@ fun main(args: Array<String>) {
                         val file = File(path)
 
                         if (!file.exists()) {
-                            println(redBold("File not found: $path"))
+                            log.warn(redBold("File not found: $path"))
                             return@action
                         }
 
                         if (file.delete()) {
-                            println(greenBold("File deleted: $path"))
+                            log.info(greenBold("File deleted: $path"))
                         } else {
-                            println(redBold("Failed to delete file: $path"))
+                            log.warn(redBold("Failed to delete file: $path"))
                         }
                     }
                 }
@@ -140,12 +143,12 @@ fun main(args: Array<String>) {
                         val file = File(path)
 
                         if (!file.exists()) {
-                            println(redBold("File not found: $path"))
+                            log.warn(redBold("File not found: $path"))
                             return@action
                         }
 
-                        println(cyanBold("📄 Reading: $path"))
-                        println(file.readText())
+                        log.info(cyanBold("📄 Reading: $path"))
+                        log.info(file.readText())
                     }
                 }
             }
@@ -168,11 +171,11 @@ fun main(args: Array<String>) {
                         val dir = File(path)
 
                         if (!dir.isDirectory) {
-                            println(redBold("Not a directory: $path"))
+                            log.warn(redBold("Not a directory: $path"))
                             return@action
                         }
 
-                        println(cyanBold("📁 Listing: $path"))
+                        log.info(cyanBold("📁 Listing: $path"))
 
                         val files = dir.listFiles() ?: emptyArray()
                         files
@@ -182,12 +185,12 @@ fun main(args: Array<String>) {
                                 if (long) {
                                     val size = if (file.isDirectory) "" else "${file.length()} B"
                                     val type = if (file.isDirectory) blueBold("d") else "-"
-                                    println("$type $size ${file.name}")
+                                    log.info("$type $size ${file.name}")
                                 } else {
                                     if (file.isDirectory) {
-                                        println(blueBold("${file.name}/"))
+                                        log.info(blueBold("${file.name}/"))
                                     } else {
-                                        println(file.name)
+                                        log.info(file.name)
                                     }
                                 }
                             }
@@ -208,9 +211,9 @@ fun main(args: Array<String>) {
                         val success = if (parents) dir.mkdirs() else dir.mkdir()
 
                         if (success) {
-                            println(greenBold("Directory created: $path"))
+                            log.info(greenBold("Directory created: $path"))
                         } else {
-                            println(redBold("Failed to create directory: $path"))
+                            log.warn(redBold("Failed to create directory: $path"))
                         }
                     }
                 }
