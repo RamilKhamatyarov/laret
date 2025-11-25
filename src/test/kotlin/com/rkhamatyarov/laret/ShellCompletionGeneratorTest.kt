@@ -144,7 +144,7 @@ class ShellCompletionGeneratorTest {
     @Test
     fun generateZshCompletion_shouldContainCommandsFunction() {
         val completion = app.generateCompletion("zsh")
-        assertContains(completion, "_values 'commands'")
+        assertContains(completion, "_describe 'commands'")
         assertContains(completion, "'create:")
         assertContains(completion, "'delete:")
         assertContains(completion, "'list:")
@@ -153,7 +153,7 @@ class ShellCompletionGeneratorTest {
     @Test
     fun generateZshCompletion_shouldContainOptionsFunction() {
         val completion = app.generateCompletion("zsh")
-        assertContains(completion, "_values 'options'")
+        assertContains(completion, "_arguments")
         assertContains(completion, "--help")
         assertContains(completion, "--version")
     }

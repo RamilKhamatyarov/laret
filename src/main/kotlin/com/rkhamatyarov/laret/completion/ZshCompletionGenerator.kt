@@ -13,9 +13,10 @@ class ZshCompletionGenerator : CompletionGenerator {
 
         val commandLines =
             app.groups.joinToString("\n") { group ->
-                val commands = group.commands.joinToString("\n") { cmd ->
-                    "                '${cmd.name}:${cmd.description}'"
-                }
+                val commands =
+                    group.commands.joinToString("\n") { cmd ->
+                        "                '${cmd.name}:${cmd.description}'"
+                    }
                 """
                 ${group.name})
                     _describe 'commands' '(

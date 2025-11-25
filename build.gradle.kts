@@ -23,6 +23,7 @@ repositories {
 
 dependencies {
     implementation(kotlin("stdlib"))
+    implementation("org.slf4j:slf4j-api:2.0.17")
 
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
