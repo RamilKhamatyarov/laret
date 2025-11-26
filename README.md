@@ -15,121 +15,6 @@
 - 📦 **Zero Dependencies** - Pure Kotlin, no external dependencies required
 - 🧩 **Type-Safe** - Leverage Kotlin's type system for safer CLI apps
 
-## 📦 Installation
-
-### Gradle (Kotlin DSL)
-```kts
-dependencies {
-    implementation("com.rkhamatyarov:laret:1.0.0")
-}
-```
-
-### Gradle (Groovy)
-
-```yaml
-dependencies {
-  implementation 'com.rkhamatyarov:laret:1.0.0'
-}
-```
-
-### Maven
-```xml
-    <dependency>
-        <groupId>com.rkhamatyarov</groupId>
-        <artifactId>laret</artifactId>
-        <version>1.0.0</version>
-    </dependency>
-```
-
-## 🏗️ Building Native Image
-
-Laret supports **GraalVM Native Image** compilation for ultra-fast startup times and minimal memory footprint.
-
-### Setup Gradle Native Image Plugin
-
-Add the GraalVM Native Image plugin to your `build.gradle.kts`:
-
-```kts
-plugins {
-    kotlin("jvm") version "1.9.20"
-    id("org.graalvm.buildtools.native") version "0.9.28"
-}
-
-graalvmNative {
-    binaries {
-            named("main") {
-            imageName.set("laret")
-            mainClass.set("com.example.MainKt")
-            buildArgs.add("--no-fallback")
-            buildArgs.add("--enable-url-protocols=http,https")
-            buildArgs.add("-H:+ReportExceptionStackTraces")
-            buildArgs.add("--initialize-at-build-time=kotlin")
-        }
-    }
-}
-```
-### Build Native Executable
-
-# Build native image
-./gradlew nativeCompile
-
-# The executable will be in build/native/nativeCompile/
-./build/native/nativeCompile/laret --help
-
-### Native Image Benefits
-
-✅ **Fast Startup** - Millisecond startup time vs JVM seconds  
-✅ **Low Memory** - ~10-50MB RAM vs JVM 100-200MB  
-✅ **Single Binary** - No JRE required for distribution  
-✅ **Instant Response** - Perfect for CLI tools
-
-### Example Build Configuration
-
-Complete `build.gradle.kts` for native image:
-```kts
-plugins {
-        kotlin("jvm") version "1.9.20"
-        application
-        id("org.graalvm.buildtools.native") version "0.9.28"
-    }
-
-    application {
-        mainClass.set("com.rkhamatyarov.laret.examples.MainKt")
-    }
-
-    graalvmNative {
-        binaries {
-            named("main") {
-            imageName.set("laret")
-            mainClass.set("com.rkhamatyarov.laret.examples.MainKt")
-
-            // Optimization flags
-            buildArgs.add("--no-fallback")
-            buildArgs.add("-O3")
-            buildArgs.add("--gc=G1")
-            
-            // Reflection configuration (if needed)
-            buildArgs.add("-H:+ReportExceptionStackTraces")
-            
-            // Initialize Kotlin at build time
-            buildArgs.add("--initialize-at-build-time=kotlin")
-            buildArgs.add("--initialize-at-build-time=kotlinx")
-        }
-    }
-}
-```
-
-### Distribution
-
-# Build optimized native binary
-./gradlew nativeCompile
-
-# Distribute single executable
-cp build/native/nativeCompile/laret /usr/local/bin/
-
-# Or create installation package
-tar -czf laret-linux-x64.tar.gz -C build/native/nativeCompile laret
-
 ## 🚀 Quick Start
 
 ```kt
@@ -567,6 +452,141 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 3. Commit your changes (`git commit -m 'Add some amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+## 📦 Installation
+
+### Gradle (Kotlin DSL)
+```kts
+dependencies {
+    implementation("com.rkhamatyarov:laret:1.0.0")
+}
+```
+
+### Gradle (Groovy)
+
+```yaml
+dependencies {
+  implementation 'com.rkhamatyarov:laret:1.0.0'
+}
+```
+
+### Maven
+```xml
+    <dependency>
+        <groupId>com.rkhamatyarov</groupId>
+        <artifactId>laret</artifactId>
+        <version>1.0.0</version>
+    </dependency>
+```
+
+## 🏗️ Building Native Image
+
+Laret supports **GraalVM Native Image** compilation for ultra-fast startup times and minimal memory footprint.
+
+### Setup Gradle Native Image Plugin
+
+Add the GraalVM Native Image plugin to your `build.gradle.kts`:
+
+```kts
+plugins {
+    kotlin("jvm") version "1.9.20"
+    id("org.graalvm.buildtools.native") version "0.9.28"
+}
+
+graalvmNative {
+    binaries {
+        create("windows") {
+            imageName.set("laret")
+            mainClass.set("com.rkhamatyarov.laret.example.MainKt")
+            buildArgs.add("--no-fallback")
+            buildArgs.add("-Ob")
+        }
+
+        create("linux") {
+            imageName.set("laret")
+            mainClass.set("com.rkhamatyarov.laret.example.MainKt")
+            buildArgs.add("--no-fallback")
+            buildArgs.add("-Ob")
+        }
+    }
+}
+```
+### Build Native Executable
+
+```bash
+# Build native image
+./gradlew nativeCompile
+
+# The executable will be in build/native/nativeCompile/
+./build/native/nativeCompile/laret --help
+```
+
+### Native Image Benefits
+
+✅ **Fast Startup** - Millisecond startup time vs JVM seconds  
+✅ **Low Memory** - ~10-50MB RAM vs JVM 100-200MB  
+✅ **Single Binary** - No JRE required for distribution  
+✅ **Instant Response** - Perfect for CLI tools
+
+### Example Build Configuration
+
+Complete `build.gradle.kts` for native image:
+```kts
+plugins {
+        kotlin("jvm") version "1.9.20"
+        application
+        id("org.graalvm.buildtools.native") version "0.9.28"
+    }
+
+    application {
+        mainClass.set("com.rkhamatyarov.laret.examples.MainKt")
+    }
+
+    graalvmNative {
+        binaries {
+            create("windows") {
+                imageName.set("laret")
+                mainClass.set("com.rkhamatyarov.laret.example.MainKt")
+                buildArgs.add("--no-fallback")
+                buildArgs.add("-Ob")
+            }
+    
+            create("linux") {
+                imageName.set("laret")
+                mainClass.set("com.rkhamatyarov.laret.example.MainKt")
+                buildArgs.add("--no-fallback")
+                buildArgs.add("-Ob")
+            }
+        }
+    }
+}
+```
+
+### Distribution
+
+```bash
+# Build optimized native binary
+./gradlew nativeCompile
+
+# Distribute single executable
+cp build/native/nativeCompile/laret /usr/local/bin/
+
+# Or create installation package
+tar -czf laret-linux-x64.tar.gz -C build/native/nativeCompile laret
+```
+
+## Docker
+
+```bash
+# compile native laret binary file
+docker build -f Dockerfile.builder -t laret-builder .
+
+# copy the laret binary file to current directory
+docker create --name temp-builder laret-builder
+docker cp temp-builder:/build/build/native/nativeCompile/laret ./build/native/nativeCompile/
+docker rm temp-builder
+
+```
 
 ## 📝 License
 

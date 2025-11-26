@@ -23,6 +23,9 @@ repositories {
 
 dependencies {
     implementation(kotlin("stdlib"))
+    implementation("org.slf4j:slf4j-api:2.0.17")
+    implementation("ch.qos.logback:logback-classic:1.5.21")
+    implementation("ch.qos.logback:logback-core:1.5.21")
 
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
@@ -47,7 +50,14 @@ ktlint {
 
 graalvmNative {
     binaries {
-        named("main") {
+        create("windows") {
+            imageName.set("laret")
+            mainClass.set("com.rkhamatyarov.laret.example.MainKt")
+            buildArgs.add("--no-fallback")
+            buildArgs.add("-Ob")
+        }
+
+        create("linux") {
             imageName.set("laret")
             mainClass.set("com.rkhamatyarov.laret.example.MainKt")
             buildArgs.add("--no-fallback")
@@ -83,6 +93,14 @@ tasks {
 
     test {
         useJUnitPlatform()
+    }
+}
+
+configurations.all {
+    resolutionStrategy {
+        force("ch.qos.logback:logback-core:1.5.21")
+        force("ch.qos.logback:logback-classic:1.5.21")
+        force("org.slf4j:slf4j-api:2.0.17")
     }
 }
 
