@@ -2,12 +2,12 @@ package com.rkhamatyarov.laret.completion
 
 import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.ui.greenBold
+import org.fusesource.jansi.AnsiConsole
 import java.io.File
 
-/**
- * Extension function to generate completion
- */
 fun CliApp.generateCompletion(shell: String = "bash"): String {
+    AnsiConsole.systemUninstall()
+
     val generator =
         when (shell.lowercase()) {
             "bash" -> BashCompletionGenerator()
@@ -15,6 +15,7 @@ fun CliApp.generateCompletion(shell: String = "bash"): String {
             "powershell" -> PowerShellCompletionGenerator()
             else -> throw IllegalArgumentException("Unsupported shell: $shell")
         }
+
     return generator.generate(this)
 }
 
@@ -33,7 +34,8 @@ fun CliApp.installCompletion(shell: String = "bash") {
                 val profilePath = System.getenv("PROFILE")
                 val profileDir =
                     if (profilePath != null) {
-                        File(profilePath).parentFile?.absolutePath ?: File(homeDir, "Documents\\PowerShell").absolutePath
+                        File(profilePath).parentFile?.absolutePath
+                            ?: File(homeDir, "Documents\\PowerShell").absolutePath
                     } else {
                         File(homeDir, "Documents\\PowerShell").absolutePath
                     }

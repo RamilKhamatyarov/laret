@@ -1,7 +1,13 @@
 package com.rkhamatyarov.laret.core
 
+import ch.qos.logback.classic.Level
 import com.rkhamatyarov.laret.model.CommandGroup
 import com.rkhamatyarov.laret.ui.redBold
+import org.fusesource.jansi.Ansi
+import org.fusesource.jansi.AnsiConsole
+import org.slf4j.LoggerFactory
+
+private val log = LoggerFactory.getLogger("laret.core")
 
 /**
  * Represents a complete CLI application
@@ -13,11 +19,25 @@ data class CliApp(
     val groups: List<CommandGroup> = emptyList(),
 ) {
     fun run(args: Array<String>) {
-        when {
-            args.isEmpty() -> showHelp()
-            args[0] == "--help" || args[0] == "-h" -> showHelp()
-            args[0] == "--version" || args[0] == "-v" -> println("$name version $version")
-            else -> executeCommand(args)
+        AnsiConsole.systemInstall()
+
+        try {
+            val isQuiet = args.contains("--quiet")
+
+            if (isQuiet) {
+                disableLogging()
+            }
+
+            when {
+                args.isEmpty() -> showHelp()
+                args[0] == "--help" || args[0] == "-h" -> showHelp()
+                args[0] == "--version" || args[0] == "-v" -> {
+                    println("$name version $version")
+                }
+                else -> executeCommand(args)
+            }
+        } finally {
+            AnsiConsole.systemUninstall()
         }
     }
 
@@ -33,12 +53,14 @@ data class CliApp(
         }
 
         val commandName = args.getOrNull(1) ?: return
-        val cmdArgs = args.drop(2)
+        val cmdArgs = args.drop(2).toTypedArray()
 
         val group =
             groups.find { it.name == groupName }
                 ?: run {
-                    println(redBold("Group not found: $groupName"))
+                    log.error("Group not found: {}", groupName)
+
+                    println(redBold("❌ Group not found: $groupName"))
                     showHelp()
                     return
                 }
@@ -46,47 +68,57 @@ data class CliApp(
         val command =
             group.commands.find { it.name == commandName }
                 ?: run {
-                    println(redBold("Command not found: $commandName"))
+                    log.error("Command not found: {} in group {}", commandName, groupName)
+
+                    println(redBold("❌ Command not found: $commandName"))
                     group.showHelp()
                     return
                 }
 
-        command.execute(cmdArgs.toTypedArray(), this)
+        command.execute(cmdArgs, this)
     }
 
     fun showHelp() {
         println(
             """
-            ========================================
-            laret  $name v$version
-            Laret - A Cobra-like CLI for Kotlin
-            ========================================
+            ${Ansi.ansi().bold().fg(Ansi.Color.CYAN)}========================================${Ansi.ansi().reset()}
+            ${Ansi.ansi().bold().fg(Ansi.Color.CYAN)}$name v$version${Ansi.ansi().reset()}
+            $description
+            ${Ansi.ansi().bold().fg(Ansi.Color.CYAN)}========================================${Ansi.ansi().reset()}
             
-            USAGE:
-              laret [COMMAND] [OPTIONS]
+            ${Ansi.ansi().bold()}USAGE:${Ansi.ansi().reset()}
+              $name [COMMAND] [SUBCOMMAND] [OPTIONS]
             
-            COMMANDS:
-              file                 File operations
-                create             Create a new file
-                delete             Delete a file
-                read               Read file contents
+            ${Ansi.ansi().bold()}COMMANDS:${Ansi.ansi().reset()}
+              ${Ansi.ansi().fg(Ansi.Color.GREEN)}file${Ansi.ansi().reset()}                 File operations
+                ${Ansi.ansi().fg(Ansi.Color.BLUE)}create${Ansi.ansi().reset()}             Create a new file
+                ${Ansi.ansi().fg(Ansi.Color.BLUE)}delete${Ansi.ansi().reset()}             Delete a file
+                ${Ansi.ansi().fg(Ansi.Color.BLUE)}read${Ansi.ansi().reset()}               Read file contents
                 
-              dir                  Directory operations
-                list               List directory contents
-                create             Create a new directory
+              ${Ansi.ansi().fg(Ansi.Color.GREEN)}dir${Ansi.ansi().reset()}                  Directory operations
+                ${Ansi.ansi().fg(Ansi.Color.BLUE)}list${Ansi.ansi().reset()}               List directory contents
+                ${Ansi.ansi().fg(Ansi.Color.BLUE)}create${Ansi.ansi().reset()}             Create a new directory
             
-            GLOBAL OPTIONS:
-              -h, --help          Show this help message
-              --version           Show version
+            ${Ansi.ansi().bold()}GLOBAL OPTIONS:${Ansi.ansi().reset()}
+              -h, --help              Show this help message
+              -v, --version           Show version
+              --quiet                 Suppress all logging output
             
-            EXAMPLES:
-              laret file create /tmp/test.txt --content "hello"
-              laret dir list . --long --all
-              laret file read /tmp/test.txt
+            ${Ansi.ansi().bold()}EXAMPLES:${Ansi.ansi().reset()}
+              $name file create /tmp/test.txt --content "hello"
+              $name dir list . --long --all
+              $name file read /tmp/test.txt
+              $name completion powershell --quiet > completion.ps1
             
             For more information on a command, use:
-              laret [COMMAND] --help
+              $name [COMMAND] --help
             """.trimIndent(),
         )
+    }
+
+    private fun disableLogging() {
+        log.debug("Disabling logging output")
+        val loggerContext = LoggerFactory.getILoggerFactory() as? ch.qos.logback.classic.LoggerContext
+        loggerContext?.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME)?.level = Level.OFF
     }
 }

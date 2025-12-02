@@ -1,6 +1,8 @@
 package com.rkhamatyarov.laret.core
 
 import com.rkhamatyarov.laret.model.Command
+import com.rkhamatyarov.laret.output.OutputStrategy
+import com.rkhamatyarov.laret.output.PlainOutput
 
 /**
  * Context passed to command actions
@@ -8,8 +10,10 @@ import com.rkhamatyarov.laret.model.Command
 class CommandContext(
     val command: Command,
     val app: CliApp? = null,
+    val outputStrategy: OutputStrategy = PlainOutput,
 ) {
     val arguments = mutableMapOf<String, String>()
+
     val options = mutableMapOf<String, String>()
 
     fun argument(name: String): String = arguments[name] ?: ""

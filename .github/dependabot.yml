@@ -11,3 +11,6 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
+    ignore:
+      - dependency-name: "org.graalvm.buildtools.native"
+        versions: ["0.11.x"]

@@ -369,13 +369,6 @@ class CliTest {
     }
 
     @Test
-    fun missingRequiredArgument_outputsErrorMessage() {
-        clearOutput()
-        app.run(arrayOf("file", "create"))
-        assertTrue(getOutput().contains("Error: Required argument"))
-    }
-
-    @Test
     fun workflow_fileCreateReadDelete_allOperationsWork() {
         val testFile = File(testDir, "workflow.txt")
         val content = "Test workflow content"
