@@ -188,11 +188,12 @@ fun main(args: Array<String>) {
                                     )
                                 }
 
-                        val formatter: OutputStrategy = when (format) {
-                            "json" -> JsonOutput
-                            "yaml" -> YamlOutput
-                            else -> PlainOutput
-                        }
+                        val formatter: OutputStrategy =
+                            when (format) {
+                                "json" -> JsonOutput
+                                "yaml" -> YamlOutput
+                                else -> PlainOutput
+                            }
 
                         when {
                             format == "plain" && long -> {
