@@ -29,12 +29,21 @@ data class CliApp(
             }
 
             when {
-                args.isEmpty() -> showHelp()
-                args[0] == "--help" || args[0] == "-h" -> showHelp()
+                args.isEmpty() -> {
+                    showHelp()
+                }
+
+                args[0] == "--help" || args[0] == "-h" -> {
+                    showHelp()
+                }
+
                 args[0] == "--version" || args[0] == "-v" -> {
                     println("$name version $version")
                 }
-                else -> executeCommand(args)
+
+                else -> {
+                    executeCommand(args)
+                }
             }
         } finally {
             AnsiConsole.systemUninstall()
