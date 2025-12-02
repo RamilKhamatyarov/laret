@@ -2,7 +2,10 @@ package com.rkhamatyarov.laret.model
 
 import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.core.CommandContext
+import com.rkhamatyarov.laret.output.OutputStrategy
+import com.rkhamatyarov.laret.output.PlainOutput
 import com.rkhamatyarov.laret.ui.redBold
+import org.slf4j.LoggerFactory
 
 /**
  * Represents a single command
@@ -14,9 +17,12 @@ data class Command(
     val options: List<Option> = emptyList(),
     val action: (CommandContext) -> Unit = {},
 ) {
+    private val log = LoggerFactory.getLogger(javaClass::class.java)
+
     fun execute(
         args: Array<String>,
         app: CliApp? = null,
+        outputStrategy: OutputStrategy = PlainOutput,
     ) {
         val context = CommandContext(this, app)
 
@@ -67,7 +73,7 @@ data class Command(
             // Validate required arguments
             arguments.filter { it.required && !it.optional }.forEach { arg ->
                 if (!context.arguments.containsKey(arg.name)) {
-                    println(redBold("Error: Required argument '${arg.name}' not provided"))
+                    log.error(redBold("Error: Required argument '${arg.name}' not provided"))
                     showHelp()
                     return
                 }
@@ -76,28 +82,28 @@ data class Command(
             // Execute action
             action(context)
         } catch (e: Exception) {
-            println(redBold("Error: ${e.message}"))
+            log.error(redBold("Error: ${e.message}"))
             e.printStackTrace()
         }
     }
 
     fun showHelp() {
-        println("Command: $name")
-        if (description.isNotEmpty()) println("Description: $description\n")
+        log.info("Command: $name")
+        if (description.isNotEmpty()) log.info("Description: $description\n")
 
         if (arguments.isNotEmpty()) {
-            println("Arguments:")
+            log.info("Arguments:")
             arguments.forEach { arg ->
                 val req = if (arg.required) "required" else "optional"
-                println("  ${arg.name.padEnd(20)} $req - ${arg.description}")
+                log.info("  ${arg.name.padEnd(20)} $req - ${arg.description}")
             }
         }
 
         if (options.isNotEmpty()) {
-            println("\nOptions:")
+            log.info("\nOptions:")
             options.forEach { opt ->
                 val flags = "-${opt.short}, --${opt.long}".padEnd(25)
-                println("  $flags ${opt.description}")
+                log.info("  $flags ${opt.description}")
             }
         }
     }

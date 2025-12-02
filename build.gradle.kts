@@ -26,6 +26,9 @@ dependencies {
     implementation("org.slf4j:slf4j-api:2.0.17")
     implementation("ch.qos.logback:logback-classic:1.5.21")
     implementation("ch.qos.logback:logback-core:1.5.21")
+    implementation("org.fusesource.jansi:jansi:2.4.1")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.17.1")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17.1")
 
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
@@ -55,6 +58,8 @@ graalvmNative {
             mainClass.set("com.rkhamatyarov.laret.example.MainKt")
             buildArgs.add("--no-fallback")
             buildArgs.add("-Ob")
+            buildArgs.add("--enable-native-access=ALL-UNNAMED")
+            buildArgs.add("-H:+ReportExceptionStackTraces")
         }
 
         create("linux") {
@@ -62,6 +67,8 @@ graalvmNative {
             mainClass.set("com.rkhamatyarov.laret.example.MainKt")
             buildArgs.add("--no-fallback")
             buildArgs.add("-Ob")
+            buildArgs.add("--enable-native-access=ALL-UNNAMED")
+            buildArgs.add("-H:+ReportExceptionStackTraces")
         }
     }
 }
@@ -93,14 +100,6 @@ tasks {
 
     test {
         useJUnitPlatform()
-    }
-}
-
-configurations.all {
-    resolutionStrategy {
-        force("ch.qos.logback:logback-core:1.5.21")
-        force("ch.qos.logback:logback-classic:1.5.21")
-        force("org.slf4j:slf4j-api:2.0.17")
     }
 }
 

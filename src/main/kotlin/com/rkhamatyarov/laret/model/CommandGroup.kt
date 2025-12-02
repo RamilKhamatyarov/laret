@@ -1,5 +1,7 @@
 package com.rkhamatyarov.laret.model
 
+import org.slf4j.LoggerFactory
+
 /**
  * Represents a group of related commands
  */
@@ -8,11 +10,13 @@ data class CommandGroup(
     val description: String = "",
     val commands: List<Command> = emptyList(),
 ) {
+    private val log = LoggerFactory.getLogger(javaClass::class.java)
+
     fun showHelp() {
-        println("Group: $name - $description")
-        println("\nCommands:")
+        log.info("Group: $name - $description")
+        log.info("\nCommands:")
         commands.forEach { cmd ->
-            println("  ${cmd.name.padEnd(20)} ${cmd.description}")
+            log.info("  ${cmd.name.padEnd(20)} ${cmd.description}")
         }
     }
 }

@@ -2,17 +2,11 @@ package com.rkhamatyarov.laret.example
 
 import com.rkhamatyarov.laret.completion.generateCompletion
 import com.rkhamatyarov.laret.completion.installCompletion
-import com.rkhamatyarov.laret.completion.installPowerShellCompletion
 import com.rkhamatyarov.laret.dsl.cli
-import com.rkhamatyarov.laret.ui.blueBold
-import com.rkhamatyarov.laret.ui.cyanBold
-import com.rkhamatyarov.laret.ui.greenBold
-import com.rkhamatyarov.laret.ui.redBold
-import com.rkhamatyarov.laret.ui.yellowItalic
 import org.slf4j.LoggerFactory
 import java.io.File
 
-private val log = LoggerFactory.getLogger("laret.completion")
+private val log = LoggerFactory.getLogger("laret.main")
 
 fun main(args: Array<String>) {
     val app =
@@ -30,11 +24,7 @@ fun main(args: Array<String>) {
                     description = "Generate bash completion script",
                 ) {
                     action { ctx ->
-                        if (ctx.app != null) {
-                            log.info(ctx.app.generateCompletion("bash"))
-                        } else {
-                            log.warn(redBold("laretError: app not available"))
-                        }
+                        print(ctx.app?.generateCompletion("bash") ?: "")
                     }
                 }
 
@@ -43,11 +33,7 @@ fun main(args: Array<String>) {
                     description = "Generate zsh completion script",
                 ) {
                     action { ctx ->
-                        if (ctx.app != null) {
-                            log.info(ctx.app.generateCompletion("zsh"))
-                        } else {
-                            log.warn(redBold("laretError: app not available"))
-                        }
+                        print(ctx.app?.generateCompletion("zsh") ?: "")
                     }
                 }
 
@@ -56,11 +42,7 @@ fun main(args: Array<String>) {
                     description = "Generate PowerShell completion script",
                 ) {
                     action { ctx ->
-                        if (ctx.app != null) {
-                            log.info(ctx.app.generateCompletion("powershell"))
-                        } else {
-                            log.warn(redBold("laretError: app not available"))
-                        }
+                        print(ctx.app?.generateCompletion("powershell") ?: "")
                     }
                 }
 
@@ -68,16 +50,14 @@ fun main(args: Array<String>) {
                     name = "install",
                     description = "Install completion script",
                 ) {
-                    argument("shell", "Shell type (bash, zsh, or powershell)", required = true)
+                    argument("shell", "Shell type (bash, zsh, powershell)", required = true)
                     action { ctx ->
                         val shell = ctx.argument("shell")
-                        if (ctx.app != null) {
-                            when (shell) {
-                                "bash" -> ctx.app.installCompletion("bash")
-                                "zsh" -> ctx.app.installCompletion("zsh")
-                                "powershell" -> ctx.app.installPowerShellCompletion()
-                                else -> log.warn(redBold("laretUnsupported shell: $shell"))
-                            }
+                        try {
+                            ctx.app?.installCompletion(shell)
+                        } catch (e: Exception) {
+                            log.error("Failed to install completion: {}", e.message)
+                            println("Error: ${e.message}")
                         }
                     }
                 }
@@ -101,12 +81,20 @@ fun main(args: Array<String>) {
                         val file = File(path)
 
                         if (file.exists() && !force) {
-                            log.warn(yellowItalic("⚠️  File already exists: $path (use --force to overwrite)"))
+                            log.warn("File already exists: {}", path)
+                            println("Error: File already exists: $path (use --force to overwrite)")
                             return@action
                         }
 
-                        file.writeText(content)
-                        log.info(greenBold("File created: $path"))
+                        try {
+                            file.parentFile?.mkdirs()
+                            file.writeText(content)
+                            log.info("File created successfully: {}", path)
+                            println("File created: $path")
+                        } catch (e: Exception) {
+                            log.error("Failed to create file: {}", path, e)
+                            println("Error: Failed to create file: ${e.message}")
+                        }
                     }
                 }
 
@@ -115,20 +103,22 @@ fun main(args: Array<String>) {
                     description = "Delete a file",
                 ) {
                     argument("path", "File path", required = true)
-                    option("f", "force", "Force deletion without confirmation", "", false)
                     action { ctx ->
                         val path = ctx.argument("path")
                         val file = File(path)
 
                         if (!file.exists()) {
-                            log.warn(redBold("File not found: $path"))
+                            log.warn("File not found: {}", path)
+                            println("Error: File not found: $path")
                             return@action
                         }
 
                         if (file.delete()) {
-                            log.info(greenBold("File deleted: $path"))
+                            log.info("File deleted: {}", path)
+                            println("File deleted: $path")
                         } else {
-                            log.warn(redBold("Failed to delete file: $path"))
+                            log.error("Failed to delete file: {}", path)
+                            println("Error: Failed to delete file: $path")
                         }
                     }
                 }
@@ -143,12 +133,14 @@ fun main(args: Array<String>) {
                         val file = File(path)
 
                         if (!file.exists()) {
-                            log.warn(redBold("File not found: $path"))
+                            log.warn("File not found: {}", path)
+                            println("Error: File not found: $path")
                             return@action
                         }
 
-                        log.info(cyanBold("📄 Reading: $path"))
-                        log.info(file.readText())
+                        log.info("Reading file: {}", path)
+                        val content = file.readText()
+                        println(content)
                     }
                 }
             }
@@ -165,35 +157,29 @@ fun main(args: Array<String>) {
                     option("l", "long", "Long format", "", false)
                     option("a", "all", "Show hidden files", "", false)
                     action { ctx ->
-                        val path = ctx.argument("path").ifEmpty { "." }
-                        val long = ctx.optionBool("long")
-                        val all = ctx.optionBool("all")
+                        val path = ctx.argument("path")
                         val dir = File(path)
 
                         if (!dir.isDirectory) {
-                            log.warn(redBold("Not a directory: $path"))
+                            log.warn("Not a directory: {}", path)
+                            println("Error: Not a directory: $path")
                             return@action
                         }
 
-                        log.info(cyanBold("📁 Listing: $path"))
-
-                        val files = dir.listFiles() ?: emptyArray()
-                        files
-                            .filter { all || !it.isHidden }
-                            .sortedBy { it.name }
-                            .forEach { file ->
-                                if (long) {
-                                    val size = if (file.isDirectory) "" else "${file.length()} B"
-                                    val type = if (file.isDirectory) blueBold("d") else "-"
-                                    log.info("$type $size ${file.name}")
-                                } else {
-                                    if (file.isDirectory) {
-                                        log.info(blueBold("${file.name}/"))
-                                    } else {
-                                        log.info(file.name)
-                                    }
-                                }
+                        log.info("Listing directory: {}", path)
+                        val entries =
+                            (dir.listFiles() ?: emptyArray()).map { file ->
+                                mapOf(
+                                    "name" to file.name,
+                                    "size" to file.length(),
+                                    "isDirectory" to file.isDirectory,
+                                )
                             }
+
+                        println("Directory: $path")
+                        entries.forEach { entry ->
+                            println("  ${entry["name"]}")
+                        }
                     }
                 }
 
@@ -205,15 +191,20 @@ fun main(args: Array<String>) {
                     option("p", "parents", "Create parent directories", "", false)
                     action { ctx ->
                         val path = ctx.argument("path")
-                        val parents = ctx.optionBool("parents")
                         val dir = File(path)
 
-                        val success = if (parents) dir.mkdirs() else dir.mkdir()
+                        if (dir.exists()) {
+                            log.warn("Directory already exists: {}", path)
+                            println("Error: Directory already exists: $path")
+                            return@action
+                        }
 
-                        if (success) {
-                            log.info(greenBold("Directory created: $path"))
+                        log.info("Creating directory: {}", path)
+                        if (dir.mkdirs()) {
+                            println("Directory created: $path")
                         } else {
-                            log.warn(redBold("Failed to create directory: $path"))
+                            log.error("Failed to create directory: {}", path)
+                            println("Error: Failed to create directory: $path")
                         }
                     }
                 }
