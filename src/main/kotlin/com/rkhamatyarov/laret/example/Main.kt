@@ -3,6 +3,10 @@ package com.rkhamatyarov.laret.example
 import com.rkhamatyarov.laret.completion.generateCompletion
 import com.rkhamatyarov.laret.completion.installCompletion
 import com.rkhamatyarov.laret.dsl.cli
+import com.rkhamatyarov.laret.output.JsonOutput
+import com.rkhamatyarov.laret.output.OutputStrategy
+import com.rkhamatyarov.laret.output.PlainOutput
+import com.rkhamatyarov.laret.output.YamlOutput
 import org.slf4j.LoggerFactory
 import java.io.File
 
@@ -156,8 +160,13 @@ fun main(args: Array<String>) {
                     argument("path", "Directory path", required = false, optional = true, default = ".")
                     option("l", "long", "Long format", "", false)
                     option("a", "all", "Show hidden files", "", false)
+                    option("f", "format", "Output format (plain, json, yaml)", "plain", true)
+
                     action { ctx ->
                         val path = ctx.argument("path")
+                        val long = ctx.optionBool("long")
+                        val all = ctx.optionBool("all")
+                        val format = ctx.option("format")
                         val dir = File(path)
 
                         if (!dir.isDirectory) {
@@ -168,17 +177,48 @@ fun main(args: Array<String>) {
 
                         log.info("Listing directory: {}", path)
                         val entries =
-                            (dir.listFiles() ?: emptyArray()).map { file ->
-                                mapOf(
-                                    "name" to file.name,
-                                    "size" to file.length(),
-                                    "isDirectory" to file.isDirectory,
-                                )
+                            (dir.listFiles() ?: emptyArray())
+                                .filter { all || !it.isHidden }
+                                .sortedBy { it.name }
+                                .map { file ->
+                                    mapOf(
+                                        "name" to file.name,
+                                        "size" to file.length(),
+                                        "isDirectory" to file.isDirectory,
+                                    )
+                                }
+
+                        val formatter: OutputStrategy =
+                            when (format) {
+                                "json" -> JsonOutput
+                                "yaml" -> YamlOutput
+                                else -> PlainOutput
                             }
 
-                        println("Directory: $path")
-                        entries.forEach { entry ->
-                            println("  ${entry["name"]}")
+                        when {
+                            format == "plain" && long -> {
+                                println("Directory: $path")
+                                entries.forEach { entry ->
+                                    val size = if (entry["isDirectory"] == true) "<dir>" else "${entry["size"]} B"
+                                    val type = if (entry["isDirectory"] == true) "d" else "-"
+                                    println("$type $size ${entry["name"]}")
+                                }
+                            }
+
+                            format == "plain" -> {
+                                println("Directory: $path")
+                                entries.forEach { entry ->
+                                    println("  ${entry["name"]}")
+                                }
+                            }
+
+                            long -> {
+                                println(formatter.render(entries))
+                            }
+
+                            else -> {
+                                println(formatter.render(entries))
+                            }
                         }
                     }
                 }
@@ -191,6 +231,7 @@ fun main(args: Array<String>) {
                     option("p", "parents", "Create parent directories", "", false)
                     action { ctx ->
                         val path = ctx.argument("path")
+                        val parents = ctx.optionBool("parents")
                         val dir = File(path)
 
                         if (dir.exists()) {
@@ -200,7 +241,9 @@ fun main(args: Array<String>) {
                         }
 
                         log.info("Creating directory: {}", path)
-                        if (dir.mkdirs()) {
+                        val success = if (parents) dir.mkdirs() else dir.mkdir()
+
+                        if (success) {
                             println("Directory created: $path")
                         } else {
                             log.error("Failed to create directory: {}", path)
