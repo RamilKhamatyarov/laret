@@ -8,7 +8,6 @@ on:
     branches:
       - main
 
-
 permissions:
   contents: read
   statuses: write
@@ -19,7 +18,6 @@ permissions:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-
     steps:
       - name: Configure Git
         run: git config --global init.defaultBranch main
@@ -106,6 +104,55 @@ jobs:
       - name: Build Native Image
         run: ./gradlew nativeCompile
 
+      - name: Test Bash Completion Generation
+        run: |
+          ./build/native/nativeCompile/laret completion bash > /tmp/laret_bash_completion.sh
+          bash -n /tmp/laret_bash_completion.sh
+          echo "Bash completion script is valid"
+
+      - name: Test Bash Completion Sourcing
+        run: |
+          bash -c "source /tmp/laret_bash_completion.sh && echo 'Bash completion sourced successfully'"
+
+      - name: Install Zsh
+        run: sudo apt-get update && sudo apt-get install -y zsh
+
+      - name: Test Zsh Completion Generation
+        run: |
+          ./build/native/nativeCompile/laret completion zsh > /tmp/laret_zsh_completion.sh
+          zsh -n /tmp/laret_zsh_completion.sh
+          echo "Zsh completion script is valid"
+
+      - name: Test Zsh Completion Sourcing
+        run: |
+          zsh -c "source /tmp/laret_zsh_completion.sh && echo 'Zsh completion sourced successfully'"
+
+      - name: Install PowerShell
+        run: sudo apt-get install -y powershell
+
+      - name: Test PowerShell Completion Generation
+        run: |
+          ./build/native/nativeCompile/laret completion powershell > /tmp/laret_ps_completion.ps1
+          pwsh -NoProfile -Command "Test-Path '/tmp/laret_ps_completion.ps1'" -ErrorAction Stop
+          echo "PowerShell completion script is valid"
+
+      - name: Test PowerShell Completion Sourcing
+        run: |
+          pwsh -NoProfile -Command ". '/tmp/laret_ps_completion.ps1'; Write-Host 'PowerShell completion sourced successfully'"
+
+      - name: Test CLI Commands
+        run: |
+          echo "Testing file operations..."
+          ./build/native/nativeCompile/laret file create /tmp/test.txt -c "test content"
+          ./build/native/nativeCompile/laret file read /tmp/test.txt
+          ./build/native/nativeCompile/laret file read /tmp/test.txt --format json
+          
+          echo "Testing directory operations..."
+          ./build/native/nativeCompile/laret dir list /tmp --long
+          ./build/native/nativeCompile/laret dir list /tmp --format json | head -20
+          
+          echo "All CLI tests passed"
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -114,3 +161,4 @@ jobs:
             build/native/nativeCompile/laret
             build/libs/laret-fat.jar
           retention-days: 7
+
