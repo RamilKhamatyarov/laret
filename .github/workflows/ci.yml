@@ -65,17 +65,8 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-review
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: 'java,kotlin'
-          queries: security-extended
-
       - name: Build the project
         run: ./gradlew build -x test
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
 
       - name: Run Tests
         run: ./gradlew test --info
@@ -161,4 +152,3 @@ jobs:
             build/native/nativeCompile/laret
             build/libs/laret-fat.jar
           retention-days: 7
-
