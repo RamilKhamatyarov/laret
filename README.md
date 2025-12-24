@@ -254,7 +254,7 @@ command(
     name = "list",
     description = "List items"
 ) {
-    option("f", "format", "Output format (json, yaml, plain)", "plain", true)
+    option("f", "format", "Output format (json, toml, yaml, plain)", "plain", true)
     
     action { ctx ->
         val format = ctx.option("format")
@@ -265,6 +265,7 @@ command(
         
         val formatter: OutputStrategy = when (format) {
             "json" -> JsonOutput
+            "toml" -> TomlOutput
             "yaml" -> YamlOutput
             else -> PlainOutput
         }

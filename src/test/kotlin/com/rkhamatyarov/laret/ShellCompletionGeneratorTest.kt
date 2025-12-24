@@ -594,31 +594,4 @@ class ShellCompletionGeneratorTest {
         assertFalse(zshCompletion == psCompletion, "Zsh and PowerShell completions should be different")
         assertFalse(bashCompletion == psCompletion, "Bash and PowerShell completions should be different")
     }
-
-    private fun setEnv(
-        key: String,
-        value: String,
-    ) {
-        try {
-            val processEnvironmentClass = Class.forName("java.lang.ProcessEnvironment")
-            val theEnvironmentField = processEnvironmentClass.getDeclaredField("theEnvironment")
-            theEnvironmentField.isAccessible = true
-            val env = theEnvironmentField.get(null) as MutableMap<String, String>
-            env[key] = value
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun clearEnv(key: String) {
-        try {
-            val processEnvironmentClass = Class.forName("java.lang.ProcessEnvironment")
-            val theEnvironmentField = processEnvironmentClass.getDeclaredField("theEnvironment")
-            theEnvironmentField.isAccessible = true
-            val env = theEnvironmentField.get(null) as MutableMap<String, String>
-            env.remove(key)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
 }
