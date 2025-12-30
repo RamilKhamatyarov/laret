@@ -19,9 +19,6 @@
 ## 🚀 Quick Start
 
 ```kt
-import com.rkhamatyarov.laret.dsl.cli
-import com.rkhamatyarov.laret.ui.*
-import java.io.File
 
 fun main(args: Array<String>) {
     val app = cli(
@@ -53,7 +50,7 @@ fun main(args: Array<String>) {
                     }
 
                     file.writeText(content)
-                    println(greenBold("✓ File created: $path"))
+                    println(greenBold("File created: $path"))
                 }
             }
 
@@ -132,7 +129,7 @@ fun main(args: Array<String>) {
 
 ```bash
 $ laret file create hello.txt --content "Hello, World!"
-✓ File created: hello.txt
+File created: hello.txt
 ```
 
 ## 📚 Documentation
@@ -233,7 +230,7 @@ Built-in color helpers with automatic terminal detection:
 
 ```kt
 println(redBold("❌ Error"))
-println(greenBold("✓ Success"))
+println(greenBold("Success"))
 println(yellowBold("⚠️ Warning"))
 println(blueBold("ℹ️ Info"))
 println(cyanBold("📄 Data"))
@@ -248,7 +245,6 @@ Colors automatically disable on unsupported terminals.
 Laret supports multiple output formats for structured data. Use the pluggable output strategy system:
 
 ```kt
-import com.rkhamatyarov.laret.output.*
 
 command(
     name = "list",
@@ -326,9 +322,6 @@ println(formatter.render(data))
 ## 🎯 Complete Example
 
 ```kt
-import com.rkhamatyarov.*
-import java.io.File
-
 fun main(args: Array<String>) {
     val app = cli(
         name = "laret",
@@ -359,7 +352,7 @@ fun main(args: Array<String>) {
                     }
                     
                     file.writeText(content)
-                    println(greenBold("✓ File created: $path"))
+                    println(greenBold("File created: $path"))
                 }
             }
             

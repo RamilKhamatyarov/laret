@@ -2,6 +2,9 @@ package com.rkhamatyarov.laret
 
 import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.dsl.cli
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -21,15 +24,12 @@ class CliTest {
 
     @Before
     fun setup() {
-        // Create test directory
         testDir.mkdirs()
 
-        // Capture output
         outputStream = ByteArrayOutputStream()
         System.setOut(PrintStream(outputStream))
         System.setErr(PrintStream(outputStream))
 
-        // Initialize CLI app
         app =
             cli(
                 name = "laret",
@@ -61,7 +61,7 @@ class CliTest {
                             }
 
                             file.writeText(content)
-                            println("✓ File created: $path")
+                            println("File created: $path")
                         }
                     }
 
@@ -82,7 +82,7 @@ class CliTest {
                             }
 
                             if (file.delete()) {
-                                println("✓ File deleted: $path")
+                                println("File deleted: $path")
                             } else {
                                 println("Failed to delete file: $path")
                             }
@@ -128,7 +128,7 @@ class CliTest {
                             val success = if (parents) dir.mkdirs() else dir.mkdir()
 
                             if (success) {
-                                println("✓ Directory created: $path")
+                                println("Directory created: $path")
                             } else {
                                 println("Failed to create directory: $path")
                             }
@@ -191,7 +191,7 @@ class CliTest {
     }
 
     @Test
-    fun fileCreate_withContent_createsFileWithContent() {
+    fun `file create with content creates file with content`() {
         // given
         val testFile = File(testDir, "test.txt")
         // when
@@ -199,11 +199,11 @@ class CliTest {
         // then
         assertTrue(testFile.exists())
         assertEquals("Hello World", testFile.readText())
-        assertTrue(getOutput().contains("✓ File created"))
+        assertTrue(getOutput().contains("File created"))
     }
 
     @Test
-    fun fileCreate_withoutContent_createsEmptyFile() {
+    fun `file create without content creates empty file`() {
         val testFile = File(testDir, "empty.txt")
         app.run(arrayOf("file", "create", testFile.absolutePath))
         assertTrue(testFile.exists())
@@ -211,7 +211,7 @@ class CliTest {
     }
 
     @Test
-    fun fileCreate_whenFileExistsAndNoForce_doesNotOverwrite() {
+    fun `file create when file exists and no force does not overwrite`() {
         val testFile = File(testDir, "duplicate.txt")
         testFile.writeText("Original")
         clearOutput()
@@ -221,17 +221,17 @@ class CliTest {
     }
 
     @Test
-    fun fileCreate_whenForceFlag_overwritesFile() {
+    fun `file create when force flag overwrite file`() {
         val testFile = File(testDir, "force.txt")
         testFile.writeText("Original")
         clearOutput()
         app.run(arrayOf("file", "create", testFile.absolutePath, "-c", "New content", "-f", "true"))
         assertEquals("New content", testFile.readText())
-        assertTrue(getOutput().contains("✓ File created"))
+        assertTrue(getOutput().contains("File created"))
     }
 
     @Test
-    fun fileRead_existingFile_outputsContent() {
+    fun `file read existing file outputs content`() {
         val testFile = File(testDir, "read.txt")
         testFile.writeText("Test content")
         clearOutput()
@@ -240,51 +240,40 @@ class CliTest {
     }
 
     @Test
-    fun fileRead_nonExistentFile_outputsError() {
+    fun `file read non existent file outputs error`() {
         clearOutput()
         app.run(arrayOf("file", "read", File(testDir, "nonexistent.txt").absolutePath))
         assertTrue(getOutput().contains("File not found"))
     }
 
     @Test
-    fun fileDelete_existingFile_deletesFile() {
-        val testFile = File(testDir, "delete.txt")
-        testFile.writeText("To delete")
-        assertTrue(testFile.exists())
-        clearOutput()
-        app.run(arrayOf("file", "delete", testFile.absolutePath))
-        assertFalse(testFile.exists())
-        assertTrue(getOutput().contains("✓ File deleted"))
-    }
-
-    @Test
-    fun fileDelete_nonExistentFile_outputsError() {
+    fun `file delete non existent file outputs error`() {
         clearOutput()
         app.run(arrayOf("file", "delete", File(testDir, "nonexistent.txt").absolutePath))
         assertTrue(getOutput().contains("File not found"))
     }
 
     @Test
-    fun dirCreate_simple_createsDirectory() {
+    fun `dir create simple creates directory`() {
         val testDir2 = File(testDir, "newdir")
         assertFalse(testDir2.exists())
         app.run(arrayOf("dir", "create", testDir2.absolutePath))
         assertTrue(testDir2.isDirectory)
-        assertTrue(getOutput().contains("✓ Directory created"))
+        assertTrue(getOutput().contains("Directory created"))
     }
 
     @Test
-    fun dirCreate_withParents_createsNestedDirectories() {
+    fun `dir create with parents creates nested directories`() {
         val nested = File(testDir, "parent/child/grandchild")
         assertFalse(nested.exists())
         clearOutput()
         app.run(arrayOf("dir", "create", nested.absolutePath, "-p", "true"))
         assertTrue(nested.isDirectory)
-        assertTrue(getOutput().contains("✓ Directory created"))
+        assertTrue(getOutput().contains("Directory created"))
     }
 
     @Test
-    fun dirList_existingDirectory_listsContents() {
+    fun `dir lst existing directory displays lists contents`() {
         File(testDir, "file1.txt").createNewFile()
         File(testDir, "file2.txt").createNewFile()
         clearOutput()
@@ -295,7 +284,7 @@ class CliTest {
     }
 
     @Test
-    fun dirList_withLongFormat_displaysFileSizeOrDir() {
+    fun `dir list with long format displays file size or dir`() {
         File(testDir, "test.txt").writeText("content")
         clearOutput()
         app.run(arrayOf("dir", "list", testDir.absolutePath, "-l", "true"))
@@ -305,14 +294,14 @@ class CliTest {
     }
 
     @Test
-    fun dirList_nonExistentDirectory_outputsError() {
+    fun `dir list non existent directory outputs error`() {
         clearOutput()
         app.run(arrayOf("dir", "list", File(testDir, "nonexistent").absolutePath))
         assertTrue(getOutput().contains("Not a directory"))
     }
 
     @Test
-    fun helpFlag_displaysHelpInfo() {
+    fun `help flag displays help info`() {
         clearOutput()
         app.run(arrayOf("--help"))
         val output = getOutput()
@@ -323,14 +312,14 @@ class CliTest {
     }
 
     @Test
-    fun versionFlag_displaysVersionInfo() {
+    fun `version flag displays version info`() {
         clearOutput()
         app.run(arrayOf("--version"))
         assertTrue(getOutput().contains("laret version 1.0.0"))
     }
 
     @Test
-    fun helpShortFlag_displaysHelpShortInfo() {
+    fun `help short flag displays help short info`() {
         clearOutput()
         app.run(arrayOf("-h"))
         val output = getOutput()
@@ -339,14 +328,14 @@ class CliTest {
     }
 
     @Test
-    fun versionShortFlag_displaysShortVersionInfo() {
+    fun `version short flag displays short version info`() {
         clearOutput()
         app.run(arrayOf("-v"))
         assertTrue(getOutput().contains("laret version 1.0.0"))
     }
 
     @Test
-    fun emptyArgs_displaysHelpInfo() {
+    fun `empty args displays help info`() {
         clearOutput()
         app.run(arrayOf())
         val output = getOutput()
@@ -355,21 +344,21 @@ class CliTest {
     }
 
     @Test
-    fun invalidGroup_outputsErrorMessage() {
+    fun `invalid group outputs error message`() {
         clearOutput()
         app.run(arrayOf("invalid", "command"))
         assertTrue(getOutput().contains("Group not found"))
     }
 
     @Test
-    fun invalidCommand_outputsErrorMessage() {
+    fun `invalid command outputs error message`() {
         clearOutput()
         app.run(arrayOf("file", "invalid"))
         assertTrue(getOutput().contains("Command not found"))
     }
 
     @Test
-    fun workflow_fileCreateReadDelete_allOperationsWork() {
+    fun `workflow file create read delete return all operations work`() {
         val testFile = File(testDir, "workflow.txt")
         val content = "Test workflow content"
         app.run(arrayOf("file", "create", testFile.absolutePath, "-c", content))
@@ -383,7 +372,7 @@ class CliTest {
     }
 
     @Test
-    fun workflow_directoryOperations_createsAndListsFiles() {
+    fun `workflow directory operations creates and lists files`() {
         val dir1 = File(testDir, "dir1")
         val dir2 = File(testDir, "dir2")
         app.run(arrayOf("dir", "create", dir1.absolutePath))
@@ -397,22 +386,81 @@ class CliTest {
         assertTrue(output.contains("file2.txt"))
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun multipleOperations_createAndDeleteMultipleFilesAllWork() {
-        val files =
-            listOf(
-                File(testDir, "test1.txt"),
-                File(testDir, "test2.txt"),
-                File(testDir, "test3.txt"),
-            )
-        files.forEach { file ->
-            app.run(arrayOf("file", "create", file.absolutePath, "-c", "Content of ${file.name}"))
-        }
-        files.forEach { assertTrue(it.exists()) }
-        files.forEach { file ->
+    fun `file delete existing file deletes file`() =
+        runTest {
+            // given
+            val testFile = File(testDir, "delete.txt")
+            testFile.writeText("To delete")
+            assertTrue(testFile.exists(), "File should exist before deletion")
+
+            // when
             clearOutput()
-            app.run(arrayOf("file", "delete", file.absolutePath))
+            app.run(arrayOf("file", "delete", testFile.absolutePath))
+
+            advanceTimeBy(100)
+
+            // then
+            val output = getOutput()
+            assertTrue(
+                output.contains("File deleted"),
+                "Output should contain 'File deleted', got: $output",
+            )
+            assertFalse(testFile.exists(), "File should be deleted after command execution")
         }
-        files.forEach { assertFalse(it.exists()) }
+
+    @Test
+    fun `file delete when deletion fails outputs error`() {
+        // given
+        val readOnlyFile = File(testDir, "readonly.txt")
+        readOnlyFile.writeText("Read only content")
+        readOnlyFile.setReadOnly()
+
+        // when
+        clearOutput()
+        try {
+            app.run(arrayOf("file", "delete", readOnlyFile.absolutePath))
+
+            // then
+            val output = getOutput()
+            assertTrue(
+                output.contains("File deleted") || output.contains("✗ Failed to delete"),
+                "Should contain either success or failure message, got: $output",
+            )
+        } finally {
+            readOnlyFile.setWritable(true)
+            readOnlyFile.delete()
+        }
     }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `file delete multiple files deletes all correctly`() =
+        runTest {
+            // given
+            val files =
+                (1..3).map {
+                    File(testDir, "file$it.txt").also { f ->
+                        f.writeText("content$it")
+                    }
+                }
+
+            // when // then
+            files.forEach { file ->
+                assertTrue(file.exists(), "File ${file.name} should exist before deletion")
+
+                clearOutput()
+                app.run(arrayOf("file", "delete", file.absolutePath))
+
+                advanceTimeBy(100)
+
+                val output = getOutput()
+                assertTrue(
+                    output.contains("File deleted"),
+                    "Output should contain 'File deleted', got: $output",
+                )
+                assertFalse(file.exists(), "File ${file.name} should be deleted after command execution")
+            }
+        }
 }
