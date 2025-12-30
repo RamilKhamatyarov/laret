@@ -6,6 +6,7 @@ import com.rkhamatyarov.laret.dsl.cli
 import com.rkhamatyarov.laret.output.JsonOutput
 import com.rkhamatyarov.laret.output.OutputStrategy
 import com.rkhamatyarov.laret.output.PlainOutput
+import com.rkhamatyarov.laret.output.TomlOutput
 import com.rkhamatyarov.laret.output.YamlOutput
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -191,6 +192,7 @@ fun main(args: Array<String>) {
                         val formatter: OutputStrategy =
                             when (format) {
                                 "json" -> JsonOutput
+                                "toml" -> TomlOutput
                                 "yaml" -> YamlOutput
                                 else -> PlainOutput
                             }
