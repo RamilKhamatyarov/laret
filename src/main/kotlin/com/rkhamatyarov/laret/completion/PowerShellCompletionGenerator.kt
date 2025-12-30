@@ -6,10 +6,22 @@ class PowerShellCompletionGenerator : CompletionGenerator {
     override fun generate(app: CliApp): String {
         val appName = app.name
 
-        val groupCases =
+        val group =
             app.groups.joinToString("\n") { group ->
-                val commands = group.commands.joinToString(",\n") { "                        '${it.name}'" }
-                "                '${group.name}' {\n                    @(\n$commands\n                    )\n                }"
+                val commands =
+                    group.commands.joinToString(",\n") { cmd ->
+                        "                        '${cmd.name}'"
+                    }
+                "            '${group.name}' {\n                \$completions = @(\n$commands\n                )\n            }"
+            }
+
+        val secondLevel =
+            app.groups.joinToString("\n") { group ->
+                val commands =
+                    group.commands.joinToString(",\n") { cmd ->
+                        "                        '${cmd.name}'"
+                    }
+                "            '${group.name}' {\n                \$completions = @(\n$commands\n                )\n            }"
             }
 
         val allOptions =
@@ -22,7 +34,7 @@ class PowerShellCompletionGenerator : CompletionGenerator {
                     }
                 }
 
-        val optionsStr = allOptions.joinToString(",\n") { "                        $it" }
+        val optionsStr = allOptions.distinct().joinToString(",\n") { "                        $it" }
 
         return """
             |# PowerShell completion for $appName
@@ -46,34 +58,55 @@ class PowerShellCompletionGenerator : CompletionGenerator {
             |        return
             |    }
             |    
-            |    ${'$'}argCount = ${'$'}tokens.Count - ${'$'}appIndex - 1
-            |    ${'$'}args = @(${'$'}tokens[(${'$'}appIndex + 1)..(${'$'}tokens.Count - 1)])
+            |    # Получаем только позиционные аргументы (без флагов)
+            |    ${'$'}allArgs = @(${'$'}tokens[(${'$'}appIndex + 1)..(${'$'}tokens.Count - 1)])
+            |    ${'$'}positionalArgs = @(${'$'}allArgs | Where-Object { !${'$'}_.StartsWith('-') })
+            |    ${'$'}argCount = ${'$'}positionalArgs.Count
+            |    
             |    ${'$'}completions = @()
             |    
-            |    switch (${'$'}argCount) {
-            |        0 {
-            |            ${'$'}completions = @(
-            |                ${app.groups.joinToString(",\n") { "                    '${it.name}'" }}
-            |            )
-            |        }
-            |        1 {
-            |            ${'$'}group = ${'$'}args[0]
-            |            switch (${'$'}group) {
-            |$groupCases
-            |                default {
-            |                    ${'$'}completions = @(
-            |                        ${app.groups.joinToString(",\n") { "                        '${it.name}'" }}
-            |                    ) | Where-Object { ${'$'}_ -like "${'$'}group*" }
-            |                }
+            |    if (${'$'}argCount -eq 0) {
+            |        # Top-level commands
+            |        ${'$'}completions = @(
+            |${app.groups.joinToString(",\n") { "            '${it.name}'" }}
+            |        )
+            |    }
+            |    elseif (${'$'}argCount -eq 1) {
+            |        # Subcommands based on group
+            |        ${'$'}group = ${'$'}positionalArgs[0]
+            |        
+            |        switch (${'$'}group) {
+            |$group
+            |            default {
+            |                # Если группа не распознана, фильтруем группы по префиксу
+            |                ${'$'}completions = @(
+            |${app.groups.joinToString(",\n") { "                    '${it.name}'" }}
+            |                ) | Where-Object { ${'$'}_ -like "${'$'}group*" }
             |            }
             |        }
-            |        default {
-            |            ${'$'}completions = @(
+            |    }
+            |    elseif (${'$'}argCount -eq 2) {
+            |        # Субкоманды для конкретной группы
+            |        ${'$'}group = ${'$'}positionalArgs[0]
+            |        
+            |        switch (${'$'}group) {
+            |$secondLevel
+            |            default {
+            |                # Неизвестная группа - флаги
+            |                ${'$'}completions = @(
             |$optionsStr
-            |            )
+            |                )
+            |            }
             |        }
             |    }
+            |    else {
+            |        # Флаги для подкоманд и их параметры
+            |        ${'$'}completions = @(
+            |$optionsStr
+            |        )
+            |    }
             |    
+            |    # Финальная фильтрация и форматирование
             |    ${'$'}completions |
             |        Where-Object { ${'$'}_ -like "${'$'}wordToComplete*" } |
             |        ForEach-Object {
