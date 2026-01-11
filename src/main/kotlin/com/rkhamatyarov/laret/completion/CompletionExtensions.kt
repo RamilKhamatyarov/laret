@@ -48,7 +48,7 @@ fun CliApp.installCompletion(shell: String = "bash") {
     file.writeText(completion)
     file.setExecutable(true)
 
-    println(greenBold("✓ Completion installed: ${file.absolutePath}"))
+    println(greenBold("Completion installed: ${file.absolutePath}"))
 
     if (shell.lowercase() == "powershell") {
         println("\nAdd to your \$PROFILE:")
