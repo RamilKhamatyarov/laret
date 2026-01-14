@@ -26,6 +26,13 @@ data class Command(
     ) {
         val context = CommandContext(this, app)
 
+        if (app?.hasPlugins() == true) {
+            if (!app.getPluginManager().beforeExecute(this)) {
+                log.warn("Plugin rejected execution of command: {}", name)
+                return
+            }
+        }
+
         try {
             // Parse arguments and options
             var argIndex = 0
@@ -84,6 +91,10 @@ data class Command(
         } catch (e: Exception) {
             log.error(redBold("Error: ${e.message}"))
             e.printStackTrace()
+        } finally {
+            if (app?.hasPlugins() == true) {
+                app.getPluginManager().afterExecute(this)
+            }
         }
     }
 

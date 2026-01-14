@@ -2,6 +2,8 @@ package com.rkhamatyarov.laret.core
 
 import ch.qos.logback.classic.Level
 import com.rkhamatyarov.laret.model.CommandGroup
+import com.rkhamatyarov.laret.plugin.LaretPlugin
+import com.rkhamatyarov.laret.plugin.PluginManager
 import com.rkhamatyarov.laret.ui.redBold
 import org.fusesource.jansi.Ansi
 import org.fusesource.jansi.AnsiConsole
@@ -18,13 +20,16 @@ data class CliApp(
     val description: String = "",
     val groups: List<CommandGroup> = emptyList(),
 ) {
+    private val pluginManager = PluginManager()
+    private var quietMode = false
+
     fun run(args: Array<String>) {
         AnsiConsole.systemInstall()
 
         try {
-            val isQuiet = args.contains("--quiet")
+            quietMode = args.contains("--quiet") || isCompletionCommand(args)
 
-            if (isQuiet) {
+            if (quietMode) {
                 disableLogging()
             }
 
@@ -42,13 +47,17 @@ data class CliApp(
                 }
 
                 else -> {
-                    executeCommand(args)
+                    val filteredArgs = args.filter { it != "--quiet" }.toTypedArray()
+                    executeCommand(filteredArgs)
                 }
             }
         } finally {
+            shutdownPlugins()
             AnsiConsole.systemUninstall()
         }
     }
+
+    private fun isCompletionCommand(args: Array<String>): Boolean = args.getOrNull(0) == "completion"
 
     private fun executeCommand(args: Array<String>) {
         val groupName = args.getOrNull(0) ?: return
@@ -68,7 +77,6 @@ data class CliApp(
             groups.find { it.name == groupName }
                 ?: run {
                     log.error("Group not found: {}", groupName)
-
                     println(redBold("❌ Group not found: $groupName"))
                     showHelp()
                     return
@@ -78,7 +86,6 @@ data class CliApp(
             group.commands.find { it.name == commandName }
                 ?: run {
                     log.error("Command not found: {} in group {}", commandName, groupName)
-
                     println(redBold("❌ Command not found: $commandName"))
                     group.showHelp()
                     return
@@ -116,8 +123,8 @@ data class CliApp(
             ${Ansi.ansi().bold()}EXAMPLES:${Ansi.ansi().reset()}
               $name file create /tmp/test.txt --content "hello"
               $name dir list . --long --all
-              $name file read /tmp/test.txt
-              $name completion powershell --quiet > completion.ps1
+              $name file read /tmp/test.txt --quiet
+              $name completion bash > completion.sh
             
             For more information on a command, use:
               $name [COMMAND] --help
@@ -126,8 +133,41 @@ data class CliApp(
     }
 
     private fun disableLogging() {
-        log.debug("Disabling logging output")
         val loggerContext = LoggerFactory.getILoggerFactory() as? ch.qos.logback.classic.LoggerContext
         loggerContext?.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME)?.level = Level.OFF
     }
+
+    fun isQuietMode(): Boolean = quietMode
+
+    fun registerPlugin(plugin: LaretPlugin): CliApp {
+        pluginManager.register(plugin)
+        return this
+    }
+
+    fun registerPlugins(vararg plugins: LaretPlugin): CliApp {
+        plugins.forEach { pluginManager.register(it) }
+        return this
+    }
+
+    fun initializePlugins() {
+        if (pluginManager.getPlugins().isNotEmpty() && !quietMode) {
+            log.info("Initializing ${pluginManager.getPlugins().size} plugin(s)")
+            pluginManager.initialize(this)
+        }
+    }
+
+    fun shutdownPlugins() {
+        if (pluginManager.getPlugins().isNotEmpty() && !quietMode) {
+            log.info("Shutting down ${pluginManager.getPlugins().size} plugin(s)")
+            pluginManager.shutdown()
+        }
+    }
+
+    internal fun getPluginManager(): PluginManager = pluginManager
+
+    fun hasPlugins(): Boolean = pluginManager.getPlugins().isNotEmpty()
+
+    fun getPlugins(): List<LaretPlugin> = pluginManager.getPlugins()
+
+    fun findPlugin(name: String): LaretPlugin? = pluginManager.getPlugins().find { it.name == name }
 }
