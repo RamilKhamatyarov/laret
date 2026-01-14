@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
+
     <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
         <target>System.err</target>
         <encoder>
@@ -20,14 +21,26 @@
 
     <logger name="laret.completion" level="OFF" additivity="false"/>
 
-    <logger name="org.fusesource" level="OFF" additivity="false"/>
+    <logger name="org.fusesource" level="WARN" additivity="false">
+        <appender-ref ref="STDERR"/>
+    </logger>
+
+    <logger name="org.fusesource.jansi" level="ERROR" additivity="false">
+        <appender-ref ref="STDERR"/>
+    </logger>
+
+    <logger name="com.oracle.graalvm" level="ERROR" additivity="false">
+        <appender-ref ref="STDERR"/>
+    </logger>
 
     <logger name="laret" level="INFO" additivity="false">
         <appender-ref ref="STDERR"/>
         <appender-ref ref="FILE"/>
     </logger>
 
-    <root level="OFF">
+    <root level="WARN">
+        <appender-ref ref="STDERR"/>
         <appender-ref ref="FILE"/>
     </root>
+
 </configuration>

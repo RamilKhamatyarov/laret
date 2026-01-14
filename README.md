@@ -7,14 +7,14 @@
 
 ## ✨ Features
 
-- 🎯 **Intuitive DSL** - Clean, readable syntax for defining CLI structure
-- 🔧 **Command Groups** - Organize related commands logically
-- 📝 **Arguments & Options** - Full support for positional arguments and flags
-- 🎨 **Colored Output** - Built-in ANSI color support with fallback for unsupported terminals
-- 📊 **Multiple Output Formats** - JSON, YAML, and Plain text output strategies
-- 🔄 **Shell Completion** - Generate completion scripts for Bash, Zsh, and PowerShell
-- 📦 **Zero Dependencies** - Pure Kotlin, no external dependencies required
-- 🧩 **Type-Safe** - Leverage Kotlin's type system for safer CLI apps
+- **Intuitive DSL**
+- **Command Groups**
+- **Arguments & Options**
+- **Colored Output**
+- **Multiple Output Formats**
+- **Shell Completion**
+- **Zero Dependencies**
+- **Type-Safe**
 
 ## 🚀 Quick Start
 
@@ -229,11 +229,11 @@ action { ctx ->
 Built-in color helpers with automatic terminal detection:
 
 ```kt
-println(redBold("❌ Error"))
+println(redBold("Error"))
 println(greenBold("Success"))
-println(yellowBold("⚠️ Warning"))
-println(blueBold("ℹ️ Info"))
-println(cyanBold("📄 Data"))
+println(yellowBold("Warning"))
+println(blueBold("Info"))
+println(cyanBold("Data"))
 println(yellowItalic("Note: Something"))
 println(redItalic("Deprecated"))
 ```
@@ -429,7 +429,7 @@ fun main(args: Array<String>) {
 
 ## 🔄 Shell Completion
 
-Laret can generate completion scripts for your CLI application:
+Laret can generate completion scripts
 
 ### Generate Completion Script
 
@@ -619,13 +619,6 @@ graalvmNative {
 ./build/native/nativeCompile/laret --help
 ```
 
-### Native Image Benefits
-
-✅ **Fast Startup** - Millisecond startup time vs JVM seconds  
-✅ **Low Memory** - ~10-50MB RAM vs JVM 100-200MB  
-✅ **Single Binary** - No JRE required for distribution  
-✅ **Instant Response** - Perfect for CLI tools
-
 ### Example Build Configuration
 
 Complete `build.gradle.kts` for native image:
@@ -699,7 +692,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - [x] GraalVM Native Image support
 - [x] JSON/YAML output formatting
-- [ ] Plugin system for extensibility
+- [x] Plugin system for extensibility
 - [ ] Built-in config file support (YAML, TOML, JSON)
 - [ ] Interactive prompts and menus
 - [ ] Progress bars and spinners

@@ -97,7 +97,7 @@ jobs:
 
       - name: Test Bash Completion Generation
         run: |
-          ./build/native/nativeCompile/laret completion bash > /tmp/laret_bash_completion.sh
+          ./build/native/nativeCompile/laret completion bash --quiet > /tmp/laret_bash_completion.sh
           bash -n /tmp/laret_bash_completion.sh
           echo "Bash completion script is valid"
 
@@ -110,7 +110,7 @@ jobs:
 
       - name: Test Zsh Completion Generation
         run: |
-          ./build/native/nativeCompile/laret completion zsh > /tmp/laret_zsh_completion.sh
+          ./build/native/nativeCompile/laret completion zsh --quiet > /tmp/laret_zsh_completion.sh
           zsh -n /tmp/laret_zsh_completion.sh
           echo "Zsh completion script is valid"
 
@@ -123,7 +123,7 @@ jobs:
 
       - name: Test PowerShell Completion Generation
         run: |
-          ./build/native/nativeCompile/laret completion powershell > /tmp/laret_ps_completion.ps1
+          ./build/native/nativeCompile/laret completion powershell --quiet > /tmp/laret_ps_completion.ps1
           pwsh -NoProfile -Command "Test-Path '/tmp/laret_ps_completion.ps1'" -ErrorAction Stop
           echo "PowerShell completion script is valid"
 

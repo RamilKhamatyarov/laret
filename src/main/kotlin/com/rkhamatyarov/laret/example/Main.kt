@@ -256,5 +256,6 @@ fun main(args: Array<String>) {
             }
         }
 
+    app.registerPlugin(LoggingPlugin())
     app.run(args)
 }
