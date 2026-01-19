@@ -27,7 +27,7 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:1.5.24")
     implementation("ch.qos.logback:logback-core:1.5.24")
     implementation("org.fusesource.jansi:jansi:2.4.2")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.20.1")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.21.0")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.20.1")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.20.1")
 
