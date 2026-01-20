@@ -8,39 +8,7 @@
         </encoder>
     </appender>
 
-    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${user.home}/.laret/laret.log</file>
-        <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
-        </encoder>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${user.home}/.laret/laret.%d{yyyy-MM-dd}.log</fileNamePattern>
-            <maxHistory>7</maxHistory>
-        </rollingPolicy>
-    </appender>
-
-    <logger name="laret.completion" level="OFF" additivity="false"/>
-
-    <logger name="org.fusesource" level="WARN" additivity="false">
-        <appender-ref ref="STDERR"/>
-    </logger>
-
-    <logger name="org.fusesource.jansi" level="ERROR" additivity="false">
-        <appender-ref ref="STDERR"/>
-    </logger>
-
-    <logger name="com.oracle.graalvm" level="ERROR" additivity="false">
-        <appender-ref ref="STDERR"/>
-    </logger>
-
-    <logger name="laret" level="INFO" additivity="false">
-        <appender-ref ref="STDERR"/>
-        <appender-ref ref="FILE"/>
-    </logger>
-
-    <root level="WARN">
-        <appender-ref ref="STDERR"/>
-        <appender-ref ref="FILE"/>
+    <root level="OFF">
     </root>
 
 </configuration>

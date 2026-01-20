@@ -23,4 +23,6 @@ class CommandContext(
     fun optionBool(name: String): Boolean = options[name]?.toBoolean() ?: false
 
     fun optionInt(name: String): Int = options[name]?.toIntOrNull() ?: 0
+
+    fun render(data: Any): String = outputStrategy.render(data)
 }

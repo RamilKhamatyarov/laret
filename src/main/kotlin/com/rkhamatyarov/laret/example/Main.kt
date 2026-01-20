@@ -3,11 +3,6 @@ package com.rkhamatyarov.laret.example
 import com.rkhamatyarov.laret.completion.generateCompletion
 import com.rkhamatyarov.laret.completion.installCompletion
 import com.rkhamatyarov.laret.dsl.cli
-import com.rkhamatyarov.laret.output.JsonOutput
-import com.rkhamatyarov.laret.output.OutputStrategy
-import com.rkhamatyarov.laret.output.PlainOutput
-import com.rkhamatyarov.laret.output.TomlOutput
-import com.rkhamatyarov.laret.output.YamlOutput
 import org.slf4j.LoggerFactory
 import java.io.File
 
@@ -145,7 +140,7 @@ fun main(args: Array<String>) {
 
                         log.info("Reading file: {}", path)
                         val content = file.readText()
-                        println(content)
+                        println(ctx.render(content))
                     }
                 }
             }
@@ -161,13 +156,15 @@ fun main(args: Array<String>) {
                     argument("path", "Directory path", required = false, optional = true, default = ".")
                     option("l", "long", "Long format", "", false)
                     option("a", "all", "Show hidden files", "", false)
-                    option("f", "format", "Output format (plain, json, yaml)", "plain", true)
+                    option("f", "format", "Output format (plain, json, yaml, toml)", "plain", true)
+                    option("m", "max-size", "Max file size in bytes", "0", true)
 
                     action { ctx ->
                         val path = ctx.argument("path")
                         val long = ctx.optionBool("long")
                         val all = ctx.optionBool("all")
                         val format = ctx.option("format")
+                        val maxSize = ctx.optionInt("max-size")
                         val dir = File(path)
 
                         if (!dir.isDirectory) {
@@ -180,6 +177,7 @@ fun main(args: Array<String>) {
                         val entries =
                             (dir.listFiles() ?: emptyArray())
                                 .filter { all || !it.isHidden }
+                                .filter { maxSize <= 0 || it.length() <= maxSize }
                                 .sortedBy { it.name }
                                 .map { file ->
                                     mapOf(
@@ -188,14 +186,6 @@ fun main(args: Array<String>) {
                                         "isDirectory" to file.isDirectory,
                                     )
                                 }
-
-                        val formatter: OutputStrategy =
-                            when (format) {
-                                "json" -> JsonOutput
-                                "toml" -> TomlOutput
-                                "yaml" -> YamlOutput
-                                else -> PlainOutput
-                            }
 
                         when {
                             format == "plain" && long -> {
@@ -214,12 +204,8 @@ fun main(args: Array<String>) {
                                 }
                             }
 
-                            long -> {
-                                println(formatter.render(entries))
-                            }
-
                             else -> {
-                                println(formatter.render(entries))
+                                println(ctx.render(entries))
                             }
                         }
                     }
