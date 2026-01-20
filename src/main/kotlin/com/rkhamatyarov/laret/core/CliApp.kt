@@ -1,15 +1,11 @@
 package com.rkhamatyarov.laret.core
 
-import ch.qos.logback.classic.Level
 import com.rkhamatyarov.laret.model.CommandGroup
 import com.rkhamatyarov.laret.plugin.LaretPlugin
 import com.rkhamatyarov.laret.plugin.PluginManager
 import com.rkhamatyarov.laret.ui.redBold
 import org.fusesource.jansi.Ansi
 import org.fusesource.jansi.AnsiConsole
-import org.slf4j.LoggerFactory
-
-private val log = LoggerFactory.getLogger("laret.core")
 
 /**
  * Represents a complete CLI application
@@ -21,17 +17,15 @@ data class CliApp(
     val groups: List<CommandGroup> = emptyList(),
 ) {
     private val pluginManager = PluginManager()
+    private val logManager = LogManager()
     private var quietMode = false
 
     fun run(args: Array<String>) {
         AnsiConsole.systemInstall()
 
         try {
-            quietMode = args.contains("--quiet") || isCompletionCommand(args)
-
-            if (quietMode) {
-                disableLogging()
-            }
+            quietMode = true
+            logManager.disableLogging()
 
             when {
                 args.isEmpty() -> {
@@ -57,8 +51,6 @@ data class CliApp(
         }
     }
 
-    private fun isCompletionCommand(args: Array<String>): Boolean = args.getOrNull(0) == "completion"
-
     private fun executeCommand(args: Array<String>) {
         val groupName = args.getOrNull(0) ?: return
 
@@ -76,8 +68,7 @@ data class CliApp(
         val group =
             groups.find { it.name == groupName }
                 ?: run {
-                    log.error("Group not found: {}", groupName)
-                    println(redBold("❌ Group not found: $groupName"))
+                    println(redBold("Group not found: $groupName"))
                     showHelp()
                     return
                 }
@@ -85,8 +76,7 @@ data class CliApp(
         val command =
             group.commands.find { it.name == commandName }
                 ?: run {
-                    log.error("Command not found: {} in group {}", commandName, groupName)
-                    println(redBold("❌ Command not found: $commandName"))
+                    println(redBold("Command not found: $commandName"))
                     group.showHelp()
                     return
                 }
@@ -118,23 +108,16 @@ data class CliApp(
             ${Ansi.ansi().bold()}GLOBAL OPTIONS:${Ansi.ansi().reset()}
               -h, --help              Show this help message
               -v, --version           Show version
-              --quiet                 Suppress all logging output
             
             ${Ansi.ansi().bold()}EXAMPLES:${Ansi.ansi().reset()}
               $name file create /tmp/test.txt --content "hello"
               $name dir list . --long --all
-              $name file read /tmp/test.txt --quiet
               $name completion bash > completion.sh
             
             For more information on a command, use:
               $name [COMMAND] --help
             """.trimIndent(),
         )
-    }
-
-    private fun disableLogging() {
-        val loggerContext = LoggerFactory.getILoggerFactory() as? ch.qos.logback.classic.LoggerContext
-        loggerContext?.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME)?.level = Level.OFF
     }
 
     fun isQuietMode(): Boolean = quietMode
@@ -150,15 +133,13 @@ data class CliApp(
     }
 
     fun initializePlugins() {
-        if (pluginManager.getPlugins().isNotEmpty() && !quietMode) {
-            log.info("Initializing ${pluginManager.getPlugins().size} plugin(s)")
+        if (pluginManager.getPlugins().isNotEmpty()) {
             pluginManager.initialize(this)
         }
     }
 
     fun shutdownPlugins() {
-        if (pluginManager.getPlugins().isNotEmpty() && !quietMode) {
-            log.info("Shutting down ${pluginManager.getPlugins().size} plugin(s)")
+        if (pluginManager.getPlugins().isNotEmpty()) {
             pluginManager.shutdown()
         }
     }

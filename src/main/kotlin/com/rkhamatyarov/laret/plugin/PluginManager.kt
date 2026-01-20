@@ -13,7 +13,6 @@ class PluginManager {
 
     fun register(plugin: LaretPlugin): PluginManager {
         plugins.add(plugin)
-        log.info("Plugin registered: ${plugin.name} v${plugin.version}")
         return this
     }
 
@@ -21,7 +20,6 @@ class PluginManager {
         plugins.forEach { plugin ->
             try {
                 plugin.initialize(app)
-                log.info("Plugin initialized: ${plugin.name}")
             } catch (e: Exception) {
                 log.error("Failed to initialize plugin ${plugin.name}", e)
             }
@@ -32,7 +30,6 @@ class PluginManager {
         for (plugin in plugins) {
             try {
                 if (!plugin.beforeExecute(command)) {
-                    log.warn("Plugin ${plugin.name} rejected execution of ${command.name}")
                     return false
                 }
             } catch (e: Exception) {

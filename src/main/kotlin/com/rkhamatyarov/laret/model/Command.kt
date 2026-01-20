@@ -24,7 +24,7 @@ data class Command(
         app: CliApp? = null,
         outputStrategy: OutputStrategy = PlainOutput,
     ) {
-        val context = CommandContext(this, app)
+        val context = CommandContext(this, app, outputStrategy)
 
         if (app?.hasPlugins() == true) {
             if (!app.getPluginManager().beforeExecute(this)) {
@@ -37,13 +37,16 @@ data class Command(
             // Parse arguments and options
             var argIndex = 0
             var i = 0
+
             while (i < args.size) {
                 val arg = args[i]
+
                 when {
                     arg.startsWith("--") -> {
                         // Long option
                         val optName = arg.substring(2)
                         val opt = options.find { it.long == optName }
+
                         if (opt != null) {
                             if (opt.takesValue && i + 1 < args.size && !args[i + 1].startsWith("-")) {
                                 context.options[opt.long] = args[i + 1]
@@ -53,10 +56,12 @@ data class Command(
                             }
                         }
                     }
+
                     arg.startsWith("-") && arg.length == 2 -> {
                         // Short option
                         val shortName = arg.substring(1)
                         val opt = options.find { it.short == shortName }
+
                         if (opt != null) {
                             if (opt.takesValue && i + 1 < args.size && !args[i + 1].startsWith("-")) {
                                 context.options[opt.long] = args[i + 1]
@@ -66,6 +71,7 @@ data class Command(
                             }
                         }
                     }
+
                     !arg.startsWith("-") -> {
                         // Positional argument
                         if (argIndex < arguments.size) {
@@ -74,10 +80,10 @@ data class Command(
                         }
                     }
                 }
+
                 i++
             }
 
-            // Validate required arguments
             arguments.filter { it.required && !it.optional }.forEach { arg ->
                 if (!context.arguments.containsKey(arg.name)) {
                     log.error(redBold("Error: Required argument '${arg.name}' not provided"))
@@ -86,7 +92,6 @@ data class Command(
                 }
             }
 
-            // Execute action
             action(context)
         } catch (e: Exception) {
             log.error(redBold("Error: ${e.message}"))
