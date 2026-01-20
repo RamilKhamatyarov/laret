@@ -28,8 +28,8 @@ dependencies {
     implementation("ch.qos.logback:logback-core:1.5.25")
     implementation("org.fusesource.jansi:jansi:2.4.2")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.21.0")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.20.1")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.20.1")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.21.0")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.21.0")
 
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
