@@ -18,7 +18,7 @@ object CommandRunner {
         if (args.size == 2 && (args[1] == "-h" || args[1] == "--help")) {
             val group = app.groups.find { it.name == groupName }
             if (group != null) {
-                group.showHelp()
+                HelpFormatter.showGroupHelp(group)
                 return
             }
         }
@@ -30,7 +30,7 @@ object CommandRunner {
             app.groups.find { it.name == groupName }
                 ?: run {
                     log.warn(redBold("Group not found: $groupName"))
-                    app.showHelp()
+                    HelpFormatter.showApplicationHelp(app)
                     return
                 }
 
@@ -38,7 +38,7 @@ object CommandRunner {
             group.commands.find { it.name == commandName }
                 ?: run {
                     log.warn(redBold("Command not found: $commandName"))
-                    group.showHelp()
+                    HelpFormatter.showCommandNotFound(commandName, group)
                     return
                 }
 

@@ -3,8 +3,6 @@ package com.rkhamatyarov.laret.core
 import com.rkhamatyarov.laret.model.CommandGroup
 import com.rkhamatyarov.laret.plugin.LaretPlugin
 import com.rkhamatyarov.laret.plugin.PluginManager
-import com.rkhamatyarov.laret.ui.redBold
-import org.fusesource.jansi.Ansi
 import org.fusesource.jansi.AnsiConsole
 
 /**
@@ -22,18 +20,16 @@ data class CliApp(
 
     fun run(args: Array<String>) {
         AnsiConsole.systemInstall()
-
         try {
             quietMode = true
             logManager.disableLogging()
-
             when {
                 args.isEmpty() -> {
-                    showHelp()
+                    HelpFormatter.showApplicationHelp(this)
                 }
 
                 args[0] == "--help" || args[0] == "-h" -> {
-                    showHelp()
+                    HelpFormatter.showApplicationHelp(this)
                 }
 
                 args[0] == "--version" || args[0] == "-v" -> {
@@ -53,71 +49,32 @@ data class CliApp(
 
     private fun executeCommand(args: Array<String>) {
         val groupName = args.getOrNull(0) ?: return
-
         if (args.size == 2 && (args[1] == "-h" || args[1] == "--help")) {
             val group = groups.find { it.name == groupName }
             if (group != null) {
-                group.showHelp()
+                HelpFormatter.showGroupHelp(group)
                 return
             }
         }
 
         val commandName = args.getOrNull(1) ?: return
         val cmdArgs = args.drop(2).toTypedArray()
-
         val group =
             groups.find { it.name == groupName }
                 ?: run {
-                    println(redBold("Group not found: $groupName"))
-                    showHelp()
+                    println("Group not found: $groupName")
+                    HelpFormatter.showApplicationHelp(this)
                     return
                 }
 
         val command =
             group.commands.find { it.name == commandName }
                 ?: run {
-                    println(redBold("Command not found: $commandName"))
-                    group.showHelp()
+                    HelpFormatter.showCommandNotFound(commandName, group)
                     return
                 }
 
         command.execute(cmdArgs, this)
-    }
-
-    fun showHelp() {
-        println(
-            """
-            ${Ansi.ansi().bold().fg(Ansi.Color.CYAN)}========================================${Ansi.ansi().reset()}
-            ${Ansi.ansi().bold().fg(Ansi.Color.CYAN)}$name v$version${Ansi.ansi().reset()}
-            $description
-            ${Ansi.ansi().bold().fg(Ansi.Color.CYAN)}========================================${Ansi.ansi().reset()}
-            
-            ${Ansi.ansi().bold()}USAGE:${Ansi.ansi().reset()}
-              $name [COMMAND] [SUBCOMMAND] [OPTIONS]
-            
-            ${Ansi.ansi().bold()}COMMANDS:${Ansi.ansi().reset()}
-              ${Ansi.ansi().fg(Ansi.Color.GREEN)}file${Ansi.ansi().reset()}                 File operations
-                ${Ansi.ansi().fg(Ansi.Color.BLUE)}create${Ansi.ansi().reset()}             Create a new file
-                ${Ansi.ansi().fg(Ansi.Color.BLUE)}delete${Ansi.ansi().reset()}             Delete a file
-                ${Ansi.ansi().fg(Ansi.Color.BLUE)}read${Ansi.ansi().reset()}               Read file contents
-                
-              ${Ansi.ansi().fg(Ansi.Color.GREEN)}dir${Ansi.ansi().reset()}                  Directory operations
-                ${Ansi.ansi().fg(Ansi.Color.BLUE)}list${Ansi.ansi().reset()}               List directory contents
-                ${Ansi.ansi().fg(Ansi.Color.BLUE)}create${Ansi.ansi().reset()}             Create a new directory
-            
-            ${Ansi.ansi().bold()}GLOBAL OPTIONS:${Ansi.ansi().reset()}
-              -h, --help              Show this help message
-              -v, --version           Show version
-            
-            ${Ansi.ansi().bold()}EXAMPLES:${Ansi.ansi().reset()}
-              $name file create /tmp/test.txt --content "hello"
-              $name dir list . --long --all
-              $name completion bash > completion.sh
-            
-            For more information on a command, use:
-              $name [COMMAND] --help
-            """.trimIndent(),
-        )
     }
 
     fun isQuietMode(): Boolean = quietMode
