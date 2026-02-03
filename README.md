@@ -1,11 +1,11 @@
-# 🚀 Laret
+# Laret
 
-**A Cobra-like CLI framework for Kotlin** - Build beautiful, feature-rich command-line applications with a clean DSL.
+** A Cobra-like CLI framework for Kotlin** - Build beautiful, feature-rich command-line applications with a clean DSL.
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9+-7F52FF.svg?logo=kotlin)](https://kotlinlang.org)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## ✨ Features
+## Features
 
 - **Intuitive DSL**
 - **Command Groups**
@@ -16,7 +16,7 @@
 - **Zero Dependencies**
 - **Type-Safe**
 
-## 🚀 Quick Start
+## Quick Start
 
 ```kt
 
@@ -45,7 +45,7 @@ fun main(args: Array<String>) {
                     val file = File(path)
 
                     if (file.exists() && !force) {
-                        println(yellowItalic("⚠️ File already exists: $path (use --force to overwrite)"))
+                        println(yellowItalic("File already exists: $path (use --force to overwrite)"))
                         return@action
                     }
 
@@ -65,11 +65,11 @@ fun main(args: Array<String>) {
                     val file = File(path)
 
                     if (!file.exists()) {
-                        println(redBold("❌ File not found: $path"))
+                        println(redBold("File not found: $path"))
                         return@action
                     }
 
-                    println(cyanBold("📄 Reading: $path"))
+                    println(cyanBold("Reading: $path"))
                     println(file.readText())
                 }
             }
@@ -94,11 +94,11 @@ fun main(args: Array<String>) {
                     val dir = File(path)
 
                     if (!dir.isDirectory) {
-                        println(redBold("❌ Not a directory: $path"))
+                        println(redBold("Not a directory: $path"))
                         return@action
                     }
 
-                    println(cyanBold("📁 Listing: $path"))
+                    println(cyanBold("Listing: $path"))
                     val files = dir.listFiles() ?: emptyArray()
 
                     files.filter { all || !it.isHidden }
@@ -132,7 +132,7 @@ $ laret file create hello.txt --content "Hello, World!"
 File created: hello.txt
 ```
 
-## 📚 Documentation
+## Documentation
 
 ### Creating a CLI Application
 
@@ -240,7 +240,7 @@ println(redItalic("Deprecated"))
 
 Colors automatically disable on unsupported terminals.
 
-### 📊 Output Formats (JSON/YAML)
+### Output Formats (JSON/YAML)
 
 Laret supports multiple output formats for structured data. Use the pluggable output strategy system:
 
@@ -319,7 +319,7 @@ val formatter = when (format) {
 println(formatter.render(data))
 ```
 
-## 🎯 Complete Example
+## Complete Example
 
 ```kt
 fun main(args: Array<String>) {
@@ -347,7 +347,7 @@ fun main(args: Array<String>) {
                     val file = File(path)
                     
                     if (file.exists() && !force) {
-                        println(yellowItalic("⚠️ File already exists: $path (use --force to overwrite)"))
+                        println(yellowItalic("File already exists: $path (use --force to overwrite)"))
                         return@action
                     }
                     
@@ -367,11 +367,11 @@ fun main(args: Array<String>) {
                     val file = File(path)
                     
                     if (!file.exists()) {
-                        println(redBold("❌ File not found: $path"))
+                        println(redBold("File not found: $path"))
                         return@action
                     }
                     
-                    println(cyanBold("📄 Reading: $path"))
+                    println(cyanBold("Reading: $path"))
                     println(file.readText())
                 }
             }
@@ -396,11 +396,11 @@ fun main(args: Array<String>) {
                     val dir = File(path)
                     
                     if (!dir.isDirectory) {
-                        println(redBold("❌ Not a directory: $path"))
+                        println(redBold("Not a directory: $path"))
                         return@action
                     }
                     
-                    println(cyanBold("📁 Listing: $path"))
+                    println(cyanBold("Listing: $path"))
                     val files = dir.listFiles() ?: emptyArray()
                     
                     files.filter { all || !it.isHidden }
@@ -427,7 +427,7 @@ fun main(args: Array<String>) {
 }
 ```
 
-## 🔄 Shell Completion
+## Shell Completion
 
 Laret can generate completion scripts
 
@@ -491,7 +491,7 @@ group(
 
 ```
 
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 com.rkhamatyarov.laret/
@@ -527,7 +527,7 @@ com.rkhamatyarov.laret/
     └── HelpFormatter.kt      # Help text formatting
 ```
 
-## 🎨 Design Philosophy
+## Design Philosophy
 
 Laret is inspired by [Cobra](https://github.com/spf13/cobra) (Go) and aims to bring similar simplicity and power to Kotlin CLI applications:
 
@@ -538,7 +538,7 @@ Laret is inspired by [Cobra](https://github.com/spf13/cobra) (Go) and aims to br
 5. **Flexible Output** - Multiple formats for different use cases
 6. **Developer Experience** - Make CLI building enjoyable
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -548,7 +548,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📦 Installation
+## Installation
 
 ### Gradle (Kotlin DSL)
 
@@ -576,7 +576,7 @@ dependencies {
 </dependency>
 ```
 
-## 🏗️ Building Native Image
+## Building Native Image
 
 Laret supports **GraalVM Native Image** compilation for ultra-fast startup times and minimal memory footprint.
 
@@ -679,16 +679,15 @@ docker rm temp-builder
 
 ```
 
-## 📝 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Inspired by [Cobra](https://github.com/spf13/cobra) (Go)
-- Built with ❤️ using Kotlin
 
-## 🗺️ Roadmap
+## Roadmap
 
 - [x] GraalVM Native Image support
 - [x] JSON/YAML output formatting
@@ -704,5 +703,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] Localization support
 
 ---
-
-**Made with ❤️ and Kotlin**
