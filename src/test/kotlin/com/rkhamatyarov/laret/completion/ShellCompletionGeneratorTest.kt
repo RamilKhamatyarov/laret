@@ -1,8 +1,5 @@
-package com.rkhamatyarov.laret
+package com.rkhamatyarov.laret.completion
 
-import com.rkhamatyarov.laret.completion.generateCompletion
-import com.rkhamatyarov.laret.completion.installCompletion
-import com.rkhamatyarov.laret.completion.installPowerShellCompletion
 import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.dsl.cli
 import org.junit.jupiter.api.AfterEach
