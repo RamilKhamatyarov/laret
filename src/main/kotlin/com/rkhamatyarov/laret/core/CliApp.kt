@@ -1,12 +1,16 @@
 package com.rkhamatyarov.laret.core
 
+import com.rkhamatyarov.laret.config.ConfigLoader
+import com.rkhamatyarov.laret.config.model.AppConfig
+import com.rkhamatyarov.laret.config.validator.ConfigValidator
 import com.rkhamatyarov.laret.model.CommandGroup
 import com.rkhamatyarov.laret.plugin.LaretPlugin
 import com.rkhamatyarov.laret.plugin.PluginManager
 import org.fusesource.jansi.AnsiConsole
+import org.slf4j.LoggerFactory
 
 /**
- * Represents a complete CLI application
+ * Represents a complete CLI application with integrated configuration system
  */
 data class CliApp(
     val name: String,
@@ -14,28 +18,85 @@ data class CliApp(
     val description: String = "",
     val groups: List<CommandGroup> = emptyList(),
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
     private val pluginManager = PluginManager()
     private val logManager = LogManager()
-    private var quietMode = false
+    private val configLoader = ConfigLoader()
+    private val configValidator = ConfigValidator()
 
+    private var quietMode = false
+    private var appConfig: AppConfig = AppConfig()
+    private var configPath: String? = null
+
+    /**
+     * Initialize application with optional config file
+     */
+    fun init(configPath: String? = null): CliApp {
+        this.configPath = configPath
+
+        try {
+            appConfig = configLoader.load(configPath)
+            log.info("Configuration loaded: app=${appConfig.app.name} v${appConfig.app.version}")
+
+            val validationResult = configValidator.validate(appConfig)
+
+            if (!validationResult.isValid) {
+                validationResult.errors.forEach { error ->
+                    log.error("Config validation error: $error")
+                    System.err.println("ERROR: $error")
+                }
+                throw RuntimeException("Configuration validation failed")
+            }
+
+            validationResult.warnings.forEach { warning ->
+                log.warn("Config validation warning: $warning")
+                System.err.println(" WARNING: $warning")
+            }
+
+            applyConfiguration(appConfig)
+
+            initializePlugins()
+
+            log.info("Application initialized successfully")
+        } catch (e: Exception) {
+            log.error("Failed to initialize application", e)
+            throw e
+        }
+
+        return this
+    }
+
+    /**
+     * Run the CLI application with arguments
+     */
     fun run(args: Array<String>) {
         AnsiConsole.systemInstall()
         try {
-            quietMode = true
-            logManager.disableLogging()
+            quietMode = args.contains("--quiet")
+            if (quietMode) {
+                logManager.disableLogging()
+            }
+
             when {
                 args.isEmpty() -> {
                     HelpFormatter.showApplicationHelp(this)
                 }
-
                 args[0] == "--help" || args[0] == "-h" -> {
                     HelpFormatter.showApplicationHelp(this)
                 }
-
                 args[0] == "--version" || args[0] == "-v" -> {
                     println("$name version $version")
+                    if (appConfig.app.description.isNotEmpty()) {
+                        println(appConfig.app.description)
+                    }
                 }
-
+                args[0] == "--config" && args.size > 1 -> {
+                    init(args[1])
+                    val remainingArgs = args.drop(2).toTypedArray()
+                    if (remainingArgs.isNotEmpty()) {
+                        executeCommand(remainingArgs)
+                    }
+                }
                 else -> {
                     val filteredArgs = args.filter { it != "--quiet" }.toTypedArray()
                     executeCommand(filteredArgs)
@@ -49,16 +110,18 @@ data class CliApp(
 
     private fun executeCommand(args: Array<String>) {
         val groupName = args.getOrNull(0) ?: return
+
         if (args.size == 2 && (args[1] == "-h" || args[1] == "--help")) {
             val group = groups.find { it.name == groupName }
             if (group != null) {
                 HelpFormatter.showGroupHelp(group)
-                return
             }
+            return
         }
 
         val commandName = args.getOrNull(1) ?: return
         val cmdArgs = args.drop(2).toTypedArray()
+
         val group =
             groups.find { it.name == groupName }
                 ?: run {
@@ -75,6 +138,58 @@ data class CliApp(
                 }
 
         command.execute(cmdArgs, this)
+    }
+
+    private fun applyConfiguration(config: AppConfig) {
+        if (config.output.verbose) {
+            log.info("Verbose mode enabled")
+        }
+
+        if (config.logging.file.isNotEmpty()) {
+            log.info("Log file configured: ${config.logging.file}")
+        }
+        log.info("Log level set to: ${config.logging.level}")
+
+        if (config.plugins.enabled.isNotEmpty()) {
+            log.info("Enabled plugins: ${config.plugins.enabled.joinToString(", ")}")
+        }
+        if (config.plugins.paths.isNotEmpty()) {
+            log.info("Plugin search paths: ${config.plugins.paths.joinToString(", ")}")
+        }
+    }
+
+    /**
+     * Get loaded application configuration
+     */
+    fun getAppConfig(): AppConfig = appConfig
+
+    /**
+     * Get specific config section
+     */
+    fun getAppMetadata() = appConfig.app
+
+    fun getOutputConfig() = appConfig.output
+
+    fun getPluginConfig() = appConfig.plugins
+
+    fun getLoggingConfig() = appConfig.logging
+
+    /**
+     * Save current configuration to file
+     */
+    fun saveConfig(outputPath: String) {
+        configLoader.save(appConfig, outputPath)
+        log.info("Configuration saved to: $outputPath")
+    }
+
+    /**
+     * Reload configuration from file
+     */
+    fun reloadConfig(): CliApp {
+        appConfig = configLoader.load(configPath)
+        applyConfiguration(appConfig)
+        log.info("Configuration reloaded")
+        return this
     }
 
     fun isQuietMode(): Boolean = quietMode

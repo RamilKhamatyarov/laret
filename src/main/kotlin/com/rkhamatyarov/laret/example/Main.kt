@@ -242,6 +242,7 @@ fun main(args: Array<String>) {
             }
         }
 
-    app.registerPlugin(LoggingPlugin())
+    app.init()
     app.run(args)
+    app.registerPlugin(LoggingPlugin())
 }
