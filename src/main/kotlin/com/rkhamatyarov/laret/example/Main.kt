@@ -3,10 +3,7 @@ package com.rkhamatyarov.laret.example
 import com.rkhamatyarov.laret.completion.generateCompletion
 import com.rkhamatyarov.laret.completion.installCompletion
 import com.rkhamatyarov.laret.dsl.cli
-import org.slf4j.LoggerFactory
 import java.io.File
-
-private val log = LoggerFactory.getLogger("laret.main")
 
 fun main(args: Array<String>) {
     val app =
@@ -56,7 +53,6 @@ fun main(args: Array<String>) {
                         try {
                             ctx.app?.installCompletion(shell)
                         } catch (e: Exception) {
-                            log.error("Failed to install completion: {}", e.message)
                             println("Error: ${e.message}")
                         }
                     }
@@ -81,7 +77,6 @@ fun main(args: Array<String>) {
                         val file = File(path)
 
                         if (file.exists() && !force) {
-                            log.warn("File already exists: $path")
                             println("Error: File already exists: $path (use --force to overwrite)")
                             return@action
                         }
@@ -89,10 +84,8 @@ fun main(args: Array<String>) {
                         try {
                             file.parentFile?.mkdirs()
                             file.writeText(content)
-                            log.info("File created successfully: $path")
                             println("File created: $path")
                         } catch (e: Exception) {
-                            log.error("Failed to create file: {}", path, e)
                             println("Error: Failed to create file: ${e.message}")
                         }
                     }
@@ -108,16 +101,13 @@ fun main(args: Array<String>) {
                         val file = File(path)
 
                         if (!file.exists()) {
-                            log.warn("File not found: $path")
                             println("Error: File not found: $path")
                             return@action
                         }
 
                         if (file.delete()) {
-                            log.info("File deleted: $path")
                             println("File deleted: $path")
                         } else {
-                            log.error("Failed to delete file: $path")
                             println("Error: Failed to delete file: $path")
                         }
                     }
@@ -133,12 +123,10 @@ fun main(args: Array<String>) {
                         val file = File(path)
 
                         if (!file.exists()) {
-                            log.warn("File not found: $path")
                             println("Error: File not found: $path")
                             return@action
                         }
 
-                        log.info("Reading file: $path")
                         val content = file.readText()
                         println(ctx.render(content))
                     }
@@ -168,12 +156,10 @@ fun main(args: Array<String>) {
                         val dir = File(path)
 
                         if (!dir.isDirectory) {
-                            log.warn("Not a directory: $path")
                             println("Error: Not a directory: $path")
                             return@action
                         }
 
-                        log.info("Listing directory: $path")
                         val entries =
                             (dir.listFiles() ?: emptyArray())
                                 .filter { all || !it.isHidden }
@@ -223,18 +209,15 @@ fun main(args: Array<String>) {
                         val dir = File(path)
 
                         if (dir.exists()) {
-                            log.warn("Directory already exists: $path")
                             println("Error: Directory already exists: $path")
                             return@action
                         }
 
-                        log.info("Creating directory: $path")
                         val success = if (parents) dir.mkdirs() else dir.mkdir()
 
                         if (success) {
                             println("Directory created: $path")
                         } else {
-                            log.error("Failed to create directory: $path")
                             println("Error: Failed to create directory: $path")
                         }
                     }
