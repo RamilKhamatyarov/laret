@@ -6,7 +6,6 @@ import com.rkhamatyarov.laret.core.HelpFormatter
 import com.rkhamatyarov.laret.output.OutputStrategy
 import com.rkhamatyarov.laret.output.PlainOutput
 import com.rkhamatyarov.laret.ui.redBold
-import org.slf4j.LoggerFactory
 
 /**
  * Represents a single command
@@ -18,8 +17,6 @@ data class Command(
     val options: List<Option> = emptyList(),
     val action: (CommandContext) -> Unit = {},
 ) {
-    private val log = LoggerFactory.getLogger(javaClass)
-
     fun execute(
         args: Array<String>,
         app: CliApp? = null,
@@ -29,7 +26,7 @@ data class Command(
 
         if (app?.hasPlugins() == true) {
             if (!app.getPluginManager().beforeExecute(this)) {
-                log.warn("Plugin rejected execution of command: {}", name)
+                println("Plugin rejected execution of command: $name")
                 return
             }
         }
@@ -90,7 +87,7 @@ data class Command(
 
             action(context)
         } catch (e: Exception) {
-            log.error(redBold("Error: ${e.message}"))
+            println(redBold("Error: ${e.message}"))
             e.printStackTrace()
         } finally {
             if (app?.hasPlugins() == true) {

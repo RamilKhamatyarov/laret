@@ -7,7 +7,6 @@ import com.rkhamatyarov.laret.model.CommandGroup
 import com.rkhamatyarov.laret.plugin.LaretPlugin
 import com.rkhamatyarov.laret.plugin.PluginManager
 import org.fusesource.jansi.AnsiConsole
-import org.slf4j.LoggerFactory
 
 /**
  * Represents a complete CLI application with integrated configuration system
@@ -18,7 +17,6 @@ data class CliApp(
     val description: String = "",
     val groups: List<CommandGroup> = emptyList(),
 ) {
-    private val log = LoggerFactory.getLogger(javaClass)
     private val pluginManager = PluginManager()
     private val logManager = LogManager()
     private val configLoader = ConfigLoader()
@@ -36,30 +34,24 @@ data class CliApp(
 
         try {
             appConfig = configLoader.load(configPath)
-            log.info("Configuration loaded: app=${appConfig.app.name} v${appConfig.app.version}")
 
             val validationResult = configValidator.validate(appConfig)
 
             if (!validationResult.isValid) {
                 validationResult.errors.forEach { error ->
-                    log.error("Config validation error: $error")
                     System.err.println("ERROR: $error")
                 }
                 throw RuntimeException("Configuration validation failed")
             }
 
             validationResult.warnings.forEach { warning ->
-                log.warn("Config validation warning: $warning")
                 System.err.println(" WARNING: $warning")
             }
 
             applyConfiguration(appConfig)
 
             initializePlugins()
-
-            log.info("Application initialized successfully")
         } catch (e: Exception) {
-            log.error("Failed to initialize application", e)
             throw e
         }
 
@@ -81,15 +73,18 @@ data class CliApp(
                 args.isEmpty() -> {
                     HelpFormatter.showApplicationHelp(this)
                 }
+
                 args[0] == "--help" || args[0] == "-h" -> {
                     HelpFormatter.showApplicationHelp(this)
                 }
+
                 args[0] == "--version" || args[0] == "-v" -> {
                     println("$name version $version")
                     if (appConfig.app.description.isNotEmpty()) {
                         println(appConfig.app.description)
                     }
                 }
+
                 args[0] == "--config" && args.size > 1 -> {
                     init(args[1])
                     val remainingArgs = args.drop(2).toTypedArray()
@@ -97,6 +92,7 @@ data class CliApp(
                         executeCommand(remainingArgs)
                     }
                 }
+
                 else -> {
                     val filteredArgs = args.filter { it != "--quiet" }.toTypedArray()
                     executeCommand(filteredArgs)
@@ -142,19 +138,19 @@ data class CliApp(
 
     private fun applyConfiguration(config: AppConfig) {
         if (config.output.verbose) {
-            log.info("Verbose mode enabled")
+            println("Verbose mode enabled")
         }
 
         if (config.logging.file.isNotEmpty()) {
-            log.info("Log file configured: ${config.logging.file}")
+            println("Log file configured: ${config.logging.file}")
         }
-        log.info("Log level set to: ${config.logging.level}")
+        println("Log level set to: ${config.logging.level}")
 
         if (config.plugins.enabled.isNotEmpty()) {
-            log.info("Enabled plugins: ${config.plugins.enabled.joinToString(", ")}")
+            println("Enabled plugins: ${config.plugins.enabled.joinToString(", ")}")
         }
         if (config.plugins.paths.isNotEmpty()) {
-            log.info("Plugin search paths: ${config.plugins.paths.joinToString(", ")}")
+            println("Plugin search paths: ${config.plugins.paths.joinToString(", ")}")
         }
     }
 
@@ -179,7 +175,7 @@ data class CliApp(
      */
     fun saveConfig(outputPath: String) {
         configLoader.save(appConfig, outputPath)
-        log.info("Configuration saved to: $outputPath")
+        println("Configuration saved to: $outputPath")
     }
 
     /**
@@ -188,7 +184,7 @@ data class CliApp(
     fun reloadConfig(): CliApp {
         appConfig = configLoader.load(configPath)
         applyConfiguration(appConfig)
-        log.info("Configuration reloaded")
+        println("Configuration reloaded")
         return this
     }
 
