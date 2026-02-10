@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.rkhamatyarov"
-version = "1.0-SNAPSHOT"
+version = "0.1.0"
 
 application {
     mainClass.set("com.rkhamatyarov.laret.example.MainKt")
@@ -124,6 +124,16 @@ publishing {
                     connection.set("scm:git:github.com/rkhamatyarov/laret.git")
                     url.set("https://github.com/rkhamatyarov/laret")
                 }
+            }
+        }
+    }
+    repositories {
+        maven("GitHubPackages") {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/RamilKhamatyarov/laret")
+            credentials {
+                username = project.findProperty("gpr.user") as String? ?: System.getenv("GITHUB_USERNAME")
+                password = project.findProperty("gpr.key") as String? ?: System.getenv("GITHUB_TOKEN")
             }
         }
     }
