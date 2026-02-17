@@ -5,12 +5,10 @@ import com.fasterxml.jackson.dataformat.toml.TomlMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.rkhamatyarov.laret.config.model.AppConfig
-import org.slf4j.LoggerFactory
+import com.rkhamatyarov.laret.ui.redBold
 import java.io.File
 
 class ConfigLoader {
-    private val log = LoggerFactory.getLogger(javaClass)
-
     private val jsonMapper: ObjectMapper = jacksonObjectMapper()
     private val yamlMapper: ObjectMapper = YAMLMapper()
     private val tomlMapper: ObjectMapper = TomlMapper()
@@ -21,7 +19,6 @@ class ConfigLoader {
         return if (file?.exists() == true) {
             loadFromFile(file)
         } else {
-            log.info("No config file found, using defaults")
             AppConfig()
         }
     }
@@ -38,10 +35,10 @@ class ConfigLoader {
             val mapper = getMapper(format)
             val config = mapper.readValue(content, AppConfig::class.java)
 
-            log.info("Loaded config from ${file.absolutePath} (format: $format)")
+            println("Loaded config from ${file.absolutePath} (format: $format)")
             applyEnvironmentOverrides(config)
         } catch (e: Exception) {
-            log.error("Failed to load config from ${file.absolutePath}", e)
+            println(redBold("Failed to load config from ${file.absolutePath} ${e.printStackTrace()}"))
             throw RuntimeException("Config loading failed: ${e.message}", e)
         }
     }
@@ -61,9 +58,9 @@ class ConfigLoader {
                     .writerWithDefaultPrettyPrinter()
                     .writeValueAsString(config)
             file.writeText(content)
-            log.info("Saved config to ${file.absolutePath}")
+            println("Saved config to ${file.absolutePath}")
         } catch (e: Exception) {
-            log.error("Failed to save config to ${file.absolutePath}", e)
+            println(redBold("Failed to save config to ${file.absolutePath} ${e.printStackTrace()}"))
             throw RuntimeException("Config save failed: ${e.message}", e)
         }
     }

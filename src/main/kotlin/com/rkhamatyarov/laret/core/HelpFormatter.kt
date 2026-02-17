@@ -1,6 +1,5 @@
 package com.rkhamatyarov.laret.core
 
-import com.rkhamatyarov.laret.core.HelpFormatter.showGroupHelp
 import com.rkhamatyarov.laret.model.Command
 import com.rkhamatyarov.laret.model.CommandGroup
 import com.rkhamatyarov.laret.ui.redBold
@@ -109,7 +108,7 @@ object HelpFormatter {
         commandName: String,
         group: CommandGroup? = null,
     ) {
-        log.error(redBold("Error: Command not found: $commandName"))
+        println(redBold("Error: Command not found: $commandName"))
         if (group != null) {
             log.info("\nAvailable commands in group '${group.name}':")
             showGroupHelp(group)
@@ -120,6 +119,6 @@ object HelpFormatter {
      * Display a required argument missing error
      */
     fun showArgumentMissingError(argumentName: String) {
-        log.error(redBold("Error: Required argument '$argumentName' not provided"))
+        println(redBold("Error: Required argument '$argumentName' not provided"))
     }
 }

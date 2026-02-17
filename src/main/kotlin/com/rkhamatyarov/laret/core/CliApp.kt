@@ -22,7 +22,6 @@ data class CliApp(
     private val configLoader = ConfigLoader()
     private val configValidator = ConfigValidator()
 
-    private var quietMode = false
     private var appConfig: AppConfig = AppConfig()
     private var configPath: String? = null
 
@@ -64,10 +63,7 @@ data class CliApp(
     fun run(args: Array<String>) {
         AnsiConsole.systemInstall()
         try {
-            quietMode = args.contains("--quiet")
-            if (quietMode) {
-                logManager.disableLogging()
-            }
+            logManager.disableLogging()
 
             when {
                 args.isEmpty() -> {
@@ -94,8 +90,7 @@ data class CliApp(
                 }
 
                 else -> {
-                    val filteredArgs = args.filter { it != "--quiet" }.toTypedArray()
-                    executeCommand(filteredArgs)
+                    executeCommand(args)
                 }
             }
         } finally {
@@ -144,7 +139,6 @@ data class CliApp(
         if (config.logging.file.isNotEmpty()) {
             println("Log file configured: ${config.logging.file}")
         }
-        println("Log level set to: ${config.logging.level}")
 
         if (config.plugins.enabled.isNotEmpty()) {
             println("Enabled plugins: ${config.plugins.enabled.joinToString(", ")}")
@@ -187,8 +181,6 @@ data class CliApp(
         println("Configuration reloaded")
         return this
     }
-
-    fun isQuietMode(): Boolean = quietMode
 
     fun registerPlugin(plugin: LaretPlugin): CliApp {
         pluginManager.register(plugin)
