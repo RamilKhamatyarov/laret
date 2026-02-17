@@ -99,7 +99,7 @@ jobs:
       - name: Test Bash Completion Generation
         run: |
           set -euo pipefail
-          ./build/native/nativeCompile/laret completion bash --quiet > /tmp/laret_bash_completion.sh 2> /tmp/laret_bash_completion.stderr.log
+          ./build/native/nativeCompile/laret completion bash > /tmp/laret_bash_completion.sh 2> /tmp/laret_bash_completion.stderr.log
           if [ -s /tmp/laret_bash_completion.stderr.log ]; then
             echo "=== laret (bash completion) stderr ==="
             head -200 /tmp/laret_bash_completion.stderr.log || true
@@ -118,7 +118,7 @@ jobs:
       - name: Test Zsh Completion Generation
         run: |
           set -euo pipefail
-          ./build/native/nativeCompile/laret completion zsh --quiet > /tmp/laret_zsh_completion.sh 2> /tmp/laret_zsh_completion.stderr.log
+          ./build/native/nativeCompile/laret completion zsh > /tmp/laret_zsh_completion.sh 2> /tmp/laret_zsh_completion.stderr.log
           if [ -s /tmp/laret_zsh_completion.stderr.log ]; then
             echo "=== laret (zsh completion) stderr ==="
             head -200 /tmp/laret_zsh_completion.stderr.log || true
@@ -136,7 +136,7 @@ jobs:
 
       - name: Test PowerShell Completion Generation
         run: |
-          ./build/native/nativeCompile/laret completion powershell --quiet > /tmp/laret_ps_completion.ps1
+          ./build/native/nativeCompile/laret completion powershell > /tmp/laret_ps_completion.ps1
 
           pwsh -NoProfile -Command "Test-Path '/tmp/laret_ps_completion.ps1'" -ErrorAction Stop
           echo "PowerShell completion script is valid"
