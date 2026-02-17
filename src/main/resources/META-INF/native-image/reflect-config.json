@@ -1,0 +1,7 @@
+[
+  {
+    "name": "ch.qos.logback.core.status.NopStatusListener",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  }
+]

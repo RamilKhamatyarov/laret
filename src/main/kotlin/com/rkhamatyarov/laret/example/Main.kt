@@ -6,6 +6,8 @@ import com.rkhamatyarov.laret.dsl.cli
 import java.io.File
 
 fun main(args: Array<String>) {
+    System.setProperty("logback.statusListenerClass", "ch.qos.logback.core.status.NopStatusListener")
+
     val app =
         cli(
             name = "laret",
