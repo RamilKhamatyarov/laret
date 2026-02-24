@@ -1,10 +1,8 @@
 package com.rkhamatyarov.laret.config.validator
 
 import com.rkhamatyarov.laret.config.model.AppConfig
-import org.slf4j.LoggerFactory
 
 class ConfigValidator {
-    private val log = LoggerFactory.getLogger(javaClass)
     private val rules = mutableListOf<ValidationRule>()
 
     init {
@@ -26,7 +24,7 @@ class ConfigValidator {
             try {
                 result = result.merge(rule.validate(config))
             } catch (e: Exception) {
-                log.error("Validation rule failed", e)
+                System.err.println("ERROR: $e")
                 result =
                     result.copy(
                         isValid = false,

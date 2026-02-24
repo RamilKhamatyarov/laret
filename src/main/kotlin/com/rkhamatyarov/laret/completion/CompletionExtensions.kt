@@ -1,15 +1,12 @@
 package com.rkhamatyarov.laret.completion
 
-import ch.qos.logback.classic.LoggerContext
 import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.ui.greenBold
 import org.fusesource.jansi.AnsiConsole
-import org.slf4j.LoggerFactory
 import java.io.File
 
 fun CliApp.generateCompletion(shell: String = "bash"): String {
     AnsiConsole.systemUninstall()
-    disableLogback()
 
     val generator =
         when (shell.lowercase()) {
@@ -64,12 +61,4 @@ fun CliApp.installCompletion(shell: String = "bash") {
  */
 fun CliApp.installPowerShellCompletion() {
     installCompletion("powershell")
-}
-
-/**
- * Disable all log messages in generating completion file
- */
-fun disableLogback() {
-    val ctx = LoggerFactory.getILoggerFactory() as? LoggerContext ?: return
-    ctx.stop()
 }

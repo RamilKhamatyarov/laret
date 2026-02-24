@@ -61,10 +61,9 @@ data class CliApp(
      * Run the CLI application with arguments
      */
     fun run(args: Array<String>) {
+        logManager.disableLogging()
         AnsiConsole.systemInstall()
         try {
-            logManager.disableLogging()
-
             when {
                 args.isEmpty() -> {
                     HelpFormatter.showApplicationHelp(this)

@@ -2,13 +2,11 @@ package com.rkhamatyarov.laret.plugin
 
 import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.model.Command
-import org.slf4j.LoggerFactory
 
 /**
  * Manages plugin lifecycle and execution
  */
 class PluginManager {
-    private val log = LoggerFactory.getLogger(javaClass)
     private val plugins = mutableListOf<LaretPlugin>()
 
     fun register(plugin: LaretPlugin): PluginManager {
@@ -21,7 +19,7 @@ class PluginManager {
             try {
                 plugin.initialize(app)
             } catch (e: Exception) {
-                log.error("Failed to initialize plugin ${plugin.name}", e)
+                System.err.println("Failed to initialize plugin ${plugin.name}: ${e.message}")
             }
         }
     }
@@ -29,12 +27,9 @@ class PluginManager {
     fun beforeExecute(command: Command): Boolean {
         for (plugin in plugins) {
             try {
-                if (!plugin.beforeExecute(command)) {
-                    return false
-                }
+                if (!plugin.beforeExecute(command)) return false
             } catch (e: Exception) {
-                log.error("Exception in plugin ${plugin.name} beforeExecute: ${e.message}", e)
-                continue
+                System.err.println("Exception in plugin ${plugin.name} beforeExecute: ${e.message}")
             }
         }
         return true
@@ -45,7 +40,7 @@ class PluginManager {
             try {
                 plugin.afterExecute(command)
             } catch (e: Exception) {
-                log.error("Exception in plugin ${plugin.name} afterExecute: ${e.message}", e)
+                System.err.println("Exception in plugin ${plugin.name} afterExecute: ${e.message}")
             }
         }
     }
@@ -55,7 +50,7 @@ class PluginManager {
             try {
                 plugin.shutdown()
             } catch (e: Exception) {
-                log.error("Exception in plugin ${plugin.name} shutdown: ${e.message}", e)
+                System.err.println("Exception in plugin ${plugin.name} shutdown: ${e.message}")
             }
         }
     }

@@ -3,11 +3,13 @@ package com.rkhamatyarov.laret.example
 import com.rkhamatyarov.laret.completion.generateCompletion
 import com.rkhamatyarov.laret.completion.installCompletion
 import com.rkhamatyarov.laret.dsl.cli
+import org.jline.reader.EndOfFileException
+import org.jline.reader.LineReaderBuilder
+import org.jline.reader.UserInterruptException
+import org.jline.terminal.TerminalBuilder
 import java.io.File
 
 fun main(args: Array<String>) {
-    System.setProperty("logback.statusListenerClass", "ch.qos.logback.core.status.NopStatusListener")
-
     val app =
         cli(
             name = "laret",
@@ -56,6 +58,42 @@ fun main(args: Array<String>) {
                             ctx.app?.installCompletion(shell)
                         } catch (e: Exception) {
                             println("Error: ${e.message}")
+                        }
+                    }
+                }
+
+                command(
+                    name = "interactive",
+                    description = "Start interactive shell",
+                ) {
+                    action { ctx ->
+                        val terminal = TerminalBuilder.builder().system(true).build()
+                        val reader =
+                            LineReaderBuilder
+                                .builder()
+                                .terminal(terminal)
+                                .appName("laret")
+                                .build()
+
+                        println("Laret Interactive Shell. Type 'exit' to quit.")
+
+                        while (true) {
+                            try {
+                                val line = reader.readLine("laret> ") ?: break
+                                if (line.trim() == "exit" || line.trim() == "quit") break
+                                if (line.isBlank()) continue
+
+                                val args = line.trim().split("\\s+".toRegex()).toTypedArray()
+                                ctx.app?.run(args)
+                            } catch (e: UserInterruptException) {
+                                println("\nInterrupted ${e.message}")
+                                break
+                            } catch (e: EndOfFileException) {
+                                println("\nEnd of input ${e.message}")
+                                break
+                            } catch (e: Exception) {
+                                println("Error: ${e.message}")
+                            }
                         }
                     }
                 }
@@ -148,7 +186,6 @@ fun main(args: Array<String>) {
                     option("a", "all", "Show hidden files", "", false)
                     option("f", "format", "Output format (plain, json, yaml, toml)", "plain", true)
                     option("m", "max-size", "Max file size in bytes", "0", true)
-
                     action { ctx ->
                         val path = ctx.argument("path")
                         val long = ctx.optionBool("long")
@@ -179,7 +216,7 @@ fun main(args: Array<String>) {
                             format == "plain" && long -> {
                                 println("Directory: $path")
                                 entries.forEach { entry ->
-                                    val size = if (entry["isDirectory"] == true) "<dir>" else "${entry["size"]} B"
+                                    val size = if (entry["isDirectory"] == true) "" else "${entry["size"]} B"
                                     val type = if (entry["isDirectory"] == true) "d" else "-"
                                     println("$type $size ${entry["name"]}")
                                 }
@@ -188,7 +225,7 @@ fun main(args: Array<String>) {
                             format == "plain" -> {
                                 println("Directory: $path")
                                 entries.forEach { entry ->
-                                    println("  ${entry["name"]}")
+                                    println(" ${entry["name"]}")
                                 }
                             }
 
@@ -229,5 +266,4 @@ fun main(args: Array<String>) {
 
     app.init()
     app.run(args)
-    app.registerPlugin(LoggingPlugin())
 }
