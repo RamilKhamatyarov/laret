@@ -319,6 +319,54 @@ val formatter = when (format) {
 println(formatter.render(data))
 ```
 
+###  Interactive Mode
+
+```bash
+$ laret interactive
+Laret Interactive Shell. Type 'exit' to quit.
+laret> file create test.txt --content "Hello World"
+File created: test.txt
+laret> file read test.txt
+Hello World
+laret> dir list --long --format json
+[
+  {
+    "name": ".",
+    "size": 4096,
+    "isDirectory": true
+  },
+  {
+    "name": "test.txt",
+    "size": 12,
+    "isDirectory": false
+  }
+]
+laret> exit
+
+```
+
+Keyboard Shortcuts
+
+| Key      | Action                    |
+| -------- | ------------------------- |
+| ↑/↓      | Previous/next command     |
+| Ctrl+R   | Reverse search history    |
+| Ctrl+A/E | Start/end of line         |
+| Ctrl+U/K | Clear line/backward       |
+| Ctrl+W   | Delete word               |
+| Tab      | Command/option completion |
+| Ctrl+C   | Interrupt current command |
+| Ctrl+D   | Exit shell                |
+
+```text
+# .laret.yml
+output:
+  colorized: true
+logging:
+  level: INFO
+
+```
+
 ## Complete Example
 
 ```kt
@@ -692,8 +740,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] GraalVM Native Image support
 - [x] JSON/YAML output formatting
 - [x] Plugin system for extensibility
-- [ ] Built-in config file support (YAML, TOML, JSON)
-- [ ] Interactive prompts and menus
+- [x] Built-in config file support (YAML, TOML, JSON)
+- [x] Interactive prompts and menus
 - [ ] Progress bars and spinners
 - [ ] Table rendering utilities
 - [ ] Command aliases

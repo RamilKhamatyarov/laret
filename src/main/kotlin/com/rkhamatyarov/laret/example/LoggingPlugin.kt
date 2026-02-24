@@ -23,7 +23,7 @@ class LoggingPlugin : LaretPlugin {
         log.info("Total command groups: ${app.groups.size}")
 
         app.groups.forEach { group ->
-            log.info("  📁 Group '${group.name}': ${group.commands.size} commands")
+            log.info("Group '${group.name}': ${group.commands.size} commands")
             group.commands.forEach { cmd ->
                 log.info("    📌 ${cmd.name}: ${cmd.description}")
             }
