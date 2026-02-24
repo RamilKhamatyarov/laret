@@ -23,9 +23,6 @@ repositories {
 
 dependencies {
     implementation(kotlin("stdlib"))
-    implementation("org.slf4j:slf4j-api:2.0.17")
-    implementation("ch.qos.logback:logback-classic:1.5.32")
-    implementation("ch.qos.logback:logback-core:1.5.32")
     implementation("org.fusesource.jansi:jansi:2.4.2")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.21.0")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.21.0")

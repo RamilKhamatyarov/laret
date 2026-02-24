@@ -1,14 +1,11 @@
 package com.rkhamatyarov.laret.core
 
 import com.rkhamatyarov.laret.ui.redBold
-import org.slf4j.LoggerFactory
 
 /**
  * Handles command execution logic
  */
 object CommandRunner {
-    private val log = LoggerFactory.getLogger(javaClass::class.java)
-
     fun execute(
         app: CliApp,
         args: Array<String>,
@@ -29,7 +26,7 @@ object CommandRunner {
         val group =
             app.groups.find { it.name == groupName }
                 ?: run {
-                    log.warn(redBold("Group not found: $groupName"))
+                    println(redBold("Group not found: $groupName"))
                     HelpFormatter.showApplicationHelp(app)
                     return
                 }
@@ -37,7 +34,7 @@ object CommandRunner {
         val command =
             group.commands.find { it.name == commandName }
                 ?: run {
-                    log.warn(redBold("Command not found: $commandName"))
+                    println(redBold("Command not found: $commandName"))
                     HelpFormatter.showCommandNotFound(commandName, group)
                     return
                 }

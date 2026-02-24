@@ -1,9 +1,5 @@
 package com.rkhamatyarov.laret.example
 
-import ch.qos.logback.classic.Level
-import ch.qos.logback.classic.Logger
-import ch.qos.logback.classic.LoggerContext
-import ch.qos.logback.core.status.NopStatusListener
 import com.rkhamatyarov.laret.completion.generateCompletion
 import com.rkhamatyarov.laret.completion.installCompletion
 import com.rkhamatyarov.laret.dsl.cli
@@ -11,12 +7,9 @@ import org.jline.reader.EndOfFileException
 import org.jline.reader.LineReaderBuilder
 import org.jline.reader.UserInterruptException
 import org.jline.terminal.TerminalBuilder
-import org.slf4j.LoggerFactory
 import java.io.File
 
 fun main(args: Array<String>) {
-    silenceLogback()
-
     val app =
         cli(
             name = "laret",
@@ -273,12 +266,4 @@ fun main(args: Array<String>) {
 
     app.init()
     app.run(args)
-}
-
-fun silenceLogback() {
-    val context = LoggerFactory.getILoggerFactory() as? LoggerContext ?: return
-    context.statusManager.clear()
-    context.getLogger(Logger.ROOT_LOGGER_NAME).level = Level.OFF
-    val nopListener = NopStatusListener()
-    context.statusManager.add(nopListener)
 }
