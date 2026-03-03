@@ -176,11 +176,9 @@ class CliTest {
 
     @After
     fun cleanup() {
-        // Restore original output streams
         System.setOut(originalOut)
         System.setErr(originalErr)
 
-        // Delete test directory and files
         testDir.deleteRecursively()
     }
 

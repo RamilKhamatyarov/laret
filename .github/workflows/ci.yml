@@ -157,6 +157,74 @@ jobs:
           ./build/native/nativeCompile/laret dir list /tmp --format json | head -20
           echo "All CLI tests passed"
 
+      - name: Test Progress Bar - file create
+        run: |
+          set -euo pipefail
+          ./build/native/nativeCompile/laret file create /tmp/laret_pb_test.txt -c "progress bar test" > /tmp/laret_pb_create.stdout.log 2> /tmp/laret_pb_create.stderr.log
+          if [ -s /tmp/laret_pb_create.stderr.log ]; then
+            echo "=== laret (file create) stderr ==="
+            head -200 /tmp/laret_pb_create.stderr.log || true
+            echo "=================================="
+          fi
+          grep -q "File created" /tmp/laret_pb_create.stderr.log
+          echo "Progress bar spinner output is valid for file create"
+
+      - name: Test Progress Bar - file delete
+        run: |
+          set -euo pipefail
+          ./build/native/nativeCompile/laret file delete /tmp/laret_pb_test.txt > /tmp/laret_pb_delete.stdout.log 2> /tmp/laret_pb_delete.stderr.log
+          if [ -s /tmp/laret_pb_delete.stderr.log ]; then
+            echo "=== laret (file delete) stderr ==="
+            head -200 /tmp/laret_pb_delete.stderr.log || true
+            echo "=================================="
+          fi
+          grep -q "File deleted" /tmp/laret_pb_delete.stderr.log
+          echo "Progress bar spinner output is valid for file delete"
+
+      - name: Test Progress Bar - dir create
+        run: |
+          set -euo pipefail
+          ./build/native/nativeCompile/laret dir create /tmp/laret_pb_testdir > /tmp/laret_pb_dircreate.stdout.log 2> /tmp/laret_pb_dircreate.stderr.log
+          if [ -s /tmp/laret_pb_dircreate.stderr.log ]; then
+            echo "=== laret (dir create) stderr ==="
+            head -200 /tmp/laret_pb_dircreate.stderr.log || true
+            echo "================================="
+          fi
+          grep -q "Directory created" /tmp/laret_pb_dircreate.stderr.log
+          echo "Progress bar spinner output is valid for dir create"
+
+      - name: Test Progress Bar - dir list
+        run: |
+          set -euo pipefail
+          ./build/native/nativeCompile/laret dir list /tmp > /tmp/laret_pb_dirlist.stdout.log 2> /tmp/laret_pb_dirlist.stderr.log
+          
+          if [ -s /tmp/laret_pb_dirlist.stderr.log ]; then
+            echo "=== laret (dir list) stderr ==="
+            grep -E "(Scanning|File|Directory)" /tmp/laret_pb_dirlist.stderr.log | head -20 || true
+            echo "=== (warnings filtered) ==="
+          fi
+          
+          if ! grep -q "Scanning" /tmp/laret_pb_dirlist.stderr.log 2>/dev/null && \
+             ! grep -q "Directory:" /tmp/laret_pb_dirlist.stdout.log 2>/dev/null; then
+            echo "ERROR: No progress bar output detected"
+            exit 1
+          fi
+          
+          grep -q "Scanning" /tmp/laret_pb_dirlist.stderr.log || echo "Note: No Scanning output (may be OK)"
+          grep -q "Directory:" /tmp/laret_pb_dirlist.stdout.log || echo "Note: No Directory output (may be OK)"
+          echo "Progress bar output is valid for dir list"
+
+
+      - name: Test Progress Bar - stdout is clean
+        run: |
+          set -euo pipefail
+          ./build/native/nativeCompile/laret file create /tmp/laret_clean_test.txt -c "clean stdout" > /tmp/laret_clean.stdout.log 2>/dev/null
+          if grep -qP "[\x00-\x08\x0e-\x1f]" /tmp/laret_clean.stdout.log 2>/dev/null; then
+            echo "ERROR: stdout contains control characters (progress bar leaked to stdout)"
+            exit 1
+          fi
+          echo "stdout is clean - no progress bar output leaked"
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
