@@ -25,9 +25,9 @@ dependencies {
     implementation(kotlin("stdlib"))
     implementation("org.fusesource.jansi:jansi:2.4.2")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.21.0")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.21.0")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.21.0")
-    implementation("org.jline:jline:3.30.6")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.21.1")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.21.1")
+    implementation("org.jline:jline:3.29.0")
 
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
