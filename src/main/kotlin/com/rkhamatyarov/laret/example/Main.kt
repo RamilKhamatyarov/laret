@@ -121,12 +121,15 @@ fun main(args: Array<String>) {
                             return@action
                         }
 
+                        val spinner = ctx.spinner("Creating $path")
                         try {
+                            spinner.tick()
                             file.parentFile?.mkdirs()
+                            spinner.tick()
                             file.writeText(content)
-                            println("File created: $path")
+                            spinner.finish("File created: $path")
                         } catch (e: Exception) {
-                            println("Error: Failed to create file: ${e.message}")
+                            spinner.fail("Failed to create file: ${e.message}")
                         }
                     }
                 }
@@ -145,10 +148,12 @@ fun main(args: Array<String>) {
                             return@action
                         }
 
+                        val spinner = ctx.spinner("Deleting $path")
+                        spinner.tick()
                         if (file.delete()) {
-                            println("File deleted: $path")
+                            spinner.finish("File deleted: $path")
                         } else {
-                            println("Error: Failed to delete file: $path")
+                            spinner.fail("Failed to delete file: $path")
                         }
                     }
                 }
@@ -199,18 +204,23 @@ fun main(args: Array<String>) {
                             return@action
                         }
 
-                        val entries =
+                        val files =
                             (dir.listFiles() ?: emptyArray())
                                 .filter { all || !it.isHidden }
                                 .filter { maxSize <= 0 || it.length() <= maxSize }
                                 .sortedBy { it.name }
-                                .map { file ->
-                                    mapOf(
-                                        "name" to file.name,
-                                        "size" to file.length(),
-                                        "isDirectory" to file.isDirectory,
-                                    )
-                                }
+
+                        val bar = ctx.progressBar(total = files.size, label = "Scanning")
+                        val entries =
+                            files.map { file ->
+                                bar.increment()
+                                mapOf(
+                                    "name" to file.name,
+                                    "size" to file.length(),
+                                    "isDirectory" to file.isDirectory,
+                                )
+                            }
+                        bar.finish()
 
                         when {
                             format == "plain" && long -> {
@@ -252,12 +262,14 @@ fun main(args: Array<String>) {
                             return@action
                         }
 
+                        val spinner = ctx.spinner("Creating directory $path")
+                        spinner.tick()
                         val success = if (parents) dir.mkdirs() else dir.mkdir()
 
                         if (success) {
-                            println("Directory created: $path")
+                            spinner.finish("Directory created: $path")
                         } else {
-                            println("Error: Failed to create directory: $path")
+                            spinner.fail("Failed to create directory: $path")
                         }
                     }
                 }

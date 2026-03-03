@@ -89,9 +89,8 @@ class ConfigLoader {
             ConfigFormat.JSON -> jsonMapper
         }
 
-    private fun applyEnvironmentOverrides(config: AppConfig): AppConfig {
-        // Override with environment variables if present
-        return config.copy(
+    private fun applyEnvironmentOverrides(config: AppConfig): AppConfig =
+        config.copy(
             output =
                 config.output.copy(
                     colorized =
@@ -114,5 +113,4 @@ class ConfigLoader {
                             ?: config.logging.file,
                 ),
         )
-    }
 }

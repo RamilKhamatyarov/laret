@@ -39,7 +39,6 @@ data class Command(
                 val arg = args[i]
                 when {
                     arg.startsWith("--") -> {
-                        // Long option
                         val optName = arg.substring(2)
                         val opt = options.find { it.long == optName }
                         if (opt != null) {

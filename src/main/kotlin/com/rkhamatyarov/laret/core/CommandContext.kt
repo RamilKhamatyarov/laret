@@ -3,6 +3,8 @@ package com.rkhamatyarov.laret.core
 import com.rkhamatyarov.laret.model.Command
 import com.rkhamatyarov.laret.output.OutputStrategy
 import com.rkhamatyarov.laret.output.PlainOutput
+import com.rkhamatyarov.laret.ui.ProgressBar
+import com.rkhamatyarov.laret.ui.Spinner
 
 /**
  * Context passed to command actions
@@ -25,4 +27,12 @@ class CommandContext(
     fun optionInt(name: String): Int = options[name]?.toIntOrNull() ?: 0
 
     fun render(data: Any): String = outputStrategy.render(data)
+
+    fun progressBar(
+        total: Int,
+        label: String = "",
+        width: Int = 40,
+    ): ProgressBar = ProgressBar(total = total, width = width, label = label)
+
+    fun spinner(label: String = ""): Spinner = Spinner(label = label)
 }
