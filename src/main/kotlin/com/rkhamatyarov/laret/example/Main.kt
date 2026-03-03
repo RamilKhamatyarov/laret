@@ -108,8 +108,8 @@ fun main(args: Array<String>) {
                     description = "Create a new file",
                 ) {
                     argument("path", "File path", required = true)
-                    option("c", "content", "File content", "", true)
-                    option("f", "force", "Overwrite if exists", "", false)
+                    option("c", "content", "File content", "", false)
+                    option("f", "format", "Output format (plain, json, yaml, toml)", "plain", false)
                     action { ctx ->
                         val path = ctx.argument("path")
                         val content = ctx.option("content")
@@ -189,8 +189,8 @@ fun main(args: Array<String>) {
                     argument("path", "Directory path", required = false, optional = true, default = ".")
                     option("l", "long", "Long format", "", false)
                     option("a", "all", "Show hidden files", "", false)
-                    option("f", "format", "Output format (plain, json, yaml, toml)", "plain", true)
-                    option("m", "max-size", "Max file size in bytes", "0", true)
+                    option("f", "format", "Output format (plain, json, yaml, toml)", "plain", false)
+                    option("m", "max-size", "Max file size in bytes", "0", false)
                     action { ctx ->
                         val path = ctx.argument("path")
                         val long = ctx.optionBool("long")
