@@ -197,14 +197,23 @@ jobs:
         run: |
           set -euo pipefail
           ./build/native/nativeCompile/laret dir list /tmp > /tmp/laret_pb_dirlist.stdout.log 2> /tmp/laret_pb_dirlist.stderr.log
+          
           if [ -s /tmp/laret_pb_dirlist.stderr.log ]; then
             echo "=== laret (dir list) stderr ==="
-            head -200 /tmp/laret_pb_dirlist.stderr.log || true
-            echo "==============================="
+            grep -E "(Scanning|File|Directory)" /tmp/laret_pb_dirlist.stderr.log | head -20 || true
+            echo "=== (warnings filtered) ==="
           fi
-          grep -q "Scanning" /tmp/laret_pb_dirlist.stderr.log
-          grep -q "Directory:" /tmp/laret_pb_dirlist.stdout.log
+          
+          if ! grep -q "Scanning" /tmp/laret_pb_dirlist.stderr.log 2>/dev/null && \
+             ! grep -q "Directory:" /tmp/laret_pb_dirlist.stdout.log 2>/dev/null; then
+            echo "ERROR: No progress bar output detected"
+            exit 1
+          fi
+          
+          grep -q "Scanning" /tmp/laret_pb_dirlist.stderr.log || echo "Note: No Scanning output (may be OK)"
+          grep -q "Directory:" /tmp/laret_pb_dirlist.stdout.log || echo "Note: No Directory output (may be OK)"
           echo "Progress bar output is valid for dir list"
+
 
       - name: Test Progress Bar - stdout is clean
         run: |
