@@ -200,18 +200,11 @@ jobs:
           
           if [ -s /tmp/laret_pb_dirlist.stderr.log ]; then
             echo "=== laret (dir list) stderr ==="
-            grep -E "(Scanning|File|Directory)" /tmp/laret_pb_dirlist.stderr.log | head -20 || true
-            echo "=== (warnings filtered) ==="
+            head -200 /tmp/laret_pb_dirlist.stderr.log || true
+            echo "==============================="
           fi
-          
-          if ! grep -q "Scanning" /tmp/laret_pb_dirlist.stderr.log 2>/dev/null && \
-             ! grep -q "Directory:" /tmp/laret_pb_dirlist.stdout.log 2>/dev/null; then
-            echo "ERROR: No progress bar output detected"
-            exit 1
-          fi
-          
-          grep -q "Scanning" /tmp/laret_pb_dirlist.stderr.log || echo "Note: No Scanning output (may be OK)"
-          grep -q "Directory:" /tmp/laret_pb_dirlist.stdout.log || echo "Note: No Directory output (may be OK)"
+          grep -q "Scanning" /tmp/laret_pb_dirlist.stderr.log
+          grep -q "Directory:" /tmp/laret_pb_dirlist.stdout.log
           echo "Progress bar output is valid for dir list"
 
 
@@ -224,6 +217,89 @@ jobs:
             exit 1
           fi
           echo "stdout is clean - no progress bar output leaked"
+
+      - name: Test Interactive Prompts - text input
+        run: |
+          set -euo pipefail
+          echo "myfilename.txt" | ./build/native/nativeCompile/laret prompt text "Enter filename" > /tmp/laret_prompt_text.stdout.log 2> /tmp/laret_prompt_text.stderr.log
+          if [ -s /tmp/laret_prompt_text.stderr.log ]; then
+            echo "=== laret (prompt text) stderr ==="
+            head -200 /tmp/laret_prompt_text.stderr.log || true
+            echo "=================================="
+          fi
+          grep -q "myfilename.txt" /tmp/laret_prompt_text.stdout.log
+          echo "Interactive prompt text input is valid"
+
+      - name: Test Interactive Prompts - text input with default
+        run: |
+          set -euo pipefail
+          echo "" | ./build/native/nativeCompile/laret prompt text "Enter filename" --default "default.txt" > /tmp/laret_prompt_default.stdout.log 2> /tmp/laret_prompt_default.stderr.log
+          if [ -s /tmp/laret_prompt_default.stderr.log ]; then
+            echo "=== laret (prompt text default) stderr ==="
+            head -200 /tmp/laret_prompt_default.stderr.log || true
+            echo "=========================================="
+          fi
+          grep -q "default.txt" /tmp/laret_prompt_default.stdout.log
+          echo "Interactive prompt default value is valid"
+
+      - name: Test Interactive Prompts - confirm yes
+        run: |
+          set -euo pipefail
+          printf 'y\n' | ./build/native/nativeCompile/laret prompt confirm "Are you sure" > /tmp/laret_confirm_yes.stdout.log 2> /tmp/laret_confirm_yes.stderr.log
+          if [ -s /tmp/laret_confirm_yes.stderr.log ]; then
+            echo "=== laret (prompt confirm yes) stderr ==="
+            head -200 /tmp/laret_confirm_yes.stderr.log || true
+            echo "========================================="
+          fi
+          grep -q "true" /tmp/laret_confirm_yes.stdout.log
+          echo "Interactive prompt confirm yes is valid"
+
+      - name: Test Interactive Prompts - confirm no
+        run: |
+          set -euo pipefail
+          printf 'n\n' | ./build/native/nativeCompile/laret prompt confirm "Are you sure" > /tmp/laret_confirm_no.stdout.log 2> /tmp/laret_confirm_no.stderr.log
+          if [ -s /tmp/laret_confirm_no.stderr.log ]; then
+            echo "=== laret (prompt confirm no) stderr ==="
+            head -200 /tmp/laret_confirm_no.stderr.log || true
+            echo "========================================"
+          fi
+          grep -q "false" /tmp/laret_confirm_no.stdout.log
+          echo "Interactive prompt confirm no is valid"
+
+      - name: Test Interactive Prompts - select
+        run: |
+          set -euo pipefail
+          printf '2\n' | ./build/native/nativeCompile/laret prompt select "Pick format" --options "json,yaml,toml" > /tmp/laret_select.stdout.log 2> /tmp/laret_select.stderr.log
+          if [ -s /tmp/laret_select.stderr.log ]; then
+            echo "=== laret (prompt select) stderr ==="
+            head -200 /tmp/laret_select.stderr.log || true
+            echo "===================================="
+          fi
+          grep -q "yaml" /tmp/laret_select.stdout.log
+          echo "Interactive prompt select is valid"
+
+      - name: Test Interactive Prompts - multiselect
+        run: |
+          set -euo pipefail
+          printf '1,3\n' | ./build/native/nativeCompile/laret prompt multiselect "Pick formats" --options "json,yaml,toml" > /tmp/laret_multiselect.stdout.log 2> /tmp/laret_multiselect.stderr.log
+          if [ -s /tmp/laret_multiselect.stderr.log ]; then
+            echo "=== laret (prompt multiselect) stderr ==="
+            head -200 /tmp/laret_multiselect.stderr.log || true
+            echo "========================================="
+          fi
+          grep -q "json" /tmp/laret_multiselect.stdout.log
+          grep -q "toml" /tmp/laret_multiselect.stdout.log
+          echo "Interactive prompt multiselect is valid"
+
+      - name: Test Interactive Prompts - stdout is clean
+        run: |
+          set -euo pipefail
+          printf 'testvalue\n' | ./build/native/nativeCompile/laret prompt text "Enter value" > /tmp/laret_prompt_clean.stdout.log 2>/dev/null
+          if grep -qP "[\x00-\x08\x0e-\x1f]" /tmp/laret_prompt_clean.stdout.log 2>/dev/null; then
+            echo "ERROR: stdout contains control characters from interactive prompts"
+            exit 1
+          fi
+          echo "Interactive prompt stdout is clean"
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4

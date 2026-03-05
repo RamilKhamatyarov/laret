@@ -3,12 +3,10 @@ package com.rkhamatyarov.laret.core
 import com.rkhamatyarov.laret.model.Command
 import com.rkhamatyarov.laret.output.OutputStrategy
 import com.rkhamatyarov.laret.output.PlainOutput
+import com.rkhamatyarov.laret.ui.InteractivePrompt
 import com.rkhamatyarov.laret.ui.ProgressBar
 import com.rkhamatyarov.laret.ui.Spinner
 
-/**
- * Context passed to command actions
- */
 class CommandContext(
     val command: Command,
     val app: CliApp? = null,
@@ -33,6 +31,8 @@ class CommandContext(
         label: String = "",
         width: Int = 40,
     ): ProgressBar = ProgressBar(total = total, width = width, label = label)
+
+    fun prompt(): InteractivePrompt = InteractivePrompt()
 
     fun spinner(label: String = ""): Spinner = Spinner(label = label)
 }

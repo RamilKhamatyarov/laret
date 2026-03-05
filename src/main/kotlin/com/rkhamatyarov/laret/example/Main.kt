@@ -100,6 +100,95 @@ fun main(args: Array<String>) {
             }
 
             group(
+                name = "prompt",
+                description = "Interactive prompt commands",
+            ) {
+                command(
+                    name = "text",
+                    description = "Ask for text input",
+                ) {
+                    argument("question", "Prompt text", required = true)
+                    option("d", "default", "Default value", "", true)
+                    action { ctx ->
+                        val question = ctx.argument("question")
+                        val default = ctx.option("default")
+                        val result = ctx.prompt().text(question, default)
+                        println(result)
+                    }
+                }
+
+                command(
+                    name = "confirm",
+                    description = "Ask a yes/no question",
+                ) {
+                    argument("question", "Prompt text", required = true)
+                    option("d", "default", "Default answer (true/false)", "true", true)
+                    action { ctx ->
+                        val question = ctx.argument("question")
+                        val default = ctx.option("default").toBooleanStrictOrNull() ?: true
+                        val result = ctx.prompt().confirm(question, default)
+                        println(result)
+                    }
+                }
+
+                command(
+                    name = "select",
+                    description = "Select one option from a list",
+                ) {
+                    argument("question", "Prompt text", required = true)
+                    option("o", "options", "Comma-separated list of options", "", true)
+                    action { ctx ->
+                        val question = ctx.argument("question")
+                        val options =
+                            ctx.option("options")
+                                .split(",")
+                                .map { it.trim() }
+                                .filter { it.isNotEmpty() }
+                        if (options.isEmpty()) {
+                            println("Error: --options must not be empty")
+                            return@action
+                        }
+                        val result = ctx.prompt().select(question, options)
+                        println(result)
+                    }
+                }
+
+                command(
+                    name = "multiselect",
+                    description = "Select multiple options from a list",
+                ) {
+                    argument("question", "Prompt text", required = true)
+                    option("o", "options", "Comma-separated list of options", "", true)
+                    action { ctx ->
+                        val question = ctx.argument("question")
+                        val options =
+                            ctx.option("options")
+                                .split(",")
+                                .map { it.trim() }
+                                .filter { it.isNotEmpty() }
+                        if (options.isEmpty()) {
+                            println("Error: --options must not be empty")
+                            return@action
+                        }
+                        val results = ctx.prompt().multiSelect(question, options)
+                        results.forEach { println(it) }
+                    }
+                }
+
+                command(
+                    name = "password",
+                    description = "Ask for a password",
+                ) {
+                    argument("question", "Prompt text", required = true)
+                    action { ctx ->
+                        val question = ctx.argument("question")
+                        val result = ctx.prompt().password(question)
+                        println(result)
+                    }
+                }
+            }
+
+            group(
                 name = "file",
                 description = "File operations",
             ) {
@@ -108,8 +197,8 @@ fun main(args: Array<String>) {
                     description = "Create a new file",
                 ) {
                     argument("path", "File path", required = true)
-                    option("c", "content", "File content", "", false)
-                    option("f", "format", "Output format (plain, json, yaml, toml)", "plain", false)
+                    option("c", "content", "File content", "", true)
+                    option("f", "force", "Overwrite if exists", "", false)
                     action { ctx ->
                         val path = ctx.argument("path")
                         val content = ctx.option("content")
@@ -189,8 +278,8 @@ fun main(args: Array<String>) {
                     argument("path", "Directory path", required = false, optional = true, default = ".")
                     option("l", "long", "Long format", "", false)
                     option("a", "all", "Show hidden files", "", false)
-                    option("f", "format", "Output format (plain, json, yaml, toml)", "plain", false)
-                    option("m", "max-size", "Max file size in bytes", "0", false)
+                    option("f", "format", "Output format (plain, json, yaml, toml)", "plain", true)
+                    option("m", "max-size", "Max file size in bytes", "0", true)
                     action { ctx ->
                         val path = ctx.argument("path")
                         val long = ctx.optionBool("long")
