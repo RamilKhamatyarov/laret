@@ -66,7 +66,6 @@ class ConfigLoader {
     }
 
     private fun resolveConfigFile(configPath: String?): File? {
-        // Priority order
         val candidates =
             listOf(
                 configPath?.let { File(it) },
