@@ -125,6 +125,7 @@ fun main(args: Array<String>) {
 }
 
 ```
+
 **Usage:**
 
 ```bash
@@ -186,9 +187,11 @@ argument("name", "Optional name", required = false, optional = true, default = "
 **Access in action:**
 
 ```kt
+
 action { ctx ->
     val path = ctx.argument("path")
 }
+
 ```
 
 ### Options
@@ -196,18 +199,22 @@ action { ctx ->
 Named flags with short and long forms:
 
 ```kt
+
 option("c", "content", "File content", "", takesValue = true)
-option("f", "force", "Force operation", "", takesValue = false)  // Boolean flag
+option("f", "force", "Force operation", "", takesValue = false) 
+
 ```
 
 **Access in action:**
 
 ```kt
+
 action { ctx ->
     val content = ctx.option("content")
     val force = ctx.optionBool("force")
     val count = ctx.optionInt("count")
 }
+
 ```
 
 ### Actions
@@ -215,6 +222,7 @@ action { ctx ->
 Define command behavior:
 
 ```kt
+
 action { ctx ->
     // ctx.argument("name") - Get argument
     // ctx.option("flag") - Get option value
@@ -222,6 +230,7 @@ action { ctx ->
 
     println(greenBold("Success!"))
 }
+
 ```
 
 ### Colored Output
@@ -229,6 +238,7 @@ action { ctx ->
 Built-in color helpers with automatic terminal detection:
 
 ```kt
+
 println(redBold("Error"))
 println(greenBold("Success"))
 println(yellowBold("Warning"))
@@ -236,6 +246,7 @@ println(blueBold("Info"))
 println(cyanBold("Data"))
 println(yellowItalic("Note: Something"))
 println(redItalic("Deprecated"))
+
 ```
 
 Colors automatically disable on unsupported terminals.
@@ -269,29 +280,29 @@ command(
         println(formatter.render(items))
     }
 }
+
 ```
 
 **CLI Usage:**
 
 ```bash
-# Plain text output (default)
+
 $ laret list
 file1.txt: 1024 B
 file2.txt: 2048 B
 
-# JSON output
 $ laret list --format json
 [
   {"name": "file1.txt", "size": 1024},
   {"name": "file2.txt", "size": 2048}
 ]
 
-# YAML output
 $ laret list --format yaml
 - name: file1.txt
   size: 1024
 - name: file2.txt
   size: 2048
+  
 ```
 
 #### Creating Custom Output Formats
@@ -299,6 +310,7 @@ $ laret list --format yaml
 Implement the `OutputStrategy` interface:
 
 ```kt
+
 object CsvOutput : OutputStrategy {
     override val name = "csv"
     
@@ -306,22 +318,26 @@ object CsvOutput : OutputStrategy {
         return csvString
     }
 }
+
 ```
 
 Then use it in your command:
 
 ```kt
+
 val formatter = when (format) {
     "csv" -> CsvOutput
     "json" -> JsonOutput
     else -> PlainOutput
 }
 println(formatter.render(data))
+
 ```
 
 ###  Interactive Mode
 
 ```bash
+
 $ laret interactive
 Laret Interactive Shell. Type 'exit' to quit.
 laret> file create test.txt --content "Hello World"
@@ -359,6 +375,7 @@ Keyboard Shortcuts
 | Ctrl+D   | Exit shell                |
 
 ```text
+
 # .laret.yml
 output:
   colorized: true
@@ -370,6 +387,7 @@ logging:
 ## Complete Example
 
 ```kt
+
 fun main(args: Array<String>) {
     val app = cli(
         name = "laret",
@@ -473,6 +491,7 @@ fun main(args: Array<String>) {
     
     app.run(args)
 }
+
 ```
 
 ## Shell Completion
@@ -482,6 +501,7 @@ Laret can generate completion scripts
 ### Generate Completion Script
 
 ```bash
+
 # Bash
 $ laret completion bash > /etc/bash_completion.d/laret
 
@@ -490,11 +510,13 @@ $ laret completion zsh > ~/.zsh_completions/_laret
 
 # PowerShell
 $ laret completion powershell > laret_completion.ps1
+
 ```
 
 ### Auto-Install Completion
 
 ```bash
+
 # Install for bash
 $ laret completion install bash
 
@@ -503,11 +525,13 @@ $ laret completion install zsh
 
 # Install for PowerShell
 $ laret completion install powershell
+
 ```
 
 ### Adding Completion to Your App
 
 ```kt
+
 group(
     name = "completion",
     description = "Shell completion"
@@ -542,6 +566,7 @@ group(
 ## Project Structure
 
 ```
+
 com.rkhamatyarov.laret/
 ├── core/
 │   ├── CliApp.kt              # Main application class
@@ -573,6 +598,7 @@ com.rkhamatyarov.laret/
     ├── Colors.kt             # ANSI color codes
     ├── ColorHelpers.kt       # Color helper functions
     └── HelpFormatter.kt      # Help text formatting
+
 ```
 
 ## Design Philosophy
@@ -601,27 +627,33 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ### Gradle (Kotlin DSL)
 
 ```kts
+
 dependencies {
     implementation("com.rkhamatyarov:laret:1.0.0")
 }
+
 ```
 
 ### Gradle (Groovy)
 
 ```gradle
+
 dependencies {
     implementation 'com.rkhamatyarov:laret:1.0.0'
 }
+
 ```
 
 ### Maven
 
 ```xml
+
 <dependency>
     <groupId>com.rkhamatyarov</groupId>
     <artifactId>laret</artifactId>
     <version>1.0.0</version>
 </dependency>
+
 ```
 
 ## Building Native Image
@@ -633,6 +665,7 @@ Laret supports **GraalVM Native Image** compilation for ultra-fast startup times
 Add the GraalVM Native Image plugin to your `build.gradle.kts`:
 
 ```kts
+
 plugins {
     kotlin("jvm") version "1.9.20"
     id("org.graalvm.buildtools.native") version "0.9.28"
@@ -655,16 +688,19 @@ graalvmNative {
         }
     }
 }
+
 ```
 
 ### Build Native Executable
 
 ```bash
+
 # Build native image
 ./gradlew nativeCompile
 
 # The executable will be in build/native/nativeCompile/
 ./build/native/nativeCompile/laret --help
+
 ```
 
 ### Example Build Configuration
@@ -672,6 +708,7 @@ graalvmNative {
 Complete `build.gradle.kts` for native image:
 
 ```kts
+
 plugins {
     kotlin("jvm") version "1.9.20"
     application
@@ -699,11 +736,13 @@ graalvmNative {
         }
     }
 }
+
 ```
 
 ### Distribution
 
 ```bash
+
 # Build optimized native binary
 ./gradlew nativeCompile
 
@@ -712,11 +751,13 @@ cp build/native/nativeCompile/laret /usr/local/bin/
 
 # Or create installation package
 tar -czf laret-linux-x64.tar.gz -C build/native/nativeCompile laret
+
 ```
 
 ## Docker
 
 ```bash
+
 # compile native laret binary file
 docker build -f Dockerfile.builder -t laret-builder .
 

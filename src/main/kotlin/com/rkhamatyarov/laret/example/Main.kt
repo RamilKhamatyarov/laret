@@ -140,7 +140,8 @@ fun main(args: Array<String>) {
                     action { ctx ->
                         val question = ctx.argument("question")
                         val options =
-                            ctx.option("options")
+                            ctx
+                                .option("options")
                                 .split(",")
                                 .map { it.trim() }
                                 .filter { it.isNotEmpty() }
@@ -162,7 +163,8 @@ fun main(args: Array<String>) {
                     action { ctx ->
                         val question = ctx.argument("question")
                         val options =
-                            ctx.option("options")
+                            ctx
+                                .option("options")
                                 .split(",")
                                 .map { it.trim() }
                                 .filter { it.isNotEmpty() }

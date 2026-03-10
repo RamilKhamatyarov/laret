@@ -3,6 +3,7 @@ plugins {
     id("org.graalvm.buildtools.native") version "0.11.4"
     id("com.gradleup.shadow") version "9.3.2"
     id("org.jlleitschuh.gradle.ktlint") version "14.0.1"
+    id("com.diffplug.spotless") version "7.0.4"
     `maven-publish`
     application
 }
@@ -48,6 +49,36 @@ ktlint {
     reporters {
         reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.PLAIN)
         reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.CHECKSTYLE)
+    }
+}
+
+spotless {
+    lineEndings = com.diffplug.spotless.LineEnding.UNIX
+
+    format("shellGenerators") {
+        target(
+            "src/**/completion/BashCompletionGenerator.kt",
+            "src/**/completion/ZshCompletionGenerator.kt",
+            "src/**/completion/PowerShellCompletionGenerator.kt",
+        )
+    }
+
+    format("kotlinSources") {
+        target("src/**/*.kt")
+        targetExclude(
+            "src/**/completion/BashCompletionGenerator.kt",
+            "src/**/completion/ZshCompletionGenerator.kt",
+            "src/**/completion/PowerShellCompletionGenerator.kt",
+        )
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+
+    kotlinGradle {
+        ktlint("1.0.1")
+        target("*.gradle.kts")
+        trimTrailingWhitespace()
+        endWithNewline()
     }
 }
 

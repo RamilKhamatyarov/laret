@@ -32,7 +32,7 @@ class CommandContext(
         width: Int = 40,
     ): ProgressBar = ProgressBar(total = total, width = width, label = label)
 
-    fun prompt(): InteractivePrompt = InteractivePrompt()
-
     fun spinner(label: String = ""): Spinner = Spinner(label = label)
+
+    fun prompt(): InteractivePrompt = InteractivePrompt()
 }

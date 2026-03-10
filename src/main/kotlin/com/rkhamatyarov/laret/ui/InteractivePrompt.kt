@@ -61,7 +61,8 @@ class InteractivePrompt(
         out.print("  Enter numbers [1-${options.size}]: ")
         val line = reader.readLine()?.trim() ?: ""
         if (line.isEmpty()) return emptyList()
-        return line.split(",")
+        return line
+            .split(",")
             .mapNotNull { it.trim().toIntOrNull() }
             .filter { it in 1..options.size }
             .distinct()
