@@ -3,6 +3,7 @@ package com.rkhamatyarov.laret.example
 import com.rkhamatyarov.laret.completion.generateCompletion
 import com.rkhamatyarov.laret.completion.installCompletion
 import com.rkhamatyarov.laret.dsl.cli
+import com.rkhamatyarov.laret.output.OutputStrategy
 import org.jline.reader.EndOfFileException
 import org.jline.reader.LineReaderBuilder
 import org.jline.reader.UserInterruptException
@@ -313,26 +314,23 @@ fun main(args: Array<String>) {
                             }
                         bar.finish()
 
-                        when {
-                            format == "plain" && long -> {
+                        if (format == "plain") {
+                            if (long) {
                                 println("Directory: $path")
                                 entries.forEach { entry ->
                                     val size = if (entry["isDirectory"] == true) "" else "${entry["size"]} B"
                                     val type = if (entry["isDirectory"] == true) "d" else "-"
                                     println("$type $size ${entry["name"]}")
                                 }
-                            }
-
-                            format == "plain" -> {
+                            } else {
                                 println("Directory: $path")
                                 entries.forEach { entry ->
                                     println(" ${entry["name"]}")
                                 }
                             }
-
-                            else -> {
-                                println(ctx.render(entries))
-                            }
+                        } else {
+                            val strategy = OutputStrategy.byName(format)
+                            println(strategy.render(entries))
                         }
                     }
                 }
