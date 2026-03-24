@@ -376,7 +376,9 @@ class PluginManagerTest {
     }
 }
 
-class TestPlugin(override val name: String) : LaretPlugin {
+class TestPlugin(
+    override val name: String,
+) : LaretPlugin {
     override val version = "1.0.0"
 
     var initializeCalled = false
@@ -413,7 +415,9 @@ class TestPlugin(override val name: String) : LaretPlugin {
     }
 }
 
-class RejectingPlugin(override val name: String) : LaretPlugin {
+class RejectingPlugin(
+    override val name: String,
+) : LaretPlugin {
     override val version = "1.0.0"
 
     var beforeExecuteCalled = false
@@ -424,7 +428,10 @@ class RejectingPlugin(override val name: String) : LaretPlugin {
     }
 }
 
-class FailingPlugin(override val name: String, private val failAt: String) : LaretPlugin {
+class FailingPlugin(
+    override val name: String,
+    private val failAt: String,
+) : LaretPlugin {
     override val version = "1.0.0"
 
     override fun initialize(app: CliApp) {

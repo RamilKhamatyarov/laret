@@ -34,8 +34,7 @@ object HelpFormatter {
 
             For more information on a command, use:
             ${app.name} [COMMAND] --help
-            """
-                .trimIndent(),
+            """.trimIndent(),
         )
     }
 

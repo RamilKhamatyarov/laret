@@ -45,7 +45,12 @@ fun main(args: Array<String>) {
                 command(name = "interactive", description = "Start interactive shell") {
                     action { ctx ->
                         val terminal = TerminalBuilder.builder().system(true).build()
-                        val reader = LineReaderBuilder.builder().terminal(terminal).appName("laret").build()
+                        val reader =
+                            LineReaderBuilder
+                                .builder()
+                                .terminal(terminal)
+                                .appName("laret")
+                                .build()
 
                         println("Laret Interactive Shell. Type 'exit' to quit.")
 
@@ -100,7 +105,11 @@ fun main(args: Array<String>) {
                     action { ctx ->
                         val question = ctx.argument("question")
                         val options =
-                            ctx.option("options").split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                            ctx
+                                .option("options")
+                                .split(",")
+                                .map { it.trim() }
+                                .filter { it.isNotEmpty() }
                         if (options.isEmpty()) {
                             println("Error: --options must not be empty")
                             return@action
@@ -116,7 +125,11 @@ fun main(args: Array<String>) {
                     action { ctx ->
                         val question = ctx.argument("question")
                         val options =
-                            ctx.option("options").split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                            ctx
+                                .option("options")
+                                .split(",")
+                                .map { it.trim() }
+                                .filter { it.isNotEmpty() }
                         if (options.isEmpty()) {
                             println("Error: --options must not be empty")
                             return@action

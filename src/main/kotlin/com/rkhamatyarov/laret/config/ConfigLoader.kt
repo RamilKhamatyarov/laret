@@ -64,7 +64,7 @@ class ConfigLoader {
 
     private fun resolveConfigFile(configPath: String?): File? {
         val candidates =
-            listOf(
+            listOfNotNull(
                 configPath?.let { File(it) },
                 File(".laret.yml"),
                 File(".laret.yaml"),
@@ -74,7 +74,6 @@ class ConfigLoader {
                 File(System.getProperty("user.home"), ".laret.toml"),
                 File(System.getProperty("user.home"), ".laret.json"),
             )
-                .filterNotNull()
 
         return candidates.firstOrNull { it.exists() }
     }

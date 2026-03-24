@@ -4,7 +4,11 @@ import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.model.CommandGroup
 
 /** Builds CLI application */
-class CliBuilder(val name: String, val version: String, val description: String) {
+class CliBuilder(
+    val name: String,
+    val version: String,
+    val description: String,
+) {
     private val groups = mutableListOf<CommandGroup>()
 
     /** Define a group of related commands */

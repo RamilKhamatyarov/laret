@@ -212,7 +212,12 @@ class AliasTest {
                         command(name = "cmd") { action {} }
                     }
                 }
-            assertTrue(app2.groups[0].commands[0].aliases.isEmpty())
+            assertTrue(
+                app2.groups[0]
+                    .commands[0]
+                    .aliases
+                    .isEmpty(),
+            )
         }
 
         @Test
@@ -226,8 +231,6 @@ class AliasTest {
             assertTrue(app2.groups[0].aliases.isEmpty())
         }
     }
-
-    // ── Group alias integration tests ─────────────────────────────────────────
 
     @Nested
     inner class GroupAliasIntegrationTests {
