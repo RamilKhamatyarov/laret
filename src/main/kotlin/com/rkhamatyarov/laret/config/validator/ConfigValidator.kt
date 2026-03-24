@@ -83,17 +83,12 @@ private class LoggingLevelRule : ValidationRule {
 
 private class PluginPathsRule : ValidationRule {
     override fun validate(config: AppConfig): ValidationResult {
-        val invalidPaths =
-            config.plugins.paths
-                .filter { path -> path.isBlank() }
+        val invalidPaths = config.plugins.paths.filter { path -> path.isBlank() }
 
         return if (invalidPaths.isEmpty()) {
             ValidationResult(isValid = true)
         } else {
-            ValidationResult(
-                isValid = false,
-                errors = listOf("Plugin paths cannot be empty"),
-            )
+            ValidationResult(isValid = false, errors = listOf("Plugin paths cannot be empty"))
         }
     }
 }

@@ -2,96 +2,54 @@ package com.rkhamatyarov.laret.model
 
 import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.core.CommandContext
-import com.rkhamatyarov.laret.core.HelpFormatter
-import com.rkhamatyarov.laret.output.OutputStrategy
-import com.rkhamatyarov.laret.output.PlainOutput
-import com.rkhamatyarov.laret.ui.redBold
 
 /**
- * Represents a single command
+ * A single executable command within a [CommandGroup].
+ *
+ * @param name        Primary name used to invoke the command (e.g. "create").
+ * @param aliases     Alternative names accepted at the CLI (e.g. listOf("c", "new")).
+ * @param description Short description shown in help output.
  */
 data class Command(
     val name: String,
     val description: String = "",
     val arguments: List<Argument> = emptyList(),
     val options: List<Option> = emptyList(),
+    val aliases: List<String> = emptyList(),
     val action: (CommandContext) -> Unit = {},
 ) {
+    fun matches(input: String): Boolean = input == name || input in aliases
+
     fun execute(
         args: Array<String>,
         app: CliApp? = null,
-        outputStrategy: OutputStrategy = PlainOutput,
     ) {
-        val context = CommandContext(this, app, outputStrategy)
+        val ctx = CommandContext(this, app)
 
-        if (app?.hasPlugins() == true) {
-            if (!app.getPluginManager().beforeExecute(this)) {
-                println("Plugin rejected execution of command: $name")
-                return
-            }
+        val positional = args.filter { !it.startsWith("-") }
+        arguments.forEachIndexed { idx, arg ->
+            ctx.arguments[arg.name] = positional.getOrElse(idx) { arg.default }
         }
 
-        try {
-            var argIndex = 0
-            var i = 0
+        options.forEach { opt -> ctx.options[opt.long] = opt.default }
 
-            while (i < args.size) {
-                val arg = args[i]
-                when {
-                    arg.startsWith("--") -> {
-                        val optName = arg.substring(2)
-                        val opt = options.find { it.long == optName }
-                        if (opt != null) {
-                            if (opt.takesValue && i + 1 < args.size && !args[i + 1].startsWith("-")) {
-                                context.options[opt.long] = args[i + 1]
-                                i++
-                            } else {
-                                context.options[opt.long] = "true"
-                            }
-                        }
-                    }
-
-                    arg.startsWith("-") && arg.length == 2 -> {
-                        val shortName = arg.substring(1)
-                        val opt = options.find { it.short == shortName }
-
-                        if (opt != null) {
-                            if (opt.takesValue && i + 1 < args.size && !args[i + 1].startsWith("-")) {
-                                context.options[opt.long] = args[i + 1]
-                                i++
-                            } else {
-                                context.options[opt.long] = "true"
-                            }
-                        }
-                    }
-
-                    !arg.startsWith("-") -> {
-                        if (argIndex < arguments.size) {
-                            context.arguments[arguments[argIndex].name] = arg
-                            argIndex++
-                        }
-                    }
+        var i = 0
+        while (i < args.size) {
+            val token = args[i]
+            val opt = options.find { "-${it.short}" == token || "--${it.long}" == token }
+            if (opt != null) {
+                if (opt.takesValue) {
+                    ctx.options[opt.long] = args.getOrElse(i + 1) { opt.default }
+                    i += 2
+                } else {
+                    ctx.options[opt.long] = "true"
+                    i++
                 }
-
+            } else {
                 i++
             }
-
-            arguments.filter { it.required && !it.optional }.forEach { arg ->
-                if (!context.arguments.containsKey(arg.name)) {
-                    HelpFormatter.showArgumentMissingError(arg.name)
-                    HelpFormatter.showCommandHelp(this)
-                    return
-                }
-            }
-
-            action(context)
-        } catch (e: Exception) {
-            println(redBold("Error: ${e.message}"))
-            e.printStackTrace()
-        } finally {
-            if (app?.hasPlugins() == true) {
-                app.getPluginManager().afterExecute(this)
-            }
         }
+
+        action(ctx)
     }
 }

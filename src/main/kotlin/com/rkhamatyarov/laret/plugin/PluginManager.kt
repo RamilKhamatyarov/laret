@@ -3,9 +3,7 @@ package com.rkhamatyarov.laret.plugin
 import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.model.Command
 
-/**
- * Manages plugin lifecycle and execution
- */
+/** Manages plugin lifecycle and execution */
 class PluginManager {
     private val plugins = mutableListOf<LaretPlugin>()
 

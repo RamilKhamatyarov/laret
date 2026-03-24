@@ -3,9 +3,7 @@ package com.rkhamatyarov.laret.dsl
 import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.model.CommandGroup
 
-/**
- * Builds CLI application
- */
+/** Builds CLI application */
 class CliBuilder(
     val name: String,
     val version: String,
@@ -13,9 +11,7 @@ class CliBuilder(
 ) {
     private val groups = mutableListOf<CommandGroup>()
 
-    /**
-     * Define a group of related commands
-     */
+    /** Define a group of related commands */
     fun group(
         name: String,
         description: String = "",

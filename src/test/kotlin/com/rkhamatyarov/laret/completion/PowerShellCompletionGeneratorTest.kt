@@ -14,11 +14,7 @@ class PowerShellCompletionGeneratorTest {
     fun setup() {
         generator = PowerShellCompletionGenerator()
         app =
-            cli(
-                name = "laret",
-                version = "1.0.0",
-                description = "Test CLI framework",
-            ) {
+            cli(name = "laret", version = "1.0.0", description = "Test CLI framework") {
                 group(name = "file", description = "File operations") {
                     command(name = "create", description = "Create a new file") {
                         option("c", "content", "File content", "", true)
@@ -139,8 +135,7 @@ class PowerShellCompletionGeneratorTest {
     fun `generate handles empty command list gracefully`() {
         val emptyApp =
             cli(name = "empty", version = "1.0.0", description = "Empty CLI") {
-                group(name = "test", description = "Test group") {
-                }
+                group(name = "test", description = "Test group") {}
             }
         val script = generator.generate(emptyApp)
         assertTrue(script.contains("empty"))
@@ -152,7 +147,10 @@ class PowerShellCompletionGeneratorTest {
         val script = generator.generate(app)
         assertTrue(script.contains("\$scriptblock"), "Should have escaped dollar signs")
         assertTrue(script.contains("\$wordToComplete"), "Should have escaped variables")
-        assertTrue(script.count { it == '{' } >= script.count { it == '}' }, "Should have balanced braces")
+        assertTrue(
+            script.count { it == '{' } >= script.count { it == '}' },
+            "Should have balanced braces",
+        )
         assertTrue(script.contains("@("), "Should use PowerShell array syntax")
     }
 

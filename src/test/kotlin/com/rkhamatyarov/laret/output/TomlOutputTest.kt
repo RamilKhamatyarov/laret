@@ -12,11 +12,7 @@ class TomlOutputTest {
 
     @Test
     fun `should render simple map to TOML format`() {
-        val data =
-            mapOf(
-                "name" to "Laret",
-                "version" to "1.0",
-            )
+        val data = mapOf("name" to "Laret", "version" to "1.0")
 
         val result = TomlOutput.render(data)
 
@@ -30,16 +26,8 @@ class TomlOutputTest {
     fun `should render nested map to TOML format`() {
         val data =
             mapOf(
-                "project" to
-                    mapOf(
-                        "name" to "Laret CLI",
-                        "version" to "1.0.0",
-                    ),
-                "build" to
-                    mapOf(
-                        "language" to "Kotlin",
-                        "jvm" to "24",
-                    ),
+                "project" to mapOf("name" to "Laret CLI", "version" to "1.0.0"),
+                "build" to mapOf("language" to "Kotlin", "jvm" to "24"),
             )
 
         val result = TomlOutput.render(data)
@@ -52,10 +40,7 @@ class TomlOutputTest {
 
     @Test
     fun `should render list in TOML format`() {
-        val data =
-            mapOf(
-                "files" to listOf("file1.kt", "file2.kt", "file3.kt"),
-            )
+        val data = mapOf("files" to listOf("file1.kt", "file2.kt", "file3.kt"))
 
         val result = TomlOutput.render(data)
 
@@ -65,11 +50,7 @@ class TomlOutputTest {
 
     @Test
     fun `should render data consistently`() {
-        val data =
-            mapOf(
-                "app" to "Laret",
-                "type" to "CLI Tool",
-            )
+        val data = mapOf("app" to "Laret", "type" to "CLI Tool")
 
         val result1 = TomlOutput.render(data)
         val result2 = TomlOutput.render(data)
@@ -87,12 +68,7 @@ class TomlOutputTest {
 
     @Test
     fun `should handle numeric values in TOML format`() {
-        val data =
-            mapOf(
-                "port" to 8080,
-                "timeout" to 30,
-                "version" to 1.0,
-            )
+        val data = mapOf("port" to 8080, "timeout" to 30, "version" to 1.0)
 
         val result = TomlOutput.render(data)
 
@@ -102,11 +78,7 @@ class TomlOutputTest {
 
     @Test
     fun `should handle boolean values in TOML format`() {
-        val data =
-            mapOf(
-                "enabled" to true,
-                "debug" to false,
-            )
+        val data = mapOf("enabled" to true, "debug" to false)
 
         val result = TomlOutput.render(data)
 
@@ -118,18 +90,8 @@ class TomlOutputTest {
     fun `should render complex config-like structure`() {
         val config =
             mapOf(
-                "app" to
-                    mapOf(
-                        "name" to "Laret",
-                        "version" to "1.0.0",
-                        "enabled" to true,
-                    ),
-                "server" to
-                    mapOf(
-                        "host" to "localhost",
-                        "port" to 8080,
-                        "ssl" to false,
-                    ),
+                "app" to mapOf("name" to "Laret", "version" to "1.0.0", "enabled" to true),
+                "server" to mapOf("host" to "localhost", "port" to 8080, "ssl" to false),
                 "features" to listOf("json", "yaml", "toml"),
             )
 

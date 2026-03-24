@@ -164,7 +164,7 @@ jobs:
           DISABLE_GITHUB_STATUS_API: true
           VALIDATE_GIT_COMMIT_HISTORY: false
           HTTP_TIMEOUT: 30
-        continue-on-error: true
+        continue-on-error: false
 
   integration-completions:
     name: Integration - Shell Completions

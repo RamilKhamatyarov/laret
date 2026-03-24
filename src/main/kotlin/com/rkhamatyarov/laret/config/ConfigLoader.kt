@@ -53,10 +53,7 @@ class ConfigLoader {
 
         try {
             val mapper = getMapper(format)
-            val content =
-                mapper
-                    .writerWithDefaultPrettyPrinter()
-                    .writeValueAsString(config)
+            val content = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(config)
             file.writeText(content)
             println("Saved config to ${file.absolutePath}")
         } catch (e: Exception) {
@@ -67,7 +64,7 @@ class ConfigLoader {
 
     private fun resolveConfigFile(configPath: String?): File? {
         val candidates =
-            listOf(
+            listOfNotNull(
                 configPath?.let { File(it) },
                 File(".laret.yml"),
                 File(".laret.yaml"),
@@ -76,7 +73,7 @@ class ConfigLoader {
                 File(System.getProperty("user.home"), ".laret.yml"),
                 File(System.getProperty("user.home"), ".laret.toml"),
                 File(System.getProperty("user.home"), ".laret.json"),
-            ).filterNotNull()
+            )
 
         return candidates.firstOrNull { it.exists() }
     }
@@ -92,24 +89,14 @@ class ConfigLoader {
         config.copy(
             output =
                 config.output.copy(
-                    colorized =
-                        System.getenv("LARET_COLORIZED")?.toBoolean()
-                            ?: config.output.colorized,
-                    verbose =
-                        System.getenv("LARET_VERBOSE")?.toBoolean()
-                            ?: config.output.verbose,
-                    format =
-                        System.getenv("LARET_OUTPUT_FORMAT")
-                            ?: config.output.format,
+                    colorized = System.getenv("LARET_COLORIZED")?.toBoolean() ?: config.output.colorized,
+                    verbose = System.getenv("LARET_VERBOSE")?.toBoolean() ?: config.output.verbose,
+                    format = System.getenv("LARET_OUTPUT_FORMAT") ?: config.output.format,
                 ),
             logging =
                 config.logging.copy(
-                    level =
-                        System.getenv("LARET_LOG_LEVEL")
-                            ?: config.logging.level,
-                    file =
-                        System.getenv("LARET_LOG_FILE")
-                            ?: config.logging.file,
+                    level = System.getenv("LARET_LOG_LEVEL") ?: config.logging.level,
+                    file = System.getenv("LARET_LOG_FILE") ?: config.logging.file,
                 ),
         )
 }

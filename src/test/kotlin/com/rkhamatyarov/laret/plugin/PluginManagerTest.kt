@@ -18,17 +18,8 @@ class PluginManagerTest {
     @BeforeEach
     fun setup() {
         pluginManager = PluginManager()
-        app =
-            cli(
-                name = "test-app",
-                version = "1.0.0",
-                description = "Test application",
-            ) {}
-        testCommand =
-            Command(
-                name = "test",
-                description = "Test command",
-            )
+        app = cli(name = "test-app", version = "1.0.0", description = "Test application") {}
+        testCommand = Command(name = "test", description = "Test command")
     }
 
     @Test
@@ -54,10 +45,7 @@ class PluginManagerTest {
         val plugin2 = TestPlugin("Plugin2")
         val plugin3 = TestPlugin("Plugin3")
 
-        pluginManager
-            .register(plugin1)
-            .register(plugin2)
-            .register(plugin3)
+        pluginManager.register(plugin1).register(plugin2).register(plugin3)
 
         assertEquals(3, pluginManager.getPlugins().size)
         assertEquals(plugin1, pluginManager.getPlugins()[0])
@@ -69,9 +57,7 @@ class PluginManagerTest {
     fun `register should allow duplicate plugin instances`() {
         val plugin = TestPlugin("DuplicatePlugin")
 
-        pluginManager
-            .register(plugin)
-            .register(plugin)
+        pluginManager.register(plugin).register(plugin)
 
         assertEquals(2, pluginManager.getPlugins().size)
     }
@@ -205,9 +191,7 @@ class PluginManagerTest {
         pluginManager.register(workingPlugin)
         pluginManager.register(failingPlugin)
 
-        assertDoesNotThrow {
-            pluginManager.beforeExecute(testCommand)
-        }
+        assertDoesNotThrow { pluginManager.beforeExecute(testCommand) }
 
         assertTrue(workingPlugin.beforeExecuteCalled)
     }
@@ -364,19 +348,31 @@ class PluginManagerTest {
         val plugin2 = TestPlugin("Plugin2")
         val plugin3 = TestPlugin("Plugin3")
 
-        pluginManager
-            .register(plugin1)
-            .register(plugin2)
-            .register(plugin3)
+        pluginManager.register(plugin1).register(plugin2).register(plugin3)
 
         pluginManager.initialize(app)
         pluginManager.beforeExecute(testCommand)
         pluginManager.afterExecute(testCommand)
         pluginManager.shutdown()
 
-        assertTrue(plugin1.initializeCalled && plugin1.beforeExecuteCalled && plugin1.afterExecuteCalled && plugin1.shutdownCalled)
-        assertTrue(plugin2.initializeCalled && plugin2.beforeExecuteCalled && plugin2.afterExecuteCalled && plugin2.shutdownCalled)
-        assertTrue(plugin3.initializeCalled && plugin3.beforeExecuteCalled && plugin3.afterExecuteCalled && plugin3.shutdownCalled)
+        assertTrue(
+            plugin1.initializeCalled &&
+                plugin1.beforeExecuteCalled &&
+                plugin1.afterExecuteCalled &&
+                plugin1.shutdownCalled,
+        )
+        assertTrue(
+            plugin2.initializeCalled &&
+                plugin2.beforeExecuteCalled &&
+                plugin2.afterExecuteCalled &&
+                plugin2.shutdownCalled,
+        )
+        assertTrue(
+            plugin3.initializeCalled &&
+                plugin3.beforeExecuteCalled &&
+                plugin3.afterExecuteCalled &&
+                plugin3.shutdownCalled,
+        )
     }
 }
 

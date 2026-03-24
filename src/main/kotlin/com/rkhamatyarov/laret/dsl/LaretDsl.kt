@@ -2,9 +2,7 @@ package com.rkhamatyarov.laret.dsl
 
 import com.rkhamatyarov.laret.core.CliApp
 
-/**
- * Main DSL entry point - creates a CLI application
- */
+/** Main DSL entry point - creates a CLI application */
 fun cli(
     name: String,
     version: String = "1.0.0",

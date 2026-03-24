@@ -4,6 +4,7 @@ plugins {
     id("com.gradleup.shadow") version "9.4.0"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
     id("com.diffplug.spotless") version "8.4.0"
+    id("pmd")
     `maven-publish`
     application
 }
@@ -45,14 +46,11 @@ kotlin {
     jvmToolchain(24)
 }
 
-ktlint {
-    version.set("1.0.1")
-    android.set(false)
-    ignoreFailures.set(false)
-    reporters {
-        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.PLAIN)
-        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.CHECKSTYLE)
-    }
+pmd {
+    toolVersion = "7.7.0"
+    isConsoleOutput = true
+    ruleSets = listOf()
+    ruleSetFiles = files("config/pmd/ruleset.xml")
 }
 
 spotless {
@@ -66,13 +64,15 @@ spotless {
         )
     }
 
-    format("kotlinSources") {
+    kotlin {
         target("src/**/*.kt")
         targetExclude(
             "src/**/completion/BashCompletionGenerator.kt",
             "src/**/completion/ZshCompletionGenerator.kt",
             "src/**/completion/PowerShellCompletionGenerator.kt",
         )
+        ktlint("1.0.1")
+            .setEditorConfigPath(".editorconfig")
         trimTrailingWhitespace()
         endWithNewline()
     }
@@ -83,6 +83,22 @@ spotless {
         trimTrailingWhitespace()
         endWithNewline()
     }
+}
+
+ktlint {
+    version.set("1.0.1")
+    android.set(false)
+    ignoreFailures.set(false)
+    enableExperimentalRules.set(false)
+
+    reporters {
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.PLAIN)
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.CHECKSTYLE)
+    }
+}
+
+tasks.named("ktlintCheck") {
+    dependsOn("spotlessApply")
 }
 
 graalvmNative {
@@ -134,6 +150,24 @@ tasks {
 
     test {
         useJUnitPlatform()
+    }
+
+    register("checkAll") {
+        description = "Run all code quality checks in correct order"
+        group = "verification"
+
+        dependsOn(
+            "spotlessApply",
+            "ktlintCheck",
+            "spotlessCheck",
+            "pmdMain",
+            "pmdTest",
+            "test",
+        )
+    }
+
+    named("check") {
+        dependsOn("spotlessCheck", "ktlintCheck")
     }
 }
 
