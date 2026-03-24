@@ -4,17 +4,34 @@ import com.rkhamatyarov.laret.model.Command
 import com.rkhamatyarov.laret.model.CommandGroup
 
 /**
- * Builds a command group
+ * DSL builder for a [CommandGroup].
+ *
+ * Usage:
+ * ```kotlin
+ * group(name = "file", description = "File operations") {
+ *     aliases("f", "files")
+ *     command(name = "create") { ... }
+ * }
+ * ```
  */
 class GroupBuilder(
     val name: String,
     val description: String = "",
 ) {
     private val commands = mutableListOf<Command>()
+    private val aliases = mutableListOf<String>()
 
     /**
-     * Define a command within a group
+     * Register one or more alternative names for this group.
+     *
+     * Example: `aliases("f")` lets users type `laret f create …`
+     * instead of `laret file create …`.
      */
+    fun aliases(vararg names: String) {
+        aliases.addAll(names)
+    }
+
+    /** Define a command within this group. */
     fun command(
         name: String,
         description: String = "",
@@ -25,5 +42,5 @@ class GroupBuilder(
         commands.add(cmdBuilder.build())
     }
 
-    fun build(): CommandGroup = CommandGroup(name, description, commands)
+    fun build(): CommandGroup = CommandGroup(name, description, commands.toList(), aliases.toList())
 }

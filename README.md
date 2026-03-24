@@ -784,8 +784,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Built-in config file support (YAML, TOML, JSON)
 - [x] Interactive prompts and menus
 - [x] Progress bars and spinners
-- [ ] Table rendering utilities
-- [ ] Command aliases
+- [x] Table rendering utilities
+- [x] Command aliases
 - [ ] Persistent flag values
 - [ ] Middleware/hooks system
 - [ ] Man page generation

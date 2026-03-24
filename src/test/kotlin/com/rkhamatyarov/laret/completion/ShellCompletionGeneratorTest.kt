@@ -29,53 +29,31 @@ class ShellCompletionGeneratorTest {
         System.setErr(PrintStream(outputStream))
 
         app =
-            cli(
-                name = "testcli",
-                version = "1.0.0",
-                description = "Test CLI for completion",
-            ) {
-                group(
-                    name = "file",
-                    description = "File operations",
-                ) {
-                    command(
-                        name = "create",
-                        description = "Create file",
-                    ) {
+            cli(name = "testcli", version = "1.0.0", description = "Test CLI for completion") {
+                group(name = "file", description = "File operations") {
+                    command(name = "create", description = "Create file") {
                         argument("path", "File path", required = true)
                         option("c", "content", "File content", "", true)
                         option("f", "force", "Overwrite", "", false)
-                        action { }
+                        action {}
                     }
 
-                    command(
-                        name = "delete",
-                        description = "Delete file",
-                    ) {
+                    command(name = "delete", description = "Delete file") {
                         argument("path", "File path", required = true)
-                        action { }
+                        action {}
                     }
                 }
 
-                group(
-                    name = "dir",
-                    description = "Directory operations",
-                ) {
-                    command(
-                        name = "create",
-                        description = "Create directory",
-                    ) {
+                group(name = "dir", description = "Directory operations") {
+                    command(name = "create", description = "Create directory") {
                         argument("path", "Dir path", required = true)
                         option("p", "parents", "Create parents", "", false)
-                        action { }
+                        action {}
                     }
 
-                    command(
-                        name = "list",
-                        description = "List directory",
-                    ) {
+                    command(name = "list", description = "List directory") {
                         argument("path", "Dir path", required = false, optional = true, default = ".")
-                        action { }
+                        action {}
                     }
                 }
             }
@@ -99,7 +77,10 @@ class ShellCompletionGeneratorTest {
     fun generateBashCompletion_shouldContainFunctionDefinition() {
         val completion = app.generateCompletion("bash")
         assertContains(completion, "_testcli_complete()")
-        assertContains(completion, "complete -o bashdefault -o default -o nospace -F _testcli_complete testcli")
+        assertContains(
+            completion,
+            "complete -o bashdefault -o default -o nospace -F _testcli_complete testcli",
+        )
     }
 
     @Test
@@ -223,7 +204,8 @@ class ShellCompletionGeneratorTest {
         val profilePath = System.getenv("PROFILE")
         val profileDir =
             if (profilePath != null) {
-                File(profilePath).parentFile?.absolutePath ?: File(homeDir, "Documents\\PowerShell").absolutePath
+                File(profilePath).parentFile?.absolutePath
+                    ?: File(homeDir, "Documents\\PowerShell").absolutePath
             } else {
                 File(homeDir, "Documents\\PowerShell").absolutePath
             }
@@ -259,7 +241,8 @@ class ShellCompletionGeneratorTest {
         val profilePath = System.getenv("PROFILE")
         val profileDir =
             if (profilePath != null) {
-                File(profilePath).parentFile?.absolutePath ?: File(homeDir, "Documents\\PowerShell").absolutePath
+                File(profilePath).parentFile?.absolutePath
+                    ?: File(homeDir, "Documents\\PowerShell").absolutePath
             } else {
                 File(homeDir, "Documents\\PowerShell").absolutePath
             }
@@ -277,7 +260,8 @@ class ShellCompletionGeneratorTest {
         val profilePath = System.getenv("PROFILE")
         val profileDir =
             if (profilePath != null) {
-                File(profilePath).parentFile?.absolutePath ?: File(homeDir, "Documents\\PowerShell").absolutePath
+                File(profilePath).parentFile?.absolutePath
+                    ?: File(homeDir, "Documents\\PowerShell").absolutePath
             } else {
                 File(homeDir, "Documents\\PowerShell").absolutePath
             }
@@ -336,21 +320,18 @@ class ShellCompletionGeneratorTest {
     @Test
     fun shellCompletionGenerator_withMultipleGroups_generatesCorrectly() {
         val multiGroupApp =
-            cli(
-                name = "multicli",
-                version = "1.0.0",
-            ) {
+            cli(name = "multicli", version = "1.0.0") {
                 group(name = "g1", description = "Group 1") {
-                    command(name = "c1", description = "Cmd 1") { action { } }
-                    command(name = "c2", description = "Cmd 2") { action { } }
+                    command(name = "c1", description = "Cmd 1") { action {} }
+                    command(name = "c2", description = "Cmd 2") { action {} }
                 }
                 group(name = "g2", description = "Group 2") {
-                    command(name = "c3", description = "Cmd 3") { action { } }
+                    command(name = "c3", description = "Cmd 3") { action {} }
                 }
                 group(name = "g3", description = "Group 3") {
-                    command(name = "c4", description = "Cmd 4") { action { } }
-                    command(name = "c5", description = "Cmd 5") { action { } }
-                    command(name = "c6", description = "Cmd 6") { action { } }
+                    command(name = "c4", description = "Cmd 4") { action {} }
+                    command(name = "c5", description = "Cmd 5") { action {} }
+                    command(name = "c6", description = "Cmd 6") { action {} }
                 }
             }
 
@@ -365,16 +346,13 @@ class ShellCompletionGeneratorTest {
     @Test
     fun shellCompletionGenerator_withOptions_generatesCorrectly() {
         val optionsApp =
-            cli(
-                name = "optcli",
-                version = "1.0.0",
-            ) {
+            cli(name = "optcli", version = "1.0.0") {
                 group(name = "ops", description = "Operations") {
                     command(name = "cmd", description = "Command") {
                         option("v", "verbose", "Verbose", "", false)
                         option("d", "debug", "Debug", "", false)
                         option("o", "output", "Output file", "", true)
-                        action { }
+                        action {}
                     }
                 }
             }
@@ -528,7 +506,10 @@ class ShellCompletionGeneratorTest {
 
         val content = file.readText()
         assertTrue(content.contains("# PowerShell completion"), "Should contain comment")
-        assertTrue(content.contains("Register-ArgumentCompleter"), "Should contain completer registration")
+        assertTrue(
+            content.contains("Register-ArgumentCompleter"),
+            "Should contain completer registration",
+        )
     }
 
     @Test
@@ -540,7 +521,10 @@ class ShellCompletionGeneratorTest {
         file.writeText(completion)
 
         assertTrue(file.exists(), "Should create file in default path")
-        assertTrue(defaultPath.path.contains("Documents\\PowerShell"), "Should use default PowerShell path")
+        assertTrue(
+            defaultPath.path.contains("Documents\\PowerShell"),
+            "Should use default PowerShell path",
+        )
     }
 
     @Test
@@ -549,7 +533,8 @@ class ShellCompletionGeneratorTest {
         mockProfilePath.parentFile?.mkdirs()
 
         val profileDir =
-            mockProfilePath.parentFile?.absolutePath ?: File(testHomeDir, "Documents\\PowerShell").absolutePath
+            mockProfilePath.parentFile?.absolutePath
+                ?: File(testHomeDir, "Documents\\PowerShell").absolutePath
         val completion = app.generateCompletion("powershell")
         val file = File(profileDir, "${app.name}_completion.ps1")
         file.parentFile?.mkdirs()
@@ -589,6 +574,9 @@ class ShellCompletionGeneratorTest {
 
         assertFalse(bashCompletion == zshCompletion, "Bash and zsh completions should be different")
         assertFalse(zshCompletion == psCompletion, "Zsh and PowerShell completions should be different")
-        assertFalse(bashCompletion == psCompletion, "Bash and PowerShell completions should be different")
+        assertFalse(
+            bashCompletion == psCompletion,
+            "Bash and PowerShell completions should be different",
+        )
     }
 }

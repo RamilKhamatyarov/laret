@@ -1,9 +1,6 @@
 package com.rkhamatyarov.laret.ui
 
-/**
- * Helper functions for colored terminal output
- */
-
+/** Helper functions for colored terminal output */
 fun redBold(text: String): String =
     if (Colors.isColorSupported()) {
         "${Colors.RED_BOLD}$text${Colors.RESET}"

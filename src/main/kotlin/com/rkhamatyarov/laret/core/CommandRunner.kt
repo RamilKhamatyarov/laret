@@ -3,39 +3,42 @@ package com.rkhamatyarov.laret.core
 import com.rkhamatyarov.laret.ui.redBold
 
 /**
- * Handles command execution logic
+ * Stateless helper that resolves and executes a command from raw CLI arguments.
+ *
+ * Both group lookup and command lookup use [matches] so that aliases registered
+ * via the DSL are transparently honoured here too.
  */
 object CommandRunner {
     fun execute(
         app: CliApp,
         args: Array<String>,
     ) {
-        val groupName = args.getOrNull(0) ?: return
+        val groupInput = args.getOrNull(0) ?: return
 
         if (args.size == 2 && (args[1] == "-h" || args[1] == "--help")) {
-            val group = app.groups.find { it.name == groupName }
+            val group = app.groups.find { it.matches(groupInput) }
             if (group != null) {
                 HelpFormatter.showGroupHelp(group)
                 return
             }
         }
 
-        val commandName = args.getOrNull(1) ?: return
+        val commandInput = args.getOrNull(1) ?: return
         val cmdArgs = args.drop(2)
 
         val group =
-            app.groups.find { it.name == groupName }
+            app.groups.find { it.matches(groupInput) }
                 ?: run {
-                    println(redBold("Group not found: $groupName"))
+                    println(redBold("Group not found: $groupInput"))
                     HelpFormatter.showApplicationHelp(app)
                     return
                 }
 
         val command =
-            group.commands.find { it.name == commandName }
+            group.commands.find { it.matches(commandInput) }
                 ?: run {
-                    println(redBold("Command not found: $commandName"))
-                    HelpFormatter.showCommandNotFound(commandName, group)
+                    println(redBold("Command not found: $commandInput"))
+                    HelpFormatter.showCommandNotFound(commandInput, group)
                     return
                 }
 

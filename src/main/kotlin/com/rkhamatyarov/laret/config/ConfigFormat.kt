@@ -11,7 +11,9 @@ enum class ConfigFormat {
     companion object {
         fun fromFile(file: File): ConfigFormat? =
             when (file.extension.lowercase()) {
-                "yml", "yaml" -> YAML
+                "yml",
+                "yaml",
+                -> YAML
                 "toml" -> TOML
                 "json" -> JSON
                 else -> null

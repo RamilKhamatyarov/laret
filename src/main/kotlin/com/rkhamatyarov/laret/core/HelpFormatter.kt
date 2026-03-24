@@ -5,13 +5,9 @@ import com.rkhamatyarov.laret.model.CommandGroup
 import com.rkhamatyarov.laret.ui.redBold
 import org.fusesource.jansi.Ansi
 
-/**
- * Centralized formatter for displaying help messages across the CLI application.
- */
+/** Centralized formatter for displaying help messages across the CLI application. */
 object HelpFormatter {
-    /**
-     * Display help for the entire CLI application
-     */
+    /** Display help for the entire CLI application */
     fun showApplicationHelp(app: CliApp) {
         println(
             """
@@ -38,13 +34,12 @@ object HelpFormatter {
 
             For more information on a command, use:
             ${app.name} [COMMAND] --help
-            """.trimIndent(),
+            """
+                .trimIndent(),
         )
     }
 
-    /**
-     * Display help for a specific command group
-     */
+    /** Display help for a specific command group */
     fun showGroupHelp(group: CommandGroup) {
         System.err.println("Group: ${group.name} - ${group.description}")
         System.err.println("\nCommands:")
@@ -53,9 +48,7 @@ object HelpFormatter {
         }
     }
 
-    /**
-     * Display help for a specific command
-     */
+    /** Display help for a specific command */
     fun showCommandHelp(command: Command) {
         System.err.println("Command: ${command.name}")
         if (command.description.isNotEmpty()) {
@@ -79,12 +72,11 @@ object HelpFormatter {
         }
     }
 
-    /**
-     * Format command groups for display in help text
-     */
+    /** Format command groups for display in help text */
     private fun formatCommandGroups(groups: List<CommandGroup>): String =
         groups.joinToString("\n") { group ->
-            val groupHeader = "${Ansi.ansi().fg(Ansi.Color.GREEN)}${group.name}${Ansi.ansi().reset()} ${group.description}"
+            val groupHeader =
+                "${Ansi.ansi().fg(Ansi.Color.GREEN)}${group.name}${Ansi.ansi().reset()} ${group.description}"
             val commandsList =
                 group.commands.joinToString("\n") { command ->
                     "  ${Ansi.ansi().fg(Ansi.Color.BLUE)}${command.name}${Ansi.ansi().reset()} ${command.description}"
@@ -92,9 +84,7 @@ object HelpFormatter {
             "$groupHeader\n$commandsList"
         }
 
-    /**
-     * Display a command not found error with suggestions
-     */
+    /** Display a command not found error with suggestions */
     fun showCommandNotFound(
         commandName: String,
         group: CommandGroup? = null,
@@ -105,9 +95,7 @@ object HelpFormatter {
         }
     }
 
-    /**
-     * Display a required argument missing error
-     */
+    /** Display a required argument missing error */
     fun showArgumentMissingError(argumentName: String) {
         println(redBold("Error: Required argument '$argumentName' not provided"))
     }

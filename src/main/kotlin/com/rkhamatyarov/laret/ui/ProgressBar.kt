@@ -12,8 +12,12 @@ class ProgressBar(
     private var current: Int = 0
     private var finished: Boolean = false
 
-    val percent: Int get() = if (total <= 0) 100 else ((current.toDouble() / total) * 100).roundToInt().coerceIn(0, 100)
-    val isFinished: Boolean get() = finished
+    val percent: Int
+        get() =
+            if (total <= 0) 100 else ((current.toDouble() / total) * 100).roundToInt().coerceIn(0, 100)
+
+    val isFinished: Boolean
+        get() = finished
 
     fun update(value: Int) {
         current = value.coerceIn(0, total)
@@ -39,15 +43,13 @@ class ProgressBar(
     }
 }
 
-class Spinner(
-    val label: String = "",
-    private val out: PrintStream = System.err,
-) {
+class Spinner(val label: String = "", private val out: PrintStream = System.err) {
     private val frames = listOf("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
     private var frameIndex: Int = 0
     private var finished: Boolean = false
 
-    val isFinished: Boolean get() = finished
+    val isFinished: Boolean
+        get() = finished
 
     fun tick() {
         if (finished) return

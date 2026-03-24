@@ -17,41 +17,20 @@ fun main(args: Array<String>) {
             version = "1.0.0",
             description = "Laret - A Cobra-like CLI framework for Kotlin",
         ) {
-            group(
-                name = "completion",
-                description = "Shell completion",
-            ) {
-                command(
-                    name = "bash",
-                    description = "Generate bash completion script",
-                ) {
-                    action { ctx ->
-                        print(ctx.app?.generateCompletion("bash") ?: "")
-                    }
+            group(name = "completion", description = "Shell completion") {
+                command(name = "bash", description = "Generate bash completion script") {
+                    action { ctx -> print(ctx.app?.generateCompletion("bash") ?: "") }
                 }
 
-                command(
-                    name = "zsh",
-                    description = "Generate zsh completion script",
-                ) {
-                    action { ctx ->
-                        print(ctx.app?.generateCompletion("zsh") ?: "")
-                    }
+                command(name = "zsh", description = "Generate zsh completion script") {
+                    action { ctx -> print(ctx.app?.generateCompletion("zsh") ?: "") }
                 }
 
-                command(
-                    name = "powershell",
-                    description = "Generate PowerShell completion script",
-                ) {
-                    action { ctx ->
-                        print(ctx.app?.generateCompletion("powershell") ?: "")
-                    }
+                command(name = "powershell", description = "Generate PowerShell completion script") {
+                    action { ctx -> print(ctx.app?.generateCompletion("powershell") ?: "") }
                 }
 
-                command(
-                    name = "install",
-                    description = "Install completion script",
-                ) {
+                command(name = "install", description = "Install completion script") {
                     argument("shell", "Shell type (bash, zsh, powershell)", required = true)
                     action { ctx ->
                         val shell = ctx.argument("shell")
@@ -63,18 +42,10 @@ fun main(args: Array<String>) {
                     }
                 }
 
-                command(
-                    name = "interactive",
-                    description = "Start interactive shell",
-                ) {
+                command(name = "interactive", description = "Start interactive shell") {
                     action { ctx ->
                         val terminal = TerminalBuilder.builder().system(true).build()
-                        val reader =
-                            LineReaderBuilder
-                                .builder()
-                                .terminal(terminal)
-                                .appName("laret")
-                                .build()
+                        val reader = LineReaderBuilder.builder().terminal(terminal).appName("laret").build()
 
                         println("Laret Interactive Shell. Type 'exit' to quit.")
 
@@ -100,14 +71,8 @@ fun main(args: Array<String>) {
                 }
             }
 
-            group(
-                name = "prompt",
-                description = "Interactive prompt commands",
-            ) {
-                command(
-                    name = "text",
-                    description = "Ask for text input",
-                ) {
+            group(name = "prompt", description = "Interactive prompt commands") {
+                command(name = "text", description = "Ask for text input") {
                     argument("question", "Prompt text", required = true)
                     option("d", "default", "Default value", "", true)
                     action { ctx ->
@@ -118,10 +83,7 @@ fun main(args: Array<String>) {
                     }
                 }
 
-                command(
-                    name = "confirm",
-                    description = "Ask a yes/no question",
-                ) {
+                command(name = "confirm", description = "Ask a yes/no question") {
                     argument("question", "Prompt text", required = true)
                     option("d", "default", "Default answer (true/false)", "true", true)
                     action { ctx ->
@@ -132,20 +94,13 @@ fun main(args: Array<String>) {
                     }
                 }
 
-                command(
-                    name = "select",
-                    description = "Select one option from a list",
-                ) {
+                command(name = "select", description = "Select one option from a list") {
                     argument("question", "Prompt text", required = true)
                     option("o", "options", "Comma-separated list of options", "", true)
                     action { ctx ->
                         val question = ctx.argument("question")
                         val options =
-                            ctx
-                                .option("options")
-                                .split(",")
-                                .map { it.trim() }
-                                .filter { it.isNotEmpty() }
+                            ctx.option("options").split(",").map { it.trim() }.filter { it.isNotEmpty() }
                         if (options.isEmpty()) {
                             println("Error: --options must not be empty")
                             return@action
@@ -155,20 +110,13 @@ fun main(args: Array<String>) {
                     }
                 }
 
-                command(
-                    name = "multiselect",
-                    description = "Select multiple options from a list",
-                ) {
+                command(name = "multiselect", description = "Select multiple options from a list") {
                     argument("question", "Prompt text", required = true)
                     option("o", "options", "Comma-separated list of options", "", true)
                     action { ctx ->
                         val question = ctx.argument("question")
                         val options =
-                            ctx
-                                .option("options")
-                                .split(",")
-                                .map { it.trim() }
-                                .filter { it.isNotEmpty() }
+                            ctx.option("options").split(",").map { it.trim() }.filter { it.isNotEmpty() }
                         if (options.isEmpty()) {
                             println("Error: --options must not be empty")
                             return@action
@@ -178,10 +126,7 @@ fun main(args: Array<String>) {
                     }
                 }
 
-                command(
-                    name = "password",
-                    description = "Ask for a password",
-                ) {
+                command(name = "password", description = "Ask for a password") {
                     argument("question", "Prompt text", required = true)
                     action { ctx ->
                         val question = ctx.argument("question")
@@ -191,14 +136,8 @@ fun main(args: Array<String>) {
                 }
             }
 
-            group(
-                name = "file",
-                description = "File operations",
-            ) {
-                command(
-                    name = "create",
-                    description = "Create a new file",
-                ) {
+            group(name = "file", description = "File operations") {
+                command(name = "create", description = "Create a new file") {
                     argument("path", "File path", required = true)
                     option("c", "content", "File content", "", true)
                     option("f", "force", "Overwrite if exists", "", false)
@@ -226,10 +165,7 @@ fun main(args: Array<String>) {
                     }
                 }
 
-                command(
-                    name = "delete",
-                    description = "Delete a file",
-                ) {
+                command(name = "delete", description = "Delete a file") {
                     argument("path", "File path", required = true)
                     action { ctx ->
                         val path = ctx.argument("path")
@@ -250,10 +186,7 @@ fun main(args: Array<String>) {
                     }
                 }
 
-                command(
-                    name = "read",
-                    description = "Read file contents",
-                ) {
+                command(name = "read", description = "Read file contents") {
                     argument("path", "File path", required = true)
                     action { ctx ->
                         val path = ctx.argument("path")
@@ -270,14 +203,8 @@ fun main(args: Array<String>) {
                 }
             }
 
-            group(
-                name = "dir",
-                description = "Directory operations",
-            ) {
-                command(
-                    name = "list",
-                    description = "List directory contents",
-                ) {
+            group(name = "dir", description = "Directory operations") {
+                command(name = "list", description = "List directory contents") {
                     argument("path", "Directory path", required = false, optional = true, default = ".")
                     option("l", "long", "Long format", "", false)
                     option("a", "all", "Show hidden files", "", false)
@@ -324,9 +251,7 @@ fun main(args: Array<String>) {
                                 }
                             } else {
                                 println("Directory: $path")
-                                entries.forEach { entry ->
-                                    println(" ${entry["name"]}")
-                                }
+                                entries.forEach { entry -> println(" ${entry["name"]}") }
                             }
                         } else {
                             val strategy = OutputStrategy.byName(format)
@@ -335,10 +260,7 @@ fun main(args: Array<String>) {
                     }
                 }
 
-                command(
-                    name = "create",
-                    description = "Create a new directory",
-                ) {
+                command(name = "create", description = "Create a new directory") {
                     argument("path", "Directory path", required = true)
                     option("p", "parents", "Create parent directories", "", false)
                     action { ctx ->
