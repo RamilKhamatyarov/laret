@@ -6,9 +6,7 @@ import com.rkhamatyarov.laret.plugin.LaretPlugin
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-/**
- * Example plugin: Logs all command executions with timing
- */
+/** Example plugin: Logs all command executions with timing */
 class LoggingPlugin : LaretPlugin {
     override val name = "LoggingPlugin"
     override val version = "1.0.0"
@@ -21,9 +19,7 @@ class LoggingPlugin : LaretPlugin {
         System.err.println("Total command groups: ${app.groups.size}")
         app.groups.forEach { group ->
             System.err.println("Group '${group.name}': ${group.commands.size} commands")
-            group.commands.forEach { cmd ->
-                System.err.println("    📌 ${cmd.name}: ${cmd.description}")
-            }
+            group.commands.forEach { cmd -> System.err.println("    📌 ${cmd.name}: ${cmd.description}") }
         }
     }
 
@@ -54,7 +50,9 @@ class LoggingPlugin : LaretPlugin {
             System.err.println("│ Options:")
             command.options.forEach { opt ->
                 val takesVal = if (opt.takesValue) "(takes value)" else ""
-                System.err.println("│   • -${opt.short}, --${opt.long.padEnd(15)} $takesVal ${opt.description}")
+                System.err.println(
+                    "│   • -${opt.short}, --${opt.long.padEnd(15)} $takesVal ${opt.description}",
+                )
             }
         }
 
@@ -63,7 +61,8 @@ class LoggingPlugin : LaretPlugin {
     }
 
     override fun afterExecute(command: Command) {
-        val elapsed = System.currentTimeMillis() - (executionTimes[command.name] ?: System.currentTimeMillis())
+        val elapsed =
+            System.currentTimeMillis() - (executionTimes[command.name] ?: System.currentTimeMillis())
         val timestamp = LocalDateTime.now().format(formatter)
 
         System.err.println("┌─────────────────────────────────────────────┐")

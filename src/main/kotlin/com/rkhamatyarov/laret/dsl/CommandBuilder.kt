@@ -6,7 +6,17 @@ import com.rkhamatyarov.laret.model.Command
 import com.rkhamatyarov.laret.model.Option
 
 /**
- * Builds a single command
+ * DSL builder for a single [Command].
+ *
+ * Usage:
+ * ```kotlin
+ * command(name = "remove", description = "Remove a file") {
+ *     aliases("rm", "del")
+ *     argument("path", "File path")
+ *     option("f", "force", "Skip confirmation")
+ *     action { ctx -> ... }
+ * }
+ * ```
  */
 class CommandBuilder(
     val name: String,
@@ -14,11 +24,22 @@ class CommandBuilder(
 ) {
     private val arguments = mutableListOf<Argument>()
     private val options = mutableListOf<Option>()
+    private val aliases = mutableListOf<String>()
     private var actionBlock: (CommandContext) -> Unit = {}
 
     /**
-     * Define a positional argument
+     * Register one or more alternative names for this command.
+     *
+     * All aliases are matched case-sensitively at runtime.  Aliases are shown
+     * in help output alongside the primary name.
+     *
+     * Example: `aliases("rm", "del")`
      */
+    fun aliases(vararg names: String) {
+        aliases.addAll(names)
+    }
+
+    /** Define a positional argument. */
     fun argument(
         name: String,
         description: String = "",
@@ -37,9 +58,7 @@ class CommandBuilder(
         )
     }
 
-    /**
-     * Define a command-line option/flag
-     */
+    /** Define a command-line option / flag. */
     fun option(
         short: String,
         long: String,
@@ -58,12 +77,10 @@ class CommandBuilder(
         )
     }
 
-    /**
-     * Define the action to execute
-     */
+    /** Define the action executed when this command is invoked. */
     fun action(block: (CommandContext) -> Unit) {
         actionBlock = block
     }
 
-    fun build(): Command = Command(name, description, arguments, options, actionBlock)
+    fun build(): Command = Command(name, description, arguments, options, aliases.toList(), actionBlock)
 }

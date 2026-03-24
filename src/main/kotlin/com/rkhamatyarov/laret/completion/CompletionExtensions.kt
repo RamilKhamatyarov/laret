@@ -19,9 +19,7 @@ fun CliApp.generateCompletion(shell: String = "bash"): String {
     return generator.generate(this)
 }
 
-/**
- * Extension function to install completion
- */
+/** Extension function to install completion */
 fun CliApp.installCompletion(shell: String = "bash") {
     val completion = generateCompletion(shell)
     val homeDir = System.getProperty("user.home")
@@ -56,9 +54,7 @@ fun CliApp.installCompletion(shell: String = "bash") {
     }
 }
 
-/**
- * Extension function to install PowerShell completion (shortcut)
- */
+/** Extension function to install PowerShell completion (shortcut) */
 fun CliApp.installPowerShellCompletion() {
     installCompletion("powershell")
 }

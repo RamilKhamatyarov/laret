@@ -7,7 +7,8 @@ class InteractivePrompt(
     private val input: InputStream = System.`in`,
     private val out: PrintStream = System.err,
 ) {
-    private val reader get() = input.bufferedReader()
+    private val reader
+        get() = input.bufferedReader()
 
     fun text(
         prompt: String,

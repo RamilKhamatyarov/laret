@@ -31,19 +31,9 @@ class CliTest {
         System.setErr(PrintStream(outputStream))
 
         app =
-            cli(
-                name = "laret",
-                version = "1.0.0",
-                description = "Test CLI framework",
-            ) {
-                group(
-                    name = "file",
-                    description = "File operations",
-                ) {
-                    command(
-                        name = "create",
-                        description = "Create a new file",
-                    ) {
+            cli(name = "laret", version = "1.0.0", description = "Test CLI framework") {
+                group(name = "file", description = "File operations") {
+                    command(name = "create", description = "Create a new file") {
                         argument("path", "File path", required = true)
                         option("c", "content", "File content", "", true)
                         option("f", "force", "Overwrite if exists", "", false)
@@ -65,10 +55,7 @@ class CliTest {
                         }
                     }
 
-                    command(
-                        name = "delete",
-                        description = "Delete a file",
-                    ) {
+                    command(name = "delete", description = "Delete a file") {
                         argument("path", "File path", required = true)
                         option("f", "force", "Force deletion", "", false)
 
@@ -89,10 +76,7 @@ class CliTest {
                         }
                     }
 
-                    command(
-                        name = "read",
-                        description = "Read file contents",
-                    ) {
+                    command(name = "read", description = "Read file contents") {
                         argument("path", "File path", required = true)
 
                         action { ctx ->
@@ -109,14 +93,8 @@ class CliTest {
                     }
                 }
 
-                group(
-                    name = "dir",
-                    description = "Directory operations",
-                ) {
-                    command(
-                        name = "create",
-                        description = "Create a new directory",
-                    ) {
+                group(name = "dir", description = "Directory operations") {
+                    command(name = "create", description = "Create a new directory") {
                         argument("path", "Directory path", required = true)
                         option("p", "parents", "Create parent directories", "", false)
 
@@ -135,10 +113,7 @@ class CliTest {
                         }
                     }
 
-                    command(
-                        name = "list",
-                        description = "List directory contents",
-                    ) {
+                    command(name = "list", description = "List directory contents") {
                         argument("path", "Directory path", required = false, optional = true, default = ".")
                         option("l", "long", "Long format", "", false)
                         option("a", "all", "Show hidden files", "", false)
@@ -437,12 +412,7 @@ class CliTest {
     fun `file delete multiple files deletes all correctly`() =
         runTest {
             // given
-            val files =
-                (1..3).map {
-                    File(testDir, "file$it.txt").also { f ->
-                        f.writeText("content$it")
-                    }
-                }
+            val files = (1..3).map { File(testDir, "file$it.txt").also { f -> f.writeText("content$it") } }
 
             // when // then
             files.forEach { file ->
