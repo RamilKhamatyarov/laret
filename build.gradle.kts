@@ -27,7 +27,7 @@ dependencies {
     implementation(kotlin("stdlib"))
 
     implementation("org.jline:jline:4.0.4")
-    implementation("org.fusesource.jansi:jansi:2.4.2")
+    implementation("org.fusesource.jansi:jansi:2.4.3")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.21.1")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.21.2")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.21.2")
