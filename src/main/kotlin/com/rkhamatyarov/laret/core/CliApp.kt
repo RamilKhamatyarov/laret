@@ -60,11 +60,11 @@ data class CliApp(
      * for rich terminal output.  Use [runForTest] in unit tests so that
      * [System.setOut] / [System.setErr] capture streams are not overridden.
      */
-    fun run(args: Array<String>) {
+    fun run(args: Array<String>): Int {
         logManager.disableLogging()
         AnsiConsole.systemInstall()
         try {
-            dispatch(args)
+            return dispatch(args)
         } finally {
             shutdownPlugins()
             AnsiConsole.systemUninstall()
@@ -87,61 +87,71 @@ data class CliApp(
         }
     }
 
-    private fun dispatch(args: Array<String>) {
+    private fun dispatch(args: Array<String>): Int {
         when {
-            args.isEmpty() -> HelpFormatter.showApplicationHelp(this)
-
-            args[0] == "--help" || args[0] == "-h" ->
+            args.isEmpty() -> {
                 HelpFormatter.showApplicationHelp(this)
+                return 0
+            }
+
+            args[0] == "--help" || args[0] == "-h" -> {
+                HelpFormatter.showApplicationHelp(this)
+                return 0
+            }
 
             args[0] == "--version" || args[0] == "-v" -> {
                 println("$name version $version")
                 if (appConfig.app.description.isNotEmpty()) println(appConfig.app.description)
+                return 0
             }
 
             args[0] == "--config" && args.size > 1 -> {
                 init(args[1])
                 val remaining = args.drop(2).toTypedArray()
-                if (remaining.isNotEmpty()) executeCommand(remaining)
+                return if (remaining.isNotEmpty()) {
+                    if (executeCommand(remaining)) 0 else 1
+                } else {
+                    0
+                }
             }
 
-            else -> executeCommand(args)
+            else -> {
+                return if (executeCommand(args)) 0 else 1
+            }
         }
     }
 
-    private fun executeCommand(args: Array<String>) {
-        val groupInput = args.getOrNull(0) ?: return
+    private fun executeCommand(args: Array<String>): Boolean {
+        val groupInput = args.getOrNull(0) ?: return false
 
-        // Group-level help — also works via alias
         if (args.size == 2 && (args[1] == "-h" || args[1] == "--help")) {
             val group = groups.find { it.matches(groupInput) }
             if (group != null) {
                 HelpFormatter.showGroupHelp(group)
-                return
+                return true
             }
         }
 
-        val commandInput = args.getOrNull(1) ?: return
+        val commandInput = args.getOrNull(1) ?: return false
         val cmdArgs = args.drop(2).toTypedArray()
 
-        // Resolve group by primary name OR alias
         val group =
             groups.find { it.matches(groupInput) }
                 ?: run {
                     println("Group not found: $groupInput")
                     HelpFormatter.showApplicationHelp(this)
-                    return
+                    return false
                 }
 
-        // Resolve command by primary name OR alias
         val command =
             group.commands.find { it.matches(commandInput) }
                 ?: run {
                     HelpFormatter.showCommandNotFound(commandInput, group)
-                    return
+                    return false
                 }
 
-        command.execute(cmdArgs, this)
+        command.execute(cmdArgs, this, group.name)
+        return true
     }
 
     private fun applyConfiguration(config: AppConfig) {

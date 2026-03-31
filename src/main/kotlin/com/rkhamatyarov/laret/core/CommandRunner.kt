@@ -42,6 +42,6 @@ object CommandRunner {
                     return
                 }
 
-        command.execute(cmdArgs.toTypedArray(), app)
+        command.execute(cmdArgs.toTypedArray(), app, group.name)
     }
 }

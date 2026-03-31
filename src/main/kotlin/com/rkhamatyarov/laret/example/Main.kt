@@ -9,6 +9,7 @@ import org.jline.reader.LineReaderBuilder
 import org.jline.reader.UserInterruptException
 import org.jline.terminal.TerminalBuilder
 import java.io.File
+import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
     val app =
@@ -150,10 +151,12 @@ fun main(args: Array<String>) {
             }
 
             group(name = "file", description = "File operations") {
+                aliases("f")
                 command(name = "create", description = "Create a new file") {
+                    aliases("c")
                     argument("path", "File path", required = true)
                     option("c", "content", "File content", "", true)
-                    option("f", "force", "Overwrite if exists", "", false)
+                    option("f", "force", "Overwrite if exists", "", true, persistent = true)
                     action { ctx ->
                         val path = ctx.argument("path")
                         val content = ctx.option("content")
@@ -179,6 +182,7 @@ fun main(args: Array<String>) {
                 }
 
                 command(name = "delete", description = "Delete a file") {
+                    aliases("rm")
                     argument("path", "File path", required = true)
                     action { ctx ->
                         val path = ctx.argument("path")
@@ -217,11 +221,13 @@ fun main(args: Array<String>) {
             }
 
             group(name = "dir", description = "Directory operations") {
+                aliases("d")
                 command(name = "list", description = "List directory contents") {
+                    aliases("ls")
                     argument("path", "Directory path", required = false, optional = true, default = ".")
                     option("l", "long", "Long format", "", false)
                     option("a", "all", "Show hidden files", "", false)
-                    option("f", "format", "Output format (plain, json, yaml, toml)", "plain", true)
+                    option("f", "format", "Output format (plain, json, yaml, toml)", "plain", true, persistent = true)
                     option("m", "max-size", "Max file size in bytes", "0", true)
                     action { ctx ->
                         val path = ctx.argument("path")
@@ -301,5 +307,6 @@ fun main(args: Array<String>) {
         }
 
     app.init()
-    app.run(args)
+    val exitCode = app.run(args)
+    exitProcess(exitCode)
 }

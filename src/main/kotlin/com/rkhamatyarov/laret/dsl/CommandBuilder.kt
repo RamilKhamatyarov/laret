@@ -8,12 +8,11 @@ import com.rkhamatyarov.laret.model.Option
 /**
  * DSL builder for a single [Command].
  *
- * Usage:
  * ```kotlin
- * command(name = "remove", description = "Remove a file") {
- *     aliases("rm", "del")
+ * command(name = "create", description = "Create a file") {
+ *     aliases("c", "new")
  *     argument("path", "File path")
- *     option("f", "force", "Skip confirmation")
+ *     option("f", "force", "Overwrite if exists", "", false, persistent = true)
  *     action { ctx -> ... }
  * }
  * ```
@@ -29,11 +28,7 @@ class CommandBuilder(
 
     /**
      * Register one or more alternative names for this command.
-     *
-     * All aliases are matched case-sensitively at runtime.  Aliases are shown
-     * in help output alongside the primary name.
-     *
-     * Example: `aliases("rm", "del")`
+     * All aliases are matched case-sensitively at runtime.
      */
     fun aliases(vararg names: String) {
         aliases.addAll(names)
@@ -47,34 +42,38 @@ class CommandBuilder(
         optional: Boolean = false,
         default: String = "",
     ) {
-        arguments.add(
-            Argument(
-                name,
-                description,
-                required,
-                optional,
-                default,
-            ),
-        )
+        arguments.add(Argument(name, description, required, optional, default))
     }
 
-    /** Define a command-line option / flag. */
+    /**
+     * Define a command-line option / flag.
+     *
+     * @param short       Single-letter short form (`"f"` → `-f`).
+     * @param long        Long form (`"force"` → `--force`).
+     * @param description Help text.
+     * @param default     Compile-time default value.
+     * @param takesValue  True if the flag accepts a value; false for boolean toggles.
+     * @param persistent  When **true**, a missing CLI value is looked up in
+     *                    [com.rkhamatyarov.laret.config.model.AppConfig.flags]
+     *                    using the key hierarchy `<group>.<cmd>.<flag>`,
+     *                    `<cmd>.<flag>`, or `global.<flag>` before falling back
+     *                    to [default].  Declare the override in `.laret.yml`:
+     *                    ```yaml
+     *                    flags:
+     *                      file:
+     *                        create:
+     *                          force: true
+     *                    ```
+     */
     fun option(
         short: String,
         long: String,
         description: String = "",
         default: String = "",
         takesValue: Boolean = true,
+        persistent: Boolean = false,
     ) {
-        options.add(
-            Option(
-                short,
-                long,
-                description,
-                default,
-                takesValue,
-            ),
-        )
+        options.add(Option(short, long, description, default, takesValue, persistent))
     }
 
     /** Define the action executed when this command is invoked. */

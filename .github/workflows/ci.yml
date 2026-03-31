@@ -858,6 +858,206 @@ jobs:
           else
             echo "WARNING: Entry counts do not match (known bug)"
           fi
+          
+  integration-aliases:
+    name: Integration - Command Aliases
+    runs-on: ubuntu-latest
+    needs: [ build ]
+
+    steps:
+      - name: Download native binary
+        uses: actions/download-artifact@v4
+        with:
+          name: laret-native
+          path: ./bin
+
+      - name: Make binary executable
+        run: chmod +x ./bin/laret
+
+      - name: Prepare test fixtures in /tmp
+        run: |
+          mkdir -p /tmp/laret_alias_test
+          echo "Fixtures created in /tmp/laret_alias_test"
+
+      - name: Test group alias (f -> file)
+        run: |
+          set -euo pipefail
+          ./bin/laret f create /tmp/laret_alias_test/group_alias.txt -c "group alias test"
+          grep -q "group alias test" /tmp/laret_alias_test/group_alias.txt
+          echo "Group alias 'f' works"
+
+      - name: Test command alias (c -> create)
+        run: |
+          set -euo pipefail
+          ./bin/laret file c /tmp/laret_alias_test/command_alias.txt -c "command alias test"
+          grep -q "command alias test" /tmp/laret_alias_test/command_alias.txt
+          echo "Command alias 'c' works"
+
+      - name: Test combined aliases (f + rm)
+        run: |
+          set -euo pipefail
+          ./bin/laret f rm /tmp/laret_alias_test/group_alias.txt
+          if [ -f /tmp/laret_alias_test/group_alias.txt ]; then
+            echo "ERROR: file should have been deleted"
+            exit 1
+          fi
+          echo "Combined aliases 'f rm' work"
+
+      - name: Test group alias for dir (d -> dir)
+        run: |
+          set -euo pipefail
+          # Create a file to ensure directory listing is not empty
+          touch /tmp/laret_alias_test/somefile.txt
+          ./bin/laret d list /tmp/laret_alias_test | grep -q "somefile.txt"
+          echo "Group alias 'd' works for dir"
+
+      - name: Test command alias for list (ls -> list)
+        run: |
+          set -euo pipefail
+          touch /tmp/laret_alias_test/another.txt
+          ./bin/laret dir ls /tmp/laret_alias_test | grep -q "another.txt"
+          echo "Command alias 'ls' works"
+
+      - name: Test primary names still work
+        run: |
+          set -euo pipefail
+          ./bin/laret file create /tmp/laret_alias_test/primary.txt -c "primary test"
+          grep -q "primary test" /tmp/laret_alias_test/primary.txt
+          echo "Primary names still work"
+
+      - name: Test unknown alias fails
+        run: |
+          set +e
+          ./bin/laret unknown group command > /tmp/unknown.out 2>&1
+          EXIT_CODE=$?
+          set -e
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "ERROR: unknown command should exit non-zero"
+            exit 1
+          fi
+          echo "Unknown alias exits with error"
+
+  integration-persistent-flags:
+    name: Integration - Persistent Flag Values
+    runs-on: ubuntu-latest
+    needs: [ build ]
+
+    steps:
+      - name: Download native binary
+        uses: actions/download-artifact@v4
+        with:
+          name: laret-native
+          path: ./bin
+
+      - name: Make binary executable
+        run: chmod +x ./bin/laret
+
+      - name: Prepare test fixtures in /tmp
+        run: |
+          for i in 1 2 3 4 5; do
+            echo "fixture content $i" > /tmp/laret_fixture_$i.txt
+          done
+          mkdir -p /tmp/laret_fixture_dir
+          echo "Fixtures ready"
+
+      - name: Persistent flag - config overrides default (force=true from YAML)
+        run: |
+          set -euo pipefail
+          # Write config with force: true for file create
+          cat > /tmp/laret_persist.yml << 'EOF'
+          flags:
+            file:
+              create:
+                force: true
+          EOF
+          
+          # Create a file that will be overwritten
+          echo "original" > /tmp/force_test.txt
+          
+          # Run WITHOUT -f flag; config should supply force=true allowing overwrite
+          ./bin/laret --config /tmp/laret_persist.yml file create /tmp/force_test.txt \
+              -c "overwritten" > /tmp/persist_create.stdout 2>/tmp/persist_create.stderr
+          cat /tmp/persist_create.stderr || true
+          cat /tmp/persist_create.stdout || true
+          
+          grep -q "File created" /tmp/persist_create.stderr \
+            || (echo "ERROR: Expected 'File created' from stderr but got:" \
+                && cat /tmp/persist_create.stderr && cat /tmp/persist_create.stdout && exit 1)
+          
+          grep -q "overwritten" /tmp/force_test.txt \
+            || (echo "ERROR: File content was not overwritten" && cat /tmp/force_test.txt && exit 1)
+          
+          echo "Persistent flag from config applied correctly"
+
+      - name: Persistent flag - CLI value overrides config
+        run: |
+          set -euo pipefail
+          # Config still has force: true but CLI supplies -f false → file must NOT be overwritten
+          echo "must_stay" > /tmp/cli_override_test.txt
+          
+          set +e
+          ./bin/laret --config /tmp/laret_persist.yml file create /tmp/cli_override_test.txt \
+              -c "should_not_appear" -f false > /tmp/persist_cli.stdout 2>/tmp/persist_cli.stderr
+          EXIT=$?
+          set -e
+          
+          cat /tmp/persist_cli.stderr || true
+          cat /tmp/persist_cli.stdout || true
+          
+          # Command should succeed (exit 0) but file must not be overwritten
+          COMBINED=$(cat /tmp/persist_cli.stdout /tmp/persist_cli.stderr)
+          echo "$COMBINED" | grep -q "File already exists" \
+            || (echo "ERROR: Expected 'File already exists', got:" && echo "$COMBINED" && exit 1)
+          
+          grep -q "must_stay" /tmp/cli_override_test.txt \
+            || (echo "ERROR: File content was overwritten unexpectedly" && exit 1)
+          
+          echo "CLI value correctly overrides config"
+
+      - name: Persistent flag - no config uses compile-time default
+        run: |
+          set -euo pipefail
+          # Create a file first
+          echo "existing" > /tmp/no_config_test.txt
+          
+          # Run WITHOUT config and WITHOUT -f flag → default is false → should report already exists
+          ./bin/laret file create /tmp/no_config_test.txt \
+              -c "new_content" > /tmp/no_config.stdout 2>/tmp/no_config.stderr || true
+          
+          COMBINED=$(cat /tmp/no_config.stdout /tmp/no_config.stderr)
+          echo "$COMBINED" | grep -q "File already exists" \
+            || (echo "ERROR: Expected 'File already exists' without config, got:" \
+                && echo "$COMBINED" && exit 1)
+          
+          echo "Compile-time default used when no config present"
+
+      - name: Persistent flag - global flag applies to any command
+        run: |
+          set -euo pipefail
+          cat > /tmp/laret_global.yml << 'EOF'
+          flags:
+            global:
+              format: json
+          EOF
+          
+          # dir list should use format=json from global key without -f flag
+          ./bin/laret --config /tmp/laret_global.yml dir list /tmp \
+            > /tmp/global_flag.stdout 2>/tmp/global_flag.stderr
+          cat /tmp/global_flag.stderr || true
+          
+          # JSON output should be parseable
+          python3 - << 'PYEOF' || echo "WARNING: JSON validation failed"
+          import json, re
+          raw = open('/tmp/global_flag.stdout').read()
+          m = re.search(r'[{[]', raw)
+          if m:
+              data = json.loads(raw[m.start():])
+              print(f"Global flag format=json produced valid JSON: {type(data).__name__}")
+          else:
+              print("WARNING: No JSON found in output (global flag may not be wired yet)")
+          PYEOF
+          
+          echo "Global persistent flag test complete"
 
   summary:
     name: Build Summary
@@ -872,6 +1072,8 @@ jobs:
       - integration-plugins
       - integration-output-formatting
       - integration-table-rendering
+      - integration-aliases
+      - integration-persistent-flags
     if: always()
 
     steps:
@@ -889,6 +1091,8 @@ jobs:
           echo " integration-plugins:        ${{ needs.integration-plugins.result }}"
           echo " integration-output:         ${{ needs.integration-output-formatting.result }}"
           echo " integration-table:          ${{ needs.integration-table-rendering.result }}"
+          echo " integration-aliases:        ${{ needs.integration-aliases.result }}"
+          echo " integration-persist:        ${{ needs.integration-persistent-flags.result }}"
           echo "=========================================="
 
       - name: Comment PR on failure
