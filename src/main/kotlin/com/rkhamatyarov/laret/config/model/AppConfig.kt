@@ -30,7 +30,7 @@ data class AppConfig(
      * ```
      */
     @field:JsonProperty("flags")
-    val flags: Map<String, Any>? = null,
+    val flags: Map<String, Any>? = null
 )
 
 data class AppMetadata(
@@ -41,5 +41,5 @@ data class AppMetadata(
     @field:JsonProperty("description")
     val description: String = "",
     @field:JsonProperty("author")
-    val author: String = "",
+    val author: String = ""
 )

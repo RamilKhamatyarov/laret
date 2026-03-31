@@ -11,7 +11,7 @@ class CommandContext(
     val command: Command,
     val app: CliApp? = null,
     val outputStrategy: OutputStrategy = PlainOutput,
-    val groupName: String,
+    val groupName: String
 ) {
     val arguments = mutableMapOf<String, String>()
 
@@ -27,11 +27,8 @@ class CommandContext(
 
     fun render(data: Any): String = outputStrategy.render(data)
 
-    fun progressBar(
-        total: Int,
-        label: String = "",
-        width: Int = 40,
-    ): ProgressBar = ProgressBar(total = total, width = width, label = label)
+    fun progressBar(total: Int, label: String = "", width: Int = 40): ProgressBar =
+        ProgressBar(total = total, width = width, label = label)
 
     fun spinner(label: String = ""): Spinner = Spinner(label = label)
 

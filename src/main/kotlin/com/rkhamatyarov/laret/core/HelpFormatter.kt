@@ -34,7 +34,7 @@ object HelpFormatter {
 
             For more information on a command, use:
             ${app.name} [COMMAND] --help
-            """.trimIndent(),
+            """.trimIndent()
         )
     }
 
@@ -72,22 +72,18 @@ object HelpFormatter {
     }
 
     /** Format command groups for display in help text */
-    private fun formatCommandGroups(groups: List<CommandGroup>): String =
-        groups.joinToString("\n") { group ->
-            val groupHeader =
-                "${Ansi.ansi().fg(Ansi.Color.GREEN)}${group.name}${Ansi.ansi().reset()} ${group.description}"
-            val commandsList =
-                group.commands.joinToString("\n") { command ->
-                    "  ${Ansi.ansi().fg(Ansi.Color.BLUE)}${command.name}${Ansi.ansi().reset()} ${command.description}"
-                }
-            "$groupHeader\n$commandsList"
-        }
+    private fun formatCommandGroups(groups: List<CommandGroup>): String = groups.joinToString("\n") { group ->
+        val groupHeader =
+            "${Ansi.ansi().fg(Ansi.Color.GREEN)}${group.name}${Ansi.ansi().reset()} ${group.description}"
+        val commandsList =
+            group.commands.joinToString("\n") { command ->
+                "  ${Ansi.ansi().fg(Ansi.Color.BLUE)}${command.name}${Ansi.ansi().reset()} ${command.description}"
+            }
+        "$groupHeader\n$commandsList"
+    }
 
     /** Display a command not found error with suggestions */
-    fun showCommandNotFound(
-        commandName: String,
-        group: CommandGroup? = null,
-    ) {
+    fun showCommandNotFound(commandName: String, group: CommandGroup? = null) {
         println(redBold("Error: Command not found: $commandName"))
         if (group != null) {
             showGroupHelp(group)

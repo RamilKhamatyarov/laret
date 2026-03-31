@@ -7,7 +7,7 @@ class ProgressBar(
     val total: Int,
     val width: Int = 40,
     val label: String = "",
-    private val out: PrintStream = System.err,
+    private val out: PrintStream = System.err
 ) {
     private var current: Int = 0
     private var finished: Boolean = false
@@ -43,10 +43,7 @@ class ProgressBar(
     }
 }
 
-class Spinner(
-    val label: String = "",
-    private val out: PrintStream = System.err,
-) {
+class Spinner(val label: String = "", val out: PrintStream = System.err) {
     private val frames = listOf("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
     private var frameIndex: Int = 0
     private var finished: Boolean = false

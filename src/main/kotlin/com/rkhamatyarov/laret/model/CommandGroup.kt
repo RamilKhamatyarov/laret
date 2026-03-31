@@ -10,7 +10,7 @@ data class CommandGroup(
     val name: String,
     val description: String = "",
     val commands: List<Command> = emptyList(),
-    val aliases: List<String> = emptyList(),
+    val aliases: List<String> = emptyList()
 ) {
     fun matches(input: String): Boolean = input == name || input in aliases
 }

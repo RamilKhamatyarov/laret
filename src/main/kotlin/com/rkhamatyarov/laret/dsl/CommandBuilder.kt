@@ -17,10 +17,7 @@ import com.rkhamatyarov.laret.model.Option
  * }
  * ```
  */
-class CommandBuilder(
-    val name: String,
-    val description: String = "",
-) {
+class CommandBuilder(val name: String, val description: String = "") {
     private val arguments = mutableListOf<Argument>()
     private val options = mutableListOf<Option>()
     private val aliases = mutableListOf<String>()
@@ -40,7 +37,7 @@ class CommandBuilder(
         description: String = "",
         required: Boolean = true,
         optional: Boolean = false,
-        default: String = "",
+        default: String = ""
     ) {
         arguments.add(Argument(name, description, required, optional, default))
     }
@@ -71,7 +68,7 @@ class CommandBuilder(
         description: String = "",
         default: String = "",
         takesValue: Boolean = true,
-        persistent: Boolean = false,
+        persistent: Boolean = false
     ) {
         options.add(Option(short, long, description, default, takesValue, persistent))
     }

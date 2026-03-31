@@ -27,12 +27,7 @@ object FlagPersistence {
      * @param config      Loaded application config, or null when no config file was found.
      * @return The resolved string value, or null if not found in config.
      */
-    fun resolveFlag(
-        option: Option,
-        groupName: String?,
-        commandName: String,
-        config: AppConfig?,
-    ): String? {
+    fun resolveFlag(option: Option, groupName: String?, commandName: String, config: AppConfig?): String? {
         val flagsMap = config?.flags ?: return null
         val keys = buildKeys(groupName, commandName, option.long)
         for (key in keys) {
@@ -52,16 +47,11 @@ object FlagPersistence {
      *  - `"create.force"`
      *  - `"global.force"`
      */
-    internal fun buildKeys(
-        groupName: String?,
-        commandName: String,
-        flagLong: String,
-    ): List<String> =
-        buildList {
-            if (!groupName.isNullOrBlank()) add("$groupName.$commandName.$flagLong")
-            add("$commandName.$flagLong")
-            add("global.$flagLong")
-        }
+    internal fun buildKeys(groupName: String?, commandName: String, flagLong: String): List<String> = buildList {
+        if (!groupName.isNullOrBlank()) add("$groupName.$commandName.$flagLong")
+        add("$commandName.$flagLong")
+        add("global.$flagLong")
+    }
 
     /**
      * Traverse [map] using a dot-separated [key].
@@ -73,10 +63,7 @@ object FlagPersistence {
      * or a leaf value (for the final segment).
      */
     @Suppress("UNCHECKED_CAST")
-    internal fun getValueFromMap(
-        map: Map<String, Any>,
-        key: String,
-    ): Any? {
+    internal fun getValueFromMap(map: Map<String, Any>, key: String): Any? {
         val parts = key.split(".")
         var current: Any = map
         for (part in parts) {
@@ -93,14 +80,10 @@ object FlagPersistence {
      * represented as `"true"` or `"false"` strings so that
      * [com.rkhamatyarov.laret.core.CommandContext.optionBool] works correctly.
      */
-    internal fun convertToString(
-        value: Any,
-        takesValue: Boolean,
-    ): String =
-        when {
-            !takesValue && value is Boolean -> value.toString()
-            !takesValue && value.toString().lowercase() in setOf("true", "false") ->
-                value.toString().lowercase()
-            else -> value.toString()
-        }
+    internal fun convertToString(value: Any, takesValue: Boolean): String = when {
+        !takesValue && value is Boolean -> value.toString()
+        !takesValue && value.toString().lowercase() in setOf("true", "false") ->
+            value.toString().lowercase()
+        else -> value.toString()
+    }
 }

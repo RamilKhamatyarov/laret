@@ -9,12 +9,11 @@ fun interface ValidationRule {
 data class ValidationResult(
     val isValid: Boolean,
     val errors: List<String> = emptyList(),
-    val warnings: List<String> = emptyList(),
+    val warnings: List<String> = emptyList()
 ) {
-    fun merge(other: ValidationResult): ValidationResult =
-        ValidationResult(
-            isValid = this.isValid && other.isValid,
-            errors = this.errors + other.errors,
-            warnings = this.warnings + other.warnings,
-        )
+    fun merge(other: ValidationResult): ValidationResult = ValidationResult(
+        isValid = this.isValid && other.isValid,
+        errors = this.errors + other.errors,
+        warnings = this.warnings + other.warnings
+    )
 }

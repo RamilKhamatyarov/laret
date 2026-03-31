@@ -51,7 +51,7 @@ class LoggingPlugin : LaretPlugin {
             command.options.forEach { opt ->
                 val takesVal = if (opt.takesValue) "(takes value)" else ""
                 System.err.println(
-                    "│   • -${opt.short}, --${opt.long.padEnd(15)} $takesVal ${opt.description}",
+                    "│   • -${opt.short}, --${opt.long.padEnd(15)} $takesVal ${opt.description}"
                 )
             }
         }

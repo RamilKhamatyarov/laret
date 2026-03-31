@@ -8,17 +8,17 @@ import com.rkhamatyarov.laret.config.model.PluginConfig
 import com.rkhamatyarov.laret.core.FlagPersistence
 import com.rkhamatyarov.laret.dsl.cli
 import com.rkhamatyarov.laret.model.Option
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Nested
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 
 class PersistentFlagTest {
     private val originalOut = System.out
@@ -43,14 +43,13 @@ class PersistentFlagTest {
 
     private fun clear() = buf.reset()
 
-    private fun configWithFlags(flags: Map<String, Any>): AppConfig =
-        AppConfig(
-            app = AppMetadata(),
-            output = OutputConfig(),
-            plugins = PluginConfig(),
-            logging = LoggingConfig(),
-            flags = flags,
-        )
+    private fun configWithFlags(flags: Map<String, Any>): AppConfig = AppConfig(
+        app = AppMetadata(),
+        output = OutputConfig(),
+        plugins = PluginConfig(),
+        logging = LoggingConfig(),
+        flags = flags
+    )
 
     @Nested
     inner class KeyGenerationTests {
@@ -166,7 +165,7 @@ class PersistentFlagTest {
             val flags =
                 mapOf(
                     "dir" to mapOf("list" to mapOf("format" to "yaml")),
-                    "global" to mapOf("format" to "toml"),
+                    "global" to mapOf("format" to "toml")
                 )
             assertEquals("yaml", FlagPersistence.resolveFlag(persistOpt, "dir", "list", configWithFlags(flags)))
         }
@@ -176,7 +175,7 @@ class PersistentFlagTest {
             val flags =
                 mapOf(
                     "list" to mapOf("format" to "json"),
-                    "global" to mapOf("format" to "toml"),
+                    "global" to mapOf("format" to "toml")
                 )
             assertEquals("json", FlagPersistence.resolveFlag(persistOpt, "dir", "list", configWithFlags(flags)))
         }
@@ -217,9 +216,7 @@ class PersistentFlagTest {
     @Nested
     inner class RealConfigFileTests {
         @Test
-        fun `force flag from config allows overwrite without CLI flag`(
-            @TempDir tmp: File,
-        ) {
+        fun `force flag from config allows overwrite without CLI flag`(@TempDir tmp: File) {
             val yml = "flags:\n  file:\n    create:\n      force: true\n"
             val configFile = File(tmp, "laret.yml")
             configFile.writeText(yml)
@@ -256,8 +253,8 @@ class PersistentFlagTest {
                     "create",
                     testFile.absolutePath,
                     "-c",
-                    "overwritten",
-                ),
+                    "overwritten"
+                )
             )
 
             val out = output()
@@ -266,9 +263,7 @@ class PersistentFlagTest {
         }
 
         @Test
-        fun `global format from config applied when CLI flag absent`(
-            @TempDir tmp: File,
-        ) {
+        fun `global format from config applied when CLI flag absent`(@TempDir tmp: File) {
             val opt = Option("f", "format", "Format", "plain", true, persistent = true)
             val config = configWithFlags(mapOf("global" to mapOf("format" to "yaml")))
             assertEquals("yaml", FlagPersistence.resolveFlag(opt, "dir", "list", config))

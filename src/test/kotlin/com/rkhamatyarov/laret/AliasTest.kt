@@ -2,16 +2,16 @@ package com.rkhamatyarov.laret
 
 import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.dsl.cli
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Nested
-import org.junit.jupiter.api.Test
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
 
 class AliasTest {
     private lateinit var app: CliApp
@@ -50,7 +50,7 @@ class AliasTest {
                         action { ctx ->
                             val path = ctx.argument("path")
                             println(
-                                if (File(path).delete()) "File deleted: $path" else "Not found: $path",
+                                if (File(path).delete()) "File deleted: $path" else "Not found: $path"
                             )
                         }
                     }
@@ -212,7 +212,7 @@ class AliasTest {
                 app2.groups[0]
                     .commands[0]
                     .aliases
-                    .isEmpty(),
+                    .isEmpty()
             )
         }
 
@@ -393,7 +393,7 @@ class AliasTest {
             app.runForTest(arrayOf("xyz", "create", "somepath"))
             assertTrue(
                 output().contains("Group not found"),
-                "Expected 'Group not found' in: ${output()}",
+                "Expected 'Group not found' in: ${output()}"
             )
         }
 
@@ -404,7 +404,7 @@ class AliasTest {
             val out = output()
             assertTrue(
                 out.contains("Command not found") || out.contains("not found"),
-                "Expected not-found message, got: $out",
+                "Expected not-found message, got: $out"
             )
         }
 

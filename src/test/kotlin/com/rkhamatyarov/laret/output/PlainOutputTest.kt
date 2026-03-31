@@ -1,8 +1,8 @@
 package com.rkhamatyarov.laret.output
 
-import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import org.junit.jupiter.api.Test
 
 class PlainOutputTest {
     @Test
@@ -25,7 +25,7 @@ class PlainOutputTest {
         val data =
             mapOf(
                 "project" to mapOf("name" to "Laret CLI", "version" to "1.0.0"),
-                "build" to mapOf("language" to "Kotlin", "jvm" to "24"),
+                "build" to mapOf("language" to "Kotlin", "jvm" to "24")
             )
         val result = PlainOutput.render(data)
         assertTrue(result.contains("project"))
@@ -79,7 +79,7 @@ class PlainOutputTest {
             mapOf(
                 "app" to mapOf("name" to "Laret", "version" to "1.0.0", "enabled" to true),
                 "server" to mapOf("host" to "localhost", "port" to 8080, "ssl" to false),
-                "features" to listOf("json", "yaml", "toml"),
+                "features" to listOf("json", "yaml", "toml")
             )
         val result = PlainOutput.render(config)
         assertTrue(result.contains("app"))
