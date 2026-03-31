@@ -98,8 +98,6 @@ class AliasTest {
     /** Resets the capture buffer. */
     private fun clear() = buf.reset()
 
-    // ── Model unit tests ──────────────────────────────────────────────────────
-
     @Nested
     inner class CommandMatchesTests {
         @Test
@@ -163,8 +161,6 @@ class AliasTest {
             assertFalse(grp.matches("d"))
         }
     }
-
-    // ── DSL model population ──────────────────────────────────────────────────
 
     @Nested
     inner class ModelPopulationTests {
@@ -259,8 +255,6 @@ class AliasTest {
         }
     }
 
-    // ── Command alias integration tests ───────────────────────────────────────
-
     @Nested
     inner class CommandAliasIntegrationTests {
         @Test
@@ -334,8 +328,6 @@ class AliasTest {
         }
     }
 
-    // ── Combined alias tests ──────────────────────────────────────────────────
-
     @Nested
     inner class CombinedAliasTests {
         @Test
@@ -374,8 +366,6 @@ class AliasTest {
         }
     }
 
-    // ── Primary names still work ──────────────────────────────────────────────
-
     @Nested
     inner class PrimaryNameTests {
         @Test
@@ -394,8 +384,6 @@ class AliasTest {
             assertTrue(output().contains("primary_list.txt"))
         }
     }
-
-    // ── Error paths ───────────────────────────────────────────────────────────
 
     @Nested
     inner class ErrorPathTests {

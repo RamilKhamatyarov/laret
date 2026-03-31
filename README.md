@@ -786,7 +786,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Progress bars and spinners
 - [x] Table rendering utilities
 - [x] Command aliases
-- [ ] Persistent flag values
+- [x] Persistent flag values
 - [ ] Middleware/hooks system
 - [ ] Man page generation
 - [ ] Localization support

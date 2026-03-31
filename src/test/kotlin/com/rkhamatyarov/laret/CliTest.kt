@@ -33,6 +33,8 @@ class CliTest {
         app =
             cli(name = "laret", version = "1.0.0", description = "Test CLI framework") {
                 group(name = "file", description = "File operations") {
+                    aliases("f")
+
                     command(name = "create", description = "Create a new file") {
                         argument("path", "File path", required = true)
                         option("c", "content", "File content", "", true)
@@ -94,6 +96,8 @@ class CliTest {
                 }
 
                 group(name = "dir", description = "Directory operations") {
+                    aliases("d")
+
                     command(name = "create", description = "Create a new directory") {
                         argument("path", "Directory path", required = true)
                         option("p", "parents", "Create parent directories", "", false)

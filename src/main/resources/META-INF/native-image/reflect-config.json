@@ -1,16 +1,96 @@
 [
   {
+    "name": "com.fasterxml.jackson.databind.ObjectMapper",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true,
+    "allDeclaredFields": true,
+    "allPublicFields": true
+  },
+  {
+    "name": "com.fasterxml.jackson.databind.deser.BeanDeserializerFactory",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "com.fasterxml.jackson.databind.deser.BeanDeserializer",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "com.fasterxml.jackson.databind.introspect.JacksonAnnotationIntrospector",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "com.fasterxml.jackson.databind.introspect.AnnotationIntrospectorPair",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "com.fasterxml.jackson.databind.ser.BeanSerializerFactory",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "com.fasterxml.jackson.databind.ser.BeanSerializer",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "com.fasterxml.jackson.dataformat.yaml.YAMLFactory",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "com.fasterxml.jackson.dataformat.yaml.YAMLMapper",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true
+  },
+  {
+    "name": "com.fasterxml.jackson.module.kotlin.KotlinModule",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "com.fasterxml.jackson.module.kotlin.KotlinModule$Builder",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "kotlin.Metadata",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
     "name": "com.rkhamatyarov.laret.config.model.AppConfig",
     "allDeclaredConstructors": true,
-    "allPublicConstructors": true
+    "allPublicConstructors": true,
+    "allDeclaredFields": true,
+    "allPublicFields": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true
   },
   {
-    "name": "com.rkhamatyarov.laret.config.model.AppConfig$AppMetadata",
+    "name": "com.rkhamatyarov.laret.config.model.AppMetadata",
     "allDeclaredConstructors": true,
     "allPublicConstructors": true
   },
   {
-    "name": "ch.qos.logback.core.status.NopStatusListener",
+    "name": "com.rkhamatyarov.laret.config.model.OutputConfig",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "com.rkhamatyarov.laret.config.model.PluginConfig",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "com.rkhamatyarov.laret.config.model.LoggingConfig",
     "allDeclaredConstructors": true,
     "allPublicConstructors": true
   }

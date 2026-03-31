@@ -103,22 +103,26 @@ tasks.named("ktlintCheck") {
 
 graalvmNative {
     binaries {
+        val reflectConfig = "$projectDir/src/main/resources/META-INF/native-image/reflect-config.json"
+        val commonArgs =
+            listOf(
+                "--no-fallback",
+                "-Ob",
+                "--enable-native-access=ALL-UNNAMED",
+                "-H:+ReportExceptionStackTraces",
+                "-H:ReflectionConfigurationFiles=$reflectConfig",
+            )
+
         create("windows") {
             imageName.set("laret")
             mainClass.set("com.rkhamatyarov.laret.example.MainKt")
-            buildArgs.add("--no-fallback")
-            buildArgs.add("-Ob")
-            buildArgs.add("--enable-native-access=ALL-UNNAMED")
-            buildArgs.add("-H:+ReportExceptionStackTraces")
+            buildArgs.addAll(commonArgs)
         }
 
         create("linux") {
             imageName.set("laret")
             mainClass.set("com.rkhamatyarov.laret.example.MainKt")
-            buildArgs.add("--no-fallback")
-            buildArgs.add("-Ob")
-            buildArgs.add("--enable-native-access=ALL-UNNAMED")
-            buildArgs.add("-H:+ReportExceptionStackTraces")
+            buildArgs.addAll(commonArgs)
         }
     }
 }
