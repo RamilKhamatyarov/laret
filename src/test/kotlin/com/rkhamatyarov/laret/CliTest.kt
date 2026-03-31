@@ -2,18 +2,18 @@ package com.rkhamatyarov.laret
 
 import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.dsl.cli
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.runTest
-import org.junit.After
-import org.junit.Before
-import org.junit.Test
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runTest
+import org.junit.After
+import org.junit.Before
+import org.junit.Test
 
 class CliTest {
     private lateinit var app: CliApp
@@ -365,27 +365,26 @@ class CliTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `file delete existing file deletes file`() =
-        runTest {
-            // given
-            val testFile = File(testDir, "delete.txt")
-            testFile.writeText("To delete")
-            assertTrue(testFile.exists(), "File should exist before deletion")
+    fun `file delete existing file deletes file`() = runTest {
+        // given
+        val testFile = File(testDir, "delete.txt")
+        testFile.writeText("To delete")
+        assertTrue(testFile.exists(), "File should exist before deletion")
 
-            // when
-            clearOutput()
-            app.run(arrayOf("file", "delete", testFile.absolutePath))
+        // when
+        clearOutput()
+        app.run(arrayOf("file", "delete", testFile.absolutePath))
 
-            advanceTimeBy(100)
+        advanceTimeBy(100)
 
-            // then
-            val output = getOutput()
-            assertTrue(
-                output.contains("File deleted"),
-                "Output should contain 'File deleted', got: $output",
-            )
-            assertFalse(testFile.exists(), "File should be deleted after command execution")
-        }
+        // then
+        val output = getOutput()
+        assertTrue(
+            output.contains("File deleted"),
+            "Output should contain 'File deleted', got: $output"
+        )
+        assertFalse(testFile.exists(), "File should be deleted after command execution")
+    }
 
     @Test
     fun `file delete when deletion fails outputs error`() {
@@ -403,7 +402,7 @@ class CliTest {
             val output = getOutput()
             assertTrue(
                 output.contains("File deleted") || output.contains("✗ Failed to delete"),
-                "Should contain either success or failure message, got: $output",
+                "Should contain either success or failure message, got: $output"
             )
         } finally {
             readOnlyFile.setWritable(true)
@@ -413,26 +412,25 @@ class CliTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `file delete multiple files deletes all correctly`() =
-        runTest {
-            // given
-            val files = (1..3).map { File(testDir, "file$it.txt").also { f -> f.writeText("content$it") } }
+    fun `file delete multiple files deletes all correctly`() = runTest {
+        // given
+        val files = (1..3).map { File(testDir, "file$it.txt").also { f -> f.writeText("content$it") } }
 
-            // when // then
-            files.forEach { file ->
-                assertTrue(file.exists(), "File ${file.name} should exist before deletion")
+        // when // then
+        files.forEach { file ->
+            assertTrue(file.exists(), "File ${file.name} should exist before deletion")
 
-                clearOutput()
-                app.run(arrayOf("file", "delete", file.absolutePath))
+            clearOutput()
+            app.run(arrayOf("file", "delete", file.absolutePath))
 
-                advanceTimeBy(100)
+            advanceTimeBy(100)
 
-                val output = getOutput()
-                assertTrue(
-                    output.contains("File deleted"),
-                    "Output should contain 'File deleted', got: $output",
-                )
-                assertFalse(file.exists(), "File ${file.name} should be deleted after command execution")
-            }
+            val output = getOutput()
+            assertTrue(
+                output.contains("File deleted"),
+                "Output should contain 'File deleted', got: $output"
+            )
+            assertFalse(file.exists(), "File ${file.name} should be deleted after command execution")
         }
+    }
 }

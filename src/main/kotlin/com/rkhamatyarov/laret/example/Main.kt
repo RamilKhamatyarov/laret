@@ -1,48 +1,56 @@
 package com.rkhamatyarov.laret.example
 
-import com.rkhamatyarov.laret.completion.generateCompletion
-import com.rkhamatyarov.laret.completion.installCompletion
+import com.rkhamatyarov.laret.completion.CompletionCommand
+import com.rkhamatyarov.laret.completion.ShellType
 import com.rkhamatyarov.laret.dsl.cli
 import com.rkhamatyarov.laret.output.OutputStrategy
+import java.io.File
+import kotlin.system.exitProcess
 import org.jline.reader.EndOfFileException
 import org.jline.reader.LineReaderBuilder
 import org.jline.reader.UserInterruptException
 import org.jline.terminal.TerminalBuilder
-import java.io.File
-import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
     val app =
         cli(
             name = "laret",
             version = "1.0.0",
-            description = "Laret - A Cobra-like CLI framework for Kotlin",
+            description = "Laret - A Cobra-like CLI framework for Kotlin"
         ) {
             group(name = "completion", description = "Shell completion") {
                 command(name = "bash", description = "Generate bash completion script") {
-                    action { ctx -> print(ctx.app?.generateCompletion("bash") ?: "") }
+                    action { ctx ->
+                        val command = CompletionCommand(ctx.app!!)
+                        print(command.generate(ShellType.BASH))
+                    }
                 }
-
                 command(name = "zsh", description = "Generate zsh completion script") {
-                    action { ctx -> print(ctx.app?.generateCompletion("zsh") ?: "") }
+                    action { ctx ->
+                        val command = CompletionCommand(ctx.app!!)
+                        print(command.generate(ShellType.ZSH))
+                    }
                 }
-
                 command(name = "powershell", description = "Generate PowerShell completion script") {
-                    action { ctx -> print(ctx.app?.generateCompletion("powershell") ?: "") }
+                    action { ctx ->
+                        val command = CompletionCommand(ctx.app!!)
+                        print(command.generate(ShellType.POWERSHELL))
+                    }
                 }
-
                 command(name = "install", description = "Install completion script") {
                     argument("shell", "Shell type (bash, zsh, powershell)", required = true)
                     action { ctx ->
-                        val shell = ctx.argument("shell")
+                        val shellName = ctx.argument("shell")
                         try {
-                            ctx.app?.installCompletion(shell)
-                        } catch (e: Exception) {
-                            println("Error: ${e.message}")
+                            val shellType = ShellType.valueOf(shellName.uppercase())
+                            val command = CompletionCommand(ctx.app!!)
+                            command.generate(shellType, File(getCompletionPath(shellType, ctx.app.name)))
+                            println("Completion installed for $shellName")
+                        } catch (e: IllegalArgumentException) {
+                            println("Error: Unsupported shell '$shellName' $e. Supported: bash, zsh, powershell")
                         }
                     }
                 }
-
                 command(name = "interactive", description = "Start interactive shell") {
                     action { ctx ->
                         val terminal = TerminalBuilder.builder().system(true).build()
@@ -57,7 +65,7 @@ fun main(args: Array<String>) {
 
                         while (true) {
                             try {
-                                val line = reader.readLine("laret> ") ?: break
+                                val line = reader.readLine("laret > ") ?: break
                                 if (line.trim() == "exit" || line.trim() == "quit") break
                                 if (line.isBlank()) continue
 
@@ -255,7 +263,7 @@ fun main(args: Array<String>) {
                                 mapOf(
                                     "name" to file.name,
                                     "size" to file.length(),
-                                    "isDirectory" to file.isDirectory,
+                                    "isDirectory" to file.isDirectory
                                 )
                             }
                         bar.finish()
@@ -264,13 +272,13 @@ fun main(args: Array<String>) {
                             if (long) {
                                 println("Directory: $path")
                                 entries.forEach { entry ->
-                                    val size = if (entry["isDirectory"] == true) "" else "${entry["size"]} B"
+                                    val size = if (entry["isDirectory"] == true) " " else "${entry["size"]} B"
                                     val type = if (entry["isDirectory"] == true) "d" else "-"
-                                    println("$type $size ${entry["name"]}")
+                                    println("$type $size ${entry["name"]} ")
                                 }
                             } else {
                                 println("Directory: $path")
-                                entries.forEach { entry -> println(" ${entry["name"]}") }
+                                entries.forEach { entry -> println(" ${entry["name"]} ") }
                             }
                         } else {
                             val strategy = OutputStrategy.byName(format)
@@ -309,4 +317,23 @@ fun main(args: Array<String>) {
     app.init()
     val exitCode = app.run(args)
     exitProcess(exitCode)
+}
+
+fun getCompletionPath(shellType: ShellType, appName: String): String {
+    val homeDir = System.getProperty("user.home")
+    return when (shellType) {
+        ShellType.BASH -> "$homeDir/.bash_completion.d/$appName"
+        ShellType.ZSH -> "$homeDir/.zsh_completions/_$appName"
+        ShellType.POWERSHELL -> {
+            val profilePath = System.getenv("PROFILE")
+            val profileDir =
+                if (profilePath != null) {
+                    File(profilePath).parentFile?.absolutePath
+                        ?: "$homeDir/Documents/PowerShell"
+                } else {
+                    "$homeDir/Documents/PowerShell"
+                }
+            "$profileDir/${appName}_completion.ps1"
+        }
+    }
 }

@@ -17,10 +17,7 @@ object TableOutput : OutputStrategy {
         }
     }
 
-    private fun renderList(
-        list: List<*>,
-        terminal: Terminal,
-    ): String {
+    private fun renderList(list: List<*>, terminal: Terminal): String {
         if (list.isEmpty()) return "No data"
 
         val first = list.firstOrNull() as? Map<*, *> ?: return list.joinToString("\n")
@@ -43,10 +40,7 @@ object TableOutput : OutputStrategy {
         return terminal.render(t)
     }
 
-    private fun renderMap(
-        map: Map<*, *>,
-        terminal: Terminal,
-    ): String {
+    private fun renderMap(map: Map<*, *>, terminal: Terminal): String {
         val headers = map.keys.map { it.toString() }
         val t =
             table {

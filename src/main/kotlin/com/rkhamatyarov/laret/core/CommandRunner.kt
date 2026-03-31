@@ -9,10 +9,7 @@ import com.rkhamatyarov.laret.ui.redBold
  * via the DSL are transparently honoured here too.
  */
 object CommandRunner {
-    fun execute(
-        app: CliApp,
-        args: Array<String>,
-    ) {
+    fun execute(app: CliApp, args: Array<String>) {
         val groupInput = args.getOrNull(0) ?: return
 
         if (args.size == 2 && (args[1] == "-h" || args[1] == "--help")) {

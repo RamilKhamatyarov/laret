@@ -24,7 +24,7 @@ data class CliApp(
     val name: String,
     val version: String = "1.0.0",
     val description: String = "",
-    val groups: List<CommandGroup> = emptyList(),
+    val groups: List<CommandGroup> = emptyList()
 ) {
     private val pluginManager = PluginManager()
     private val logManager = LogManager()

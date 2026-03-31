@@ -1,0 +1,22 @@
+{
+  "resources": {
+    "includes": [
+      {
+        "pattern": "templates/.*\\.tpl$"
+      },
+      {
+        "pattern": "templates/bash\\.tpl$"
+      },
+      {
+        "pattern": "templates/zsh\\.tpl$"
+      },
+      {
+        "pattern": "templates/powershell\\.tpl$"
+      },
+      {
+        "pattern": "META-INF/native-image/.*\\.json$"
+      }
+    ]
+  },
+  "bundles": []
+}

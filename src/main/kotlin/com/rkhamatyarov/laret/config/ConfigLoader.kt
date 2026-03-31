@@ -43,11 +43,7 @@ class ConfigLoader {
         }
     }
 
-    fun save(
-        config: AppConfig,
-        outputPath: String,
-        format: ConfigFormat = ConfigFormat.YAML,
-    ) {
+    fun save(config: AppConfig, outputPath: String, format: ConfigFormat = ConfigFormat.YAML) {
         val file = File(outputPath)
         file.parentFile?.mkdirs()
 
@@ -72,31 +68,29 @@ class ConfigLoader {
                 File(".laret.json"),
                 File(System.getProperty("user.home"), ".laret.yml"),
                 File(System.getProperty("user.home"), ".laret.toml"),
-                File(System.getProperty("user.home"), ".laret.json"),
+                File(System.getProperty("user.home"), ".laret.json")
             )
 
         return candidates.firstOrNull { it.exists() }
     }
 
-    private fun getMapper(format: ConfigFormat): ObjectMapper =
-        when (format) {
-            ConfigFormat.YAML -> yamlMapper
-            ConfigFormat.TOML -> tomlMapper
-            ConfigFormat.JSON -> jsonMapper
-        }
+    private fun getMapper(format: ConfigFormat): ObjectMapper = when (format) {
+        ConfigFormat.YAML -> yamlMapper
+        ConfigFormat.TOML -> tomlMapper
+        ConfigFormat.JSON -> jsonMapper
+    }
 
-    private fun applyEnvironmentOverrides(config: AppConfig): AppConfig =
-        config.copy(
-            output =
-                config.output.copy(
-                    colorized = System.getenv("LARET_COLORIZED")?.toBoolean() ?: config.output.colorized,
-                    verbose = System.getenv("LARET_VERBOSE")?.toBoolean() ?: config.output.verbose,
-                    format = System.getenv("LARET_OUTPUT_FORMAT") ?: config.output.format,
-                ),
-            logging =
-                config.logging.copy(
-                    level = System.getenv("LARET_LOG_LEVEL") ?: config.logging.level,
-                    file = System.getenv("LARET_LOG_FILE") ?: config.logging.file,
-                ),
+    private fun applyEnvironmentOverrides(config: AppConfig): AppConfig = config.copy(
+        output =
+        config.output.copy(
+            colorized = System.getenv("LARET_COLORIZED")?.toBoolean() ?: config.output.colorized,
+            verbose = System.getenv("LARET_VERBOSE")?.toBoolean() ?: config.output.verbose,
+            format = System.getenv("LARET_OUTPUT_FORMAT") ?: config.output.format
+        ),
+        logging =
+        config.logging.copy(
+            level = System.getenv("LARET_LOG_LEVEL") ?: config.logging.level,
+            file = System.getenv("LARET_LOG_FILE") ?: config.logging.file
         )
+    )
 }

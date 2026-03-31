@@ -2,9 +2,29 @@
 root = true
 
 [*.{kt,kts}]
+ktlint_code_style = android_studio
+
+# Import rules
+ktlint_standard_no-wildcard-imports = disabled
+ktlint_standard_no-unused-imports = enabled
+
+# Formatting rules
+ktlint_standard_filename = disabled
+ktlint_standard_class-naming = enabled
+ktlint_standard_function-naming = enabled
+ktlint_standard_property-naming = enabled
+
+# Indentation
 indent_size = 4
 indent_style = space
+
+# Line length
 max_line_length = 120
-ij_kotlin_imports_layout = *,java.**,javax.**,kotlin.**,^
-ij_kotlin_allow_trailing_comma = true
-ij_kotlin_allow_trailing_comma_on_call_site = true
+
+# Trailing whitespace
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# Character encoding
+charset = utf-8
+end_of_line = lf

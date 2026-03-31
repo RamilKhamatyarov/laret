@@ -17,7 +17,7 @@ data class Command(
     val arguments: List<Argument> = emptyList(),
     val options: List<Option> = emptyList(),
     val aliases: List<String> = emptyList(),
-    val action: (CommandContext) -> Unit = {},
+    val action: (CommandContext) -> Unit = {}
 ) {
     /** True when [input] equals the primary name or any alias. */
     fun matches(input: String): Boolean = input == name || input in aliases
@@ -36,11 +36,7 @@ data class Command(
      * @param groupName Name of the group this command belongs to, used to build
      *                  the config-key hierarchy for persistent-flag lookup.
      */
-    fun execute(
-        args: Array<String>,
-        app: CliApp? = null,
-        groupName: String = "",
-    ) {
+    fun execute(args: Array<String>, app: CliApp? = null, groupName: String = "") {
         val providedOptions = mutableMapOf<String, String>()
 
         val ctx = CommandContext(this, app, groupName = groupName)
@@ -62,7 +58,7 @@ data class Command(
                         option = option,
                         groupName = groupName,
                         commandName = this.name,
-                        config = app?.getAppConfig(),
+                        config = app?.getAppConfig()
                     )
                 if (configValue != null) {
                     finalOptions[option.long] = configValue

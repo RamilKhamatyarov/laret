@@ -1,6 +1,6 @@
 plugins {
     kotlin("jvm") version "2.3.20"
-    id("org.graalvm.buildtools.native") version "0.11.5"
+    id("org.graalvm.buildtools.native") version "1.0.0"
     id("com.gradleup.shadow") version "9.4.1"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
     id("com.diffplug.spotless") version "8.4.0"
@@ -43,7 +43,7 @@ dependencies {
 }
 
 kotlin {
-    jvmToolchain(24)
+    jvmToolchain(25)
 }
 
 pmd {
@@ -60,7 +60,7 @@ spotless {
         target(
             "src/**/completion/BashCompletionGenerator.kt",
             "src/**/completion/ZshCompletionGenerator.kt",
-            "src/**/completion/PowerShellCompletionGenerator.kt",
+            "src/**/completion/PowerShellCompletionGenerator.kt"
         )
     }
 
@@ -69,7 +69,7 @@ spotless {
         targetExclude(
             "src/**/completion/BashCompletionGenerator.kt",
             "src/**/completion/ZshCompletionGenerator.kt",
-            "src/**/completion/PowerShellCompletionGenerator.kt",
+            "src/**/completion/PowerShellCompletionGenerator.kt"
         )
         ktlint("1.0.1")
             .setEditorConfigPath(".editorconfig")
@@ -104,6 +104,7 @@ tasks.named("ktlintCheck") {
 graalvmNative {
     binaries {
         val reflectConfig = "$projectDir/src/main/resources/META-INF/native-image/reflect-config.json"
+        val resourceConfig = "$projectDir/src/main/resources/META-INF/native-image/resource-config.json"
         val commonArgs =
             listOf(
                 "--no-fallback",
@@ -111,14 +112,14 @@ graalvmNative {
                 "--enable-native-access=ALL-UNNAMED",
                 "-H:+ReportExceptionStackTraces",
                 "-H:ReflectionConfigurationFiles=$reflectConfig",
+                "-H:ResourceConfigurationFiles=$resourceConfig",
+                "-H:IncludeResources=templates/.*\\.tpl$"
             )
-
         create("windows") {
             imageName.set("laret")
             mainClass.set("com.rkhamatyarov.laret.example.MainKt")
             buildArgs.addAll(commonArgs)
         }
-
         create("linux") {
             imageName.set("laret")
             mainClass.set("com.rkhamatyarov.laret.example.MainKt")
@@ -166,7 +167,7 @@ tasks {
             "spotlessCheck",
             "pmdMain",
             "pmdTest",
-            "test",
+            "test"
         )
     }
 

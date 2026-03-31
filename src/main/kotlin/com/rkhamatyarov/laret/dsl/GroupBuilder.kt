@@ -14,10 +14,7 @@ import com.rkhamatyarov.laret.model.CommandGroup
  * }
  * ```
  */
-class GroupBuilder(
-    val name: String,
-    val description: String = "",
-) {
+class GroupBuilder(val name: String, val description: String = "") {
     private val commands = mutableListOf<Command>()
     private val aliases = mutableListOf<String>()
 
@@ -32,11 +29,7 @@ class GroupBuilder(
     }
 
     /** Define a command within this group. */
-    fun command(
-        name: String,
-        description: String = "",
-        block: CommandBuilder.() -> Unit,
-    ) {
+    fun command(name: String, description: String = "", block: CommandBuilder.() -> Unit) {
         val cmdBuilder = CommandBuilder(name, description)
         cmdBuilder.block()
         commands.add(cmdBuilder.build())
