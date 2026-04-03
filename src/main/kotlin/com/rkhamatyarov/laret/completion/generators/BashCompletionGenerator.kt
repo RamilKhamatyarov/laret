@@ -40,13 +40,13 @@ class BashCompletionGenerator(val templateEngine: TemplateEngine = TemplateEngin
                             TemplateContext.OptionContext(
                                 long = opt.long,
                                 short = opt.short,
-                                description = opt.description
+                                description = opt.description,
                             )
-                        }
+                        },
                     )
-                }
+                },
             )
-        }
+        },
     )
 
     private fun loadTemplate(): String = javaClass.classLoader.getResource("templates/bash.tpl")

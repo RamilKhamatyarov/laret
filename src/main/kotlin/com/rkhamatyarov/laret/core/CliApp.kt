@@ -6,6 +6,7 @@ import com.rkhamatyarov.laret.config.validator.ConfigValidator
 import com.rkhamatyarov.laret.model.CommandGroup
 import com.rkhamatyarov.laret.plugin.LaretPlugin
 import com.rkhamatyarov.laret.plugin.PluginManager
+import kotlinx.coroutines.runBlocking
 import org.fusesource.jansi.AnsiConsole
 
 /**
@@ -24,7 +25,7 @@ data class CliApp(
     val name: String,
     val version: String = "1.0.0",
     val description: String = "",
-    val groups: List<CommandGroup> = emptyList()
+    val groups: List<CommandGroup> = emptyList(),
 ) {
     private val pluginManager = PluginManager()
     private val logManager = LogManager()
@@ -33,6 +34,9 @@ data class CliApp(
 
     private var appConfig: AppConfig = AppConfig()
     private var configPath: String? = null
+
+    internal var onInitHook: suspend (CliApp) -> Unit = {}
+    internal var onShutdownHook: suspend (CliApp) -> Unit = {}
 
     /** Initialize the application, optionally loading a config file. */
     fun init(configPath: String? = null): CliApp {
@@ -50,7 +54,43 @@ data class CliApp(
         } catch (e: Exception) {
             throw e
         }
+        runBlocking { onInitHook(this@CliApp) }
         return this
+    }
+
+    private fun executeCommand(args: Array<String>): Boolean {
+        val groupInput = args.getOrNull(0) ?: return false
+
+        if (args.size == 2 && (args[1] == "-h" || args[1] == "--help")) {
+            val group = groups.find { it.matches(groupInput) }
+            if (group != null) {
+                HelpFormatter.showGroupHelp(group)
+                return true
+            }
+        }
+
+        val commandInput = args.getOrNull(1) ?: return false
+        val cmdArgs = args.drop(2).toTypedArray()
+
+        val group =
+            groups.find { it.matches(groupInput) }
+                ?: run {
+                    println("Group not found: $groupInput")
+                    HelpFormatter.showApplicationHelp(this)
+                    return false
+                }
+
+        val command =
+            group.commands.find { it.matches(commandInput) }
+                ?: run {
+                    HelpFormatter.showCommandNotFound(commandInput, group)
+                    return false
+                }
+
+        runBlocking {
+            CommandRunner.executeCommand(command, cmdArgs, this@CliApp, group.name)
+        }
+        return true
     }
 
     /**
@@ -121,39 +161,6 @@ data class CliApp(
         }
     }
 
-    private fun executeCommand(args: Array<String>): Boolean {
-        val groupInput = args.getOrNull(0) ?: return false
-
-        if (args.size == 2 && (args[1] == "-h" || args[1] == "--help")) {
-            val group = groups.find { it.matches(groupInput) }
-            if (group != null) {
-                HelpFormatter.showGroupHelp(group)
-                return true
-            }
-        }
-
-        val commandInput = args.getOrNull(1) ?: return false
-        val cmdArgs = args.drop(2).toTypedArray()
-
-        val group =
-            groups.find { it.matches(groupInput) }
-                ?: run {
-                    println("Group not found: $groupInput")
-                    HelpFormatter.showApplicationHelp(this)
-                    return false
-                }
-
-        val command =
-            group.commands.find { it.matches(commandInput) }
-                ?: run {
-                    HelpFormatter.showCommandNotFound(commandInput, group)
-                    return false
-                }
-
-        command.execute(cmdArgs, this, group.name)
-        return true
-    }
-
     private fun applyConfiguration(config: AppConfig) {
         if (config.output.verbose) println("Verbose mode enabled")
         if (config.logging.file.isNotEmpty()) println("Log file configured: ${config.logging.file}")
@@ -201,7 +208,12 @@ data class CliApp(
         if (pluginManager.getPlugins().isNotEmpty()) pluginManager.initialize(this)
     }
 
-    fun shutdownPlugins() {
+    fun shutdown() {
+        runBlocking { onShutdownHook(this@CliApp) }
+        shutdownPlugins()
+    }
+
+    internal fun shutdownPlugins() {
         if (pluginManager.getPlugins().isNotEmpty()) pluginManager.shutdown()
     }
 

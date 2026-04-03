@@ -5,13 +5,13 @@ import java.io.File
 enum class ConfigFormat {
     YAML,
     TOML,
-    JSON
+    JSON,
     ;
 
     companion object {
         fun fromFile(file: File): ConfigFormat? = when (file.extension.lowercase()) {
             "yml",
-            "yaml"
+            "yaml",
             -> YAML
             "toml" -> TOML
             "json" -> JSON

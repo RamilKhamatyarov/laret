@@ -25,7 +25,7 @@ class PowerShellCompletionGenerator(val templateEngine: TemplateEngine = Templat
             TemplateContext.OptionContext(
                 long = long,
                 short = short,
-                description = ""
+                description = "",
             )
         }.sortedBy { it.long }
 
@@ -42,14 +42,14 @@ class PowerShellCompletionGenerator(val templateEngine: TemplateEngine = Templat
                                 TemplateContext.OptionContext(
                                     long = opt.long.trim(),
                                     short = opt.short.trim(),
-                                    description = opt.description.trim()
+                                    description = opt.description.trim(),
                                 )
-                            }
+                            },
                         )
-                    }
+                    },
                 )
             },
-            globalOptions = globalOptions
+            globalOptions = globalOptions,
         )
     }
 

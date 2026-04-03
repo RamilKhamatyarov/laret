@@ -11,7 +11,7 @@ class CommandContext(
     val command: Command,
     val app: CliApp? = null,
     val outputStrategy: OutputStrategy = PlainOutput,
-    val groupName: String
+    val groupName: String,
 ) {
     val arguments = mutableMapOf<String, String>()
 

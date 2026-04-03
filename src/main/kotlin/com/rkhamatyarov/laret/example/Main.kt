@@ -4,20 +4,25 @@ import com.rkhamatyarov.laret.completion.CompletionCommand
 import com.rkhamatyarov.laret.completion.ShellType
 import com.rkhamatyarov.laret.dsl.cli
 import com.rkhamatyarov.laret.output.OutputStrategy
-import java.io.File
-import kotlin.system.exitProcess
 import org.jline.reader.EndOfFileException
 import org.jline.reader.LineReaderBuilder
 import org.jline.reader.UserInterruptException
 import org.jline.terminal.TerminalBuilder
+import java.io.File
+import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
     val app =
         cli(
             name = "laret",
             version = "1.0.0",
-            description = "Laret - A Cobra-like CLI framework for Kotlin"
+            description = "Laret - A Cobra-like CLI framework for Kotlin",
         ) {
+            use(LoggingMiddleware())
+
+            onAppInit = { println("Laret initializing...") }
+            onAppShutdown = { println("Laret shutting down...") }
+
             group(name = "completion", description = "Shell completion") {
                 command(name = "bash", description = "Generate bash completion script") {
                     action { ctx ->
@@ -165,6 +170,20 @@ fun main(args: Array<String>) {
                     argument("path", "File path", required = true)
                     option("c", "content", "File content", "", true)
                     option("f", "force", "Overwrite if exists", "", true, persistent = true)
+
+                    preExecute = { ctx ->
+                        val path = ctx.argument("path")
+                        require(path.isNotBlank()) { "File path cannot be empty" }
+                    }
+
+                    postExecute = { ctx ->
+                        println("File operation completed for ${ctx.argument("path")}")
+                    }
+
+                    onError = { ctx, error ->
+                        println("Error creating ${ctx.argument("path")}: ${error.message}")
+                    }
+
                     action { ctx ->
                         val path = ctx.argument("path")
                         val content = ctx.option("content")
@@ -237,6 +256,14 @@ fun main(args: Array<String>) {
                     option("a", "all", "Show hidden files", "", false)
                     option("f", "format", "Output format (plain, json, yaml, toml)", "plain", true, persistent = true)
                     option("m", "max-size", "Max file size in bytes", "0", true)
+
+                    postExecute = { ctx ->
+                        val path = ctx.argument("path")
+                        val dir = File(path)
+                        val count = dir.listFiles()?.size ?: 0
+                        println("listed $count entries in $path")
+                    }
+
                     action { ctx ->
                         val path = ctx.argument("path")
                         val long = ctx.optionBool("long")
@@ -263,7 +290,7 @@ fun main(args: Array<String>) {
                                 mapOf(
                                     "name" to file.name,
                                     "size" to file.length(),
-                                    "isDirectory" to file.isDirectory
+                                    "isDirectory" to file.isDirectory,
                                 )
                             }
                         bar.finish()

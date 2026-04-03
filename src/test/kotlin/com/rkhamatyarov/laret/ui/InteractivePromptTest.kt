@@ -1,11 +1,11 @@
 package com.rkhamatyarov.laret.ui
 
+import org.junit.jupiter.api.Test
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.Test
 
 class InteractivePromptTest {
     private fun makePrompt(inputLines: String): Pair<InteractivePrompt, ByteArrayOutputStream> {

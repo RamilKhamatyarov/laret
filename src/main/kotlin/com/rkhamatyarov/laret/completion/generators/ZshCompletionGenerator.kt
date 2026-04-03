@@ -36,13 +36,13 @@ class ZshCompletionGenerator(val templateEngine: TemplateEngine = TemplateEngine
                             TemplateContext.OptionContext(
                                 long = opt.long,
                                 short = opt.short,
-                                description = opt.description
+                                description = opt.description,
                             )
-                        }
+                        },
                     )
-                }
+                },
             )
-        }
+        },
     )
 
     private fun loadTemplate(): String = javaClass.classLoader.getResource("templates/zsh.tpl")

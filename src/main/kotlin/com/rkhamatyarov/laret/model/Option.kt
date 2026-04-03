@@ -20,5 +20,5 @@ data class Option(
     val description: String = "",
     val default: String = "",
     val takesValue: Boolean = true,
-    val persistent: Boolean = false
+    val persistent: Boolean = false,
 )

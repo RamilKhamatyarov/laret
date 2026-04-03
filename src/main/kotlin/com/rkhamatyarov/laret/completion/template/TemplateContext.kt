@@ -3,12 +3,12 @@ package com.rkhamatyarov.laret.completion.template
 data class TemplateContext(
     val appName: String,
     val groups: List<GroupContext>,
-    val globalOptions: List<OptionContext> = emptyList()
+    val globalOptions: List<OptionContext> = emptyList(),
 ) {
     data class GroupContext(val name: String, val commands: List<CommandContext>) {
         fun toMap(): Map<String, Any?> = mapOf(
             "name" to name,
-            "commands" to commands.map { it.toMap() }
+            "commands" to commands.map { it.toMap() },
         )
     }
 
@@ -16,7 +16,7 @@ data class TemplateContext(
         fun toMap(): Map<String, Any?> = mapOf(
             "name" to name,
             "description" to description,
-            "options" to options.map { it.toMap() }
+            "options" to options.map { it.toMap() },
         )
     }
 
@@ -24,13 +24,13 @@ data class TemplateContext(
         fun toMap(): Map<String, Any?> = mapOf(
             "long" to long,
             "short" to short,
-            "description" to description
+            "description" to description,
         )
     }
 
     fun toMap(): Map<String, Any?> = mapOf(
         "appName" to appName,
         "groups" to groups.map { it.toMap() },
-        "globalOptions" to globalOptions.map { it.toMap() }
+        "globalOptions" to globalOptions.map { it.toMap() },
     )
 }

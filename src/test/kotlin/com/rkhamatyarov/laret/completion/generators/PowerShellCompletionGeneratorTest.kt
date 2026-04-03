@@ -4,9 +4,9 @@ import com.rkhamatyarov.laret.completion.CompletionCommand
 import com.rkhamatyarov.laret.completion.ShellType
 import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.dsl.cli
-import kotlin.test.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import kotlin.test.assertTrue
 
 class PowerShellCompletionGeneratorTest {
     private lateinit var completionCommand: CompletionCommand
@@ -131,7 +131,7 @@ class PowerShellCompletionGeneratorTest {
         val script = completionCommand.generate(ShellType.POWERSHELL)
         assertTrue(
             script.count { it == '{' } >= script.count { it == '}' },
-            "Should have balanced braces"
+            "Should have balanced braces",
         )
     }
 

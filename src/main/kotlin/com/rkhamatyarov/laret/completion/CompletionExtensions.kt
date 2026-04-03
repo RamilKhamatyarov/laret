@@ -2,8 +2,8 @@ package com.rkhamatyarov.laret.completion
 
 import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.ui.greenBold
-import java.io.File
 import org.fusesource.jansi.AnsiConsole
+import java.io.File
 
 fun CliApp.generateCompletion(shell: String = "bash"): String {
     AnsiConsole.systemUninstall()

@@ -1,8 +1,8 @@
 package com.rkhamatyarov.laret.output
 
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.Test
 
 class TableOutputTest {
     @Test
@@ -21,7 +21,7 @@ class TableOutputTest {
         val data =
             listOf(
                 mapOf("name" to "file1.txt", "size" to 1024, "isDirectory" to false),
-                mapOf("name" to "docs", "size" to 4096, "isDirectory" to true)
+                mapOf("name" to "docs", "size" to 4096, "isDirectory" to true),
             )
         val result = TableOutput.render(data)
 
