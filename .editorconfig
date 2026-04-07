@@ -1,30 +1,17 @@
 # .editorconfig
 root = true
 
-[*.{kt,kts}]
-ktlint_code_style = android_studio
-
-# Import rules
-ktlint_standard_no-wildcard-imports = disabled
-ktlint_standard_no-unused-imports = enabled
-
-# Formatting rules
-ktlint_standard_filename = disabled
-ktlint_standard_class-naming = enabled
-ktlint_standard_function-naming = enabled
-ktlint_standard_property-naming = enabled
-
-# Indentation
-indent_size = 4
-indent_style = space
-
-# Line length
-max_line_length = 120
-
-# Trailing whitespace
-trim_trailing_whitespace = true
-insert_final_newline = true
-
-# Character encoding
+[*]
 charset = utf-8
 end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{kt,kts}]
+ktlint_code_style = intellij_idea
+ktlint_standard_no-wildcard-imports = disabled
+ktlint_standard_no-unused-imports = enabled
+ktlint_standard_filename = disabled
+max_line_length = 120

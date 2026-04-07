@@ -104,7 +104,7 @@ class TemplateEngine {
                         val isLast = idx == size - 1
                         val sep = if (isLast) "" else ","
                         val itemMap = when (item) {
-                            is Map<*, *> -> item as Map<String, Any?>
+                            is Map<*, *> -> item
                             is TemplateContext.GroupContext -> item.toMap()
                             is TemplateContext.CommandContext -> item.toMap()
                             is TemplateContext.OptionContext -> item.toMap()

@@ -3,12 +3,12 @@ package com.rkhamatyarov.laret.plugin
 import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.dsl.cli
 import com.rkhamatyarov.laret.model.Command
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class PluginManagerTest {
     private lateinit var pluginManager: PluginManager
@@ -359,19 +359,19 @@ class PluginManagerTest {
             plugin1.initializeCalled &&
                 plugin1.beforeExecuteCalled &&
                 plugin1.afterExecuteCalled &&
-                plugin1.shutdownCalled
+                plugin1.shutdownCalled,
         )
         assertTrue(
             plugin2.initializeCalled &&
                 plugin2.beforeExecuteCalled &&
                 plugin2.afterExecuteCalled &&
-                plugin2.shutdownCalled
+                plugin2.shutdownCalled,
         )
         assertTrue(
             plugin3.initializeCalled &&
                 plugin3.beforeExecuteCalled &&
                 plugin3.afterExecuteCalled &&
-                plugin3.shutdownCalled
+                plugin3.shutdownCalled,
         )
     }
 }

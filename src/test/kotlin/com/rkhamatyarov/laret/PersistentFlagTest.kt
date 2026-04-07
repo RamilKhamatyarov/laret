@@ -8,17 +8,17 @@ import com.rkhamatyarov.laret.config.model.PluginConfig
 import com.rkhamatyarov.laret.core.FlagPersistence
 import com.rkhamatyarov.laret.dsl.cli
 import com.rkhamatyarov.laret.model.Option
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Nested
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
 
 class PersistentFlagTest {
     private val originalOut = System.out
@@ -48,7 +48,7 @@ class PersistentFlagTest {
         output = OutputConfig(),
         plugins = PluginConfig(),
         logging = LoggingConfig(),
-        flags = flags
+        flags = flags,
     )
 
     @Nested
@@ -165,7 +165,7 @@ class PersistentFlagTest {
             val flags =
                 mapOf(
                     "dir" to mapOf("list" to mapOf("format" to "yaml")),
-                    "global" to mapOf("format" to "toml")
+                    "global" to mapOf("format" to "toml"),
                 )
             assertEquals("yaml", FlagPersistence.resolveFlag(persistOpt, "dir", "list", configWithFlags(flags)))
         }
@@ -175,7 +175,7 @@ class PersistentFlagTest {
             val flags =
                 mapOf(
                     "list" to mapOf("format" to "json"),
-                    "global" to mapOf("format" to "toml")
+                    "global" to mapOf("format" to "toml"),
                 )
             assertEquals("json", FlagPersistence.resolveFlag(persistOpt, "dir", "list", configWithFlags(flags)))
         }
@@ -253,8 +253,8 @@ class PersistentFlagTest {
                     "create",
                     testFile.absolutePath,
                     "-c",
-                    "overwritten"
-                )
+                    "overwritten",
+                ),
             )
 
             val out = output()

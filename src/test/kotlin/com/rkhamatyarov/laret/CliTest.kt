@@ -2,18 +2,18 @@ package com.rkhamatyarov.laret
 
 import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.dsl.cli
-import java.io.ByteArrayOutputStream
-import java.io.File
-import java.io.PrintStream
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.PrintStream
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class CliTest {
     private lateinit var app: CliApp
@@ -381,7 +381,7 @@ class CliTest {
         val output = getOutput()
         assertTrue(
             output.contains("File deleted"),
-            "Output should contain 'File deleted', got: $output"
+            "Output should contain 'File deleted', got: $output",
         )
         assertFalse(testFile.exists(), "File should be deleted after command execution")
     }
@@ -402,7 +402,7 @@ class CliTest {
             val output = getOutput()
             assertTrue(
                 output.contains("File deleted") || output.contains("✗ Failed to delete"),
-                "Should contain either success or failure message, got: $output"
+                "Should contain either success or failure message, got: $output",
             )
         } finally {
             readOnlyFile.setWritable(true)
@@ -428,7 +428,7 @@ class CliTest {
             val output = getOutput()
             assertTrue(
                 output.contains("File deleted"),
-                "Output should contain 'File deleted', got: $output"
+                "Output should contain 'File deleted', got: $output",
             )
             assertFalse(file.exists(), "File ${file.name} should be deleted after command execution")
         }

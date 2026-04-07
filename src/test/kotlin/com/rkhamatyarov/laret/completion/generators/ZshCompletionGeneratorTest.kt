@@ -4,14 +4,14 @@ import com.rkhamatyarov.laret.completion.CompletionCommand
 import com.rkhamatyarov.laret.completion.ShellType
 import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.dsl.cli
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 import java.io.File
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
 
 class ZshCompletionGeneratorTest {
     private lateinit var app: CliApp
@@ -302,12 +302,12 @@ class ZshCompletionGeneratorTest {
 
         assertFalse(
             script.contains("${app.name} \"\$@\""),
-            "Zsh completion should not execute app name at end"
+            "Zsh completion should not execute app name at end",
         )
 
         assertTrue(
             script.trimEnd().endsWith("}"),
-            "Zsh completion should end with function closing brace"
+            "Zsh completion should end with function closing brace",
         )
     }
 
@@ -316,7 +316,7 @@ class ZshCompletionGeneratorTest {
         val script = completionCommand.generate(ShellType.ZSH)
         assertFalse(
             script.contains("${app.name} \"\$@\""),
-            "Zsh completion script should not contain command execution line"
+            "Zsh completion script should not contain command execution line",
         )
     }
 }

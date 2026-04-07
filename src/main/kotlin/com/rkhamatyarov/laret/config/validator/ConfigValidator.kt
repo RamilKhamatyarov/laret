@@ -28,7 +28,7 @@ class ConfigValidator {
                 result =
                     result.copy(
                         isValid = false,
-                        errors = result.errors + "Validation rule failed: ${e.message}"
+                        errors = result.errors + "Validation rule failed: ${e.message}",
                     )
             }
         }
@@ -45,7 +45,7 @@ private class AppNameRule : ValidationRule {
         } else {
             ValidationResult(
                 isValid = false,
-                errors = listOf("App name must be non-empty and max 100 characters")
+                errors = listOf("App name must be non-empty and max 100 characters"),
             )
         }
     }
@@ -60,7 +60,7 @@ private class OutputFormatRule : ValidationRule {
         } else {
             ValidationResult(
                 isValid = false,
-                errors = listOf("Invalid output format: ${config.output.format}. Valid: $validFormats")
+                errors = listOf("Invalid output format: ${config.output.format}. Valid: $validFormats"),
             )
         }
     }
@@ -75,7 +75,7 @@ private class LoggingLevelRule : ValidationRule {
         } else {
             ValidationResult(
                 isValid = false,
-                errors = listOf("Invalid log level: ${config.logging.level}. Valid: $validLevels")
+                errors = listOf("Invalid log level: ${config.logging.level}. Valid: $validLevels"),
             )
         }
     }

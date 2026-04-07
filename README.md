@@ -201,7 +201,7 @@ Named flags with short and long forms:
 ```kt
 
 option("c", "content", "File content", "", takesValue = true)
-option("f", "force", "Force operation", "", takesValue = false) 
+option("f", "force", "Force operation", "", takesValue = false)
 
 ```
 
@@ -262,21 +262,21 @@ command(
     description = "List items"
 ) {
     option("f", "format", "Output format (json, toml, yaml, plain)", "plain", true)
-    
+
     action { ctx ->
         val format = ctx.option("format")
         val items = listOf(
             mapOf("name" to "file1.txt", "size" to 1024),
             mapOf("name" to "file2.txt", "size" to 2048)
         )
-        
+
         val formatter: OutputStrategy = when (format) {
             "json" -> JsonOutput
             "toml" -> TomlOutput
             "yaml" -> YamlOutput
             else -> PlainOutput
         }
-        
+
         println(formatter.render(items))
     }
 }
@@ -302,7 +302,7 @@ $ laret list --format yaml
   size: 1024
 - name: file2.txt
   size: 2048
-  
+
 ```
 
 #### Creating Custom Output Formats
@@ -313,7 +313,7 @@ Implement the `OutputStrategy` interface:
 
 object CsvOutput : OutputStrategy {
     override val name = "csv"
-    
+
     override fun render(data: T): String {
         return csvString
     }
@@ -411,38 +411,38 @@ fun main(args: Array<String>) {
                     val content = ctx.option("content")
                     val force = ctx.optionBool("force")
                     val file = File(path)
-                    
+
                     if (file.exists() && !force) {
                         println(yellowItalic("File already exists: $path (use --force to overwrite)"))
                         return@action
                     }
-                    
+
                     file.writeText(content)
                     println(greenBold("File created: $path"))
                 }
             }
-            
+
             command(
                 name = "read",
                 description = "Read file contents"
             ) {
                 argument("path", "File path", required = true)
-                
+
                 action { ctx ->
                     val path = ctx.argument("path")
                     val file = File(path)
-                    
+
                     if (!file.exists()) {
                         println(redBold("File not found: $path"))
                         return@action
                     }
-                    
+
                     println(cyanBold("Reading: $path"))
                     println(file.readText())
                 }
             }
         }
-        
+
         group(
             name = "dir",
             description = "Directory operations"
@@ -454,21 +454,21 @@ fun main(args: Array<String>) {
                 argument("path", "Directory path", required = false, optional = true, default = ".")
                 option("l", "long", "Long format", "", false)
                 option("a", "all", "Show hidden files", "", false)
-                
+
                 action { ctx ->
                     val path = ctx.argument("path").ifEmpty { "." }
                     val long = ctx.optionBool("long")
                     val all = ctx.optionBool("all")
                     val dir = File(path)
-                    
+
                     if (!dir.isDirectory) {
                         println(redBold("Not a directory: $path"))
                         return@action
                     }
-                    
+
                     println(cyanBold("Listing: $path"))
                     val files = dir.listFiles() ?: emptyArray()
-                    
+
                     files.filter { all || !it.isHidden }
                         .sortedBy { it.name }
                         .forEach { file ->
@@ -488,7 +488,7 @@ fun main(args: Array<String>) {
             }
         }
     }
-    
+
     app.run(args)
 }
 
@@ -787,7 +787,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Table rendering utilities
 - [x] Command aliases
 - [x] Persistent flag values
-- [ ] Middleware/hooks system
+- [x] Middleware/hooks system
 - [ ] Man page generation
 - [ ] Localization support
 

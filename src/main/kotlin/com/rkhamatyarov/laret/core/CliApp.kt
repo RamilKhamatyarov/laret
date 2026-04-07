@@ -6,6 +6,7 @@ import com.rkhamatyarov.laret.config.validator.ConfigValidator
 import com.rkhamatyarov.laret.model.CommandGroup
 import com.rkhamatyarov.laret.plugin.LaretPlugin
 import com.rkhamatyarov.laret.plugin.PluginManager
+import kotlinx.coroutines.runBlocking
 import org.fusesource.jansi.AnsiConsole
 
 /**
@@ -24,7 +25,7 @@ data class CliApp(
     val name: String,
     val version: String = "1.0.0",
     val description: String = "",
-    val groups: List<CommandGroup> = emptyList()
+    val groups: List<CommandGroup> = emptyList(),
 ) {
     private val pluginManager = PluginManager()
     private val logManager = LogManager()
@@ -33,6 +34,9 @@ data class CliApp(
 
     private var appConfig: AppConfig = AppConfig()
     private var configPath: String? = null
+
+    internal var onInitHook: suspend (CliApp) -> Unit = {}
+    internal var onShutdownHook: suspend (CliApp) -> Unit = {}
 
     /** Initialize the application, optionally loading a config file. */
     fun init(configPath: String? = null): CliApp {
@@ -50,7 +54,40 @@ data class CliApp(
         } catch (e: Exception) {
             throw e
         }
+        runBlocking { onInitHook(this@CliApp) }
         return this
+    }
+
+    private fun executeCommand(args: Array<String>): Int {
+        val groupInput = args.getOrNull(0) ?: return 0
+
+        if (args.size == 2 && (args[1] == "-h" || args[1] == "--help")) {
+            val group = groups.find { it.matches(groupInput) }
+            if (group != null) {
+                HelpFormatter.showGroupHelp(group)
+                return 0
+            }
+        }
+
+        val commandInput = args.getOrNull(1) ?: return 0
+        val cmdArgs = args.drop(2).toTypedArray()
+
+        val group = groups.find { it.matches(groupInput) }
+            ?: run {
+                println("Group not found: $groupInput")
+                HelpFormatter.showApplicationHelp(this)
+                return 1
+            }
+
+        val command = group.commands.find { it.matches(commandInput) }
+            ?: run {
+                HelpFormatter.showCommandNotFound(commandInput, group)
+                return 1
+            }
+
+        return runBlocking {
+            CommandRunner.executeCommand(command, cmdArgs, this@CliApp, group.name)
+        }
     }
 
     /**
@@ -78,13 +115,11 @@ data class CliApp(
      * tests have installed, so [println] output is captured correctly.
      * Do **not** call this from production code — use [run] instead.
      */
-    fun runForTest(args: Array<String>) {
+    fun runForTest(args: Array<String>): Int {
         logManager.disableLogging()
-        try {
-            dispatch(args)
-        } finally {
-            shutdownPlugins()
-        }
+        val exitCode = dispatch(args)
+        shutdownPlugins()
+        return exitCode
     }
 
     private fun dispatch(args: Array<String>): Int {
@@ -109,49 +144,16 @@ data class CliApp(
                 init(args[1])
                 val remaining = args.drop(2).toTypedArray()
                 return if (remaining.isNotEmpty()) {
-                    if (executeCommand(remaining)) 0 else 1
+                    executeCommand(remaining)
                 } else {
                     0
                 }
             }
 
             else -> {
-                return if (executeCommand(args)) 0 else 1
+                return executeCommand(args)
             }
         }
-    }
-
-    private fun executeCommand(args: Array<String>): Boolean {
-        val groupInput = args.getOrNull(0) ?: return false
-
-        if (args.size == 2 && (args[1] == "-h" || args[1] == "--help")) {
-            val group = groups.find { it.matches(groupInput) }
-            if (group != null) {
-                HelpFormatter.showGroupHelp(group)
-                return true
-            }
-        }
-
-        val commandInput = args.getOrNull(1) ?: return false
-        val cmdArgs = args.drop(2).toTypedArray()
-
-        val group =
-            groups.find { it.matches(groupInput) }
-                ?: run {
-                    println("Group not found: $groupInput")
-                    HelpFormatter.showApplicationHelp(this)
-                    return false
-                }
-
-        val command =
-            group.commands.find { it.matches(commandInput) }
-                ?: run {
-                    HelpFormatter.showCommandNotFound(commandInput, group)
-                    return false
-                }
-
-        command.execute(cmdArgs, this, group.name)
-        return true
     }
 
     private fun applyConfiguration(config: AppConfig) {
@@ -201,7 +203,12 @@ data class CliApp(
         if (pluginManager.getPlugins().isNotEmpty()) pluginManager.initialize(this)
     }
 
-    fun shutdownPlugins() {
+    fun shutdown() {
+        runBlocking { onShutdownHook(this@CliApp) }
+        shutdownPlugins()
+    }
+
+    internal fun shutdownPlugins() {
         if (pluginManager.getPlugins().isNotEmpty()) pluginManager.shutdown()
     }
 

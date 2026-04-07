@@ -26,7 +26,7 @@ repositories {
 dependencies {
     implementation(kotlin("stdlib"))
 
-    implementation("org.jline:jline:4.0.9")
+    implementation("org.jline:jline:4.0.10")
     implementation("org.fusesource.jansi:jansi:2.4.3")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.21.2")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.21.2")
@@ -60,7 +60,7 @@ spotless {
         target(
             "src/**/completion/BashCompletionGenerator.kt",
             "src/**/completion/ZshCompletionGenerator.kt",
-            "src/**/completion/PowerShellCompletionGenerator.kt"
+            "src/**/completion/PowerShellCompletionGenerator.kt",
         )
     }
 
@@ -69,7 +69,7 @@ spotless {
         targetExclude(
             "src/**/completion/BashCompletionGenerator.kt",
             "src/**/completion/ZshCompletionGenerator.kt",
-            "src/**/completion/PowerShellCompletionGenerator.kt"
+            "src/**/completion/PowerShellCompletionGenerator.kt",
         )
         ktlint("1.0.1")
             .setEditorConfigPath(".editorconfig")
@@ -113,7 +113,7 @@ graalvmNative {
                 "-H:+ReportExceptionStackTraces",
                 "-H:ReflectionConfigurationFiles=$reflectConfig",
                 "-H:ResourceConfigurationFiles=$resourceConfig",
-                "-H:IncludeResources=templates/.*\\.tpl$"
+                "-H:IncludeResources=templates/.*\\.tpl$",
             )
         create("windows") {
             imageName.set("laret")
@@ -167,7 +167,7 @@ tasks {
             "spotlessCheck",
             "pmdMain",
             "pmdTest",
-            "test"
+            "test",
         )
     }
 
