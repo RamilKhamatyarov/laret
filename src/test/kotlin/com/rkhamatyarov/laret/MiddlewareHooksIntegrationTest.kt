@@ -1,4 +1,4 @@
-package com.rkhamatyarov
+package com.rkhamatyarov.laret
 
 import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.core.CommandContext

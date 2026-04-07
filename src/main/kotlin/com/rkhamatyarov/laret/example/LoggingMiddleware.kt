@@ -5,10 +5,10 @@ import com.rkhamatyarov.laret.core.Middleware
 
 class LoggingMiddleware : Middleware {
     override suspend fun handle(ctx: CommandContext, next: suspend () -> Unit) {
-        println("[LOG] Executing: ${ctx.command.name}")
+        System.err.println("START: ${ctx.command.name}")
         val start = System.currentTimeMillis()
         next()
         val elapsed = System.currentTimeMillis() - start
-        println("[LOG] Finished: ${ctx.command.name} in ${elapsed}ms")
+        System.err.println("END: ${ctx.command.name} took ${elapsed}ms")
     }
 }

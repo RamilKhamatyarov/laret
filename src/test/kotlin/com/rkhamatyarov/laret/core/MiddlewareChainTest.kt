@@ -142,9 +142,8 @@ class MiddlewareChainTest {
     fun `exception in middleware propagates correctly`() = runTest {
         var actionCalled = false
         val failing = object : Middleware {
-            override suspend fun handle(ctx: CommandContext, next: suspend () -> Unit) {
+            override suspend fun handle(ctx: CommandContext, next: suspend () -> Unit) =
                 throw RuntimeException("Middleware failure")
-            }
         }
 
         val chain = MiddlewareChain(listOf(failing)) { actionCalled = true }

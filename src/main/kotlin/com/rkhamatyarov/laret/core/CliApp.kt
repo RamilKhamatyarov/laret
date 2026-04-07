@@ -58,39 +58,36 @@ data class CliApp(
         return this
     }
 
-    private fun executeCommand(args: Array<String>): Boolean {
-        val groupInput = args.getOrNull(0) ?: return false
+    private fun executeCommand(args: Array<String>): Int {
+        val groupInput = args.getOrNull(0) ?: return 0
 
         if (args.size == 2 && (args[1] == "-h" || args[1] == "--help")) {
             val group = groups.find { it.matches(groupInput) }
             if (group != null) {
                 HelpFormatter.showGroupHelp(group)
-                return true
+                return 0
             }
         }
 
-        val commandInput = args.getOrNull(1) ?: return false
+        val commandInput = args.getOrNull(1) ?: return 0
         val cmdArgs = args.drop(2).toTypedArray()
 
-        val group =
-            groups.find { it.matches(groupInput) }
-                ?: run {
-                    println("Group not found: $groupInput")
-                    HelpFormatter.showApplicationHelp(this)
-                    return false
-                }
+        val group = groups.find { it.matches(groupInput) }
+            ?: run {
+                println("Group not found: $groupInput")
+                HelpFormatter.showApplicationHelp(this)
+                return 1
+            }
 
-        val command =
-            group.commands.find { it.matches(commandInput) }
-                ?: run {
-                    HelpFormatter.showCommandNotFound(commandInput, group)
-                    return false
-                }
+        val command = group.commands.find { it.matches(commandInput) }
+            ?: run {
+                HelpFormatter.showCommandNotFound(commandInput, group)
+                return 1
+            }
 
-        runBlocking {
+        return runBlocking {
             CommandRunner.executeCommand(command, cmdArgs, this@CliApp, group.name)
         }
-        return true
     }
 
     /**
@@ -118,13 +115,11 @@ data class CliApp(
      * tests have installed, so [println] output is captured correctly.
      * Do **not** call this from production code — use [run] instead.
      */
-    fun runForTest(args: Array<String>) {
+    fun runForTest(args: Array<String>): Int {
         logManager.disableLogging()
-        try {
-            dispatch(args)
-        } finally {
-            shutdownPlugins()
-        }
+        val exitCode = dispatch(args)
+        shutdownPlugins()
+        return exitCode
     }
 
     private fun dispatch(args: Array<String>): Int {
@@ -149,14 +144,14 @@ data class CliApp(
                 init(args[1])
                 val remaining = args.drop(2).toTypedArray()
                 return if (remaining.isNotEmpty()) {
-                    if (executeCommand(remaining)) 0 else 1
+                    executeCommand(remaining)
                 } else {
                     0
                 }
             }
 
             else -> {
-                return if (executeCommand(args)) 0 else 1
+                return executeCommand(args)
             }
         }
     }

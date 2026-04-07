@@ -173,15 +173,11 @@ fun main(args: Array<String>) {
 
                     preExecute = { ctx ->
                         val path = ctx.argument("path")
-                        require(path.isNotBlank()) { "File path cannot be empty" }
+                        require(path.isNotBlank()) { "Path cannot be empty" }
                     }
 
                     postExecute = { ctx ->
-                        println("File operation completed for ${ctx.argument("path")}")
-                    }
-
-                    onError = { ctx, error ->
-                        println("Error creating ${ctx.argument("path")}: ${error.message}")
+                        System.err.println("File operation completed for ${ctx.argument("path")}")
                     }
 
                     action { ctx ->
@@ -191,8 +187,8 @@ fun main(args: Array<String>) {
                         val file = File(path)
 
                         if (file.exists() && !force) {
-                            println("Error: File already exists: $path (use --force to overwrite)")
-                            return@action
+                            System.err.println("Error: File already exists: $path (use --force to overwrite)")
+                            throw RuntimeException("File already exists")
                         }
 
                         val spinner = ctx.spinner("Creating $path")
