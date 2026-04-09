@@ -3,6 +3,7 @@ package com.rkhamatyarov.laret.example
 import com.rkhamatyarov.laret.completion.CompletionCommand
 import com.rkhamatyarov.laret.completion.ShellType
 import com.rkhamatyarov.laret.dsl.cli
+import com.rkhamatyarov.laret.man.ManPageGenerator
 import com.rkhamatyarov.laret.output.OutputStrategy
 import org.jline.reader.EndOfFileException
 import org.jline.reader.LineReaderBuilder
@@ -56,6 +57,66 @@ fun main(args: Array<String>) {
                         }
                     }
                 }
+                command(name = "man", description = "Generate man page (Groff format)") {
+                    option(
+                        "o",
+                        "output",
+                        "Write to file instead of stdout (e.g. /usr/share/man/man1/laret.1)",
+                        "",
+                        true,
+                    )
+                    option(
+                        "g",
+                        "group",
+                        "Generate for specific group (e.g. file, dir). Omit for overview page.",
+                        "",
+                        true,
+                    )
+                    option("c", "command", "Generate for specific command within --group", "", true)
+                    action { ctx ->
+                        val outputPath = ctx.option("output")
+                        val groupFilter = ctx.option("group")
+                        val commandFilter = ctx.option("command")
+                        val app = ctx.app ?: return@action
+                        val generator = ManPageGenerator()
+
+                        val content = when {
+                            groupFilter.isNotBlank() && commandFilter.isNotBlank() -> {
+                                val grp = app.groups.find { it.matches(groupFilter) }
+                                    ?: run {
+                                        println("Error: group '$groupFilter' not found")
+                                        return@action
+                                    }
+                                val cmd = grp.commands.find { it.matches(commandFilter) }
+                                    ?: run {
+                                        println("Error: command '$commandFilter' not found in group '$groupFilter'")
+                                        return@action
+                                    }
+                                generator.generate(cmd, app.name, app.version, grp.name)
+                            }
+                            else -> {
+                                buildString {
+                                    app.groups.forEach { grp ->
+                                        grp.commands.forEach { cmd ->
+                                            append(generator.generate(cmd, app.name, app.version, grp.name))
+                                            append("\n")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (outputPath.isNotBlank()) {
+                            val file = java.io.File(outputPath)
+                            file.parentFile?.mkdirs()
+                            file.writeText(content)
+                            println("Man page written to $outputPath")
+                        } else {
+                            print(content)
+                        }
+                    }
+                }
+
                 command(name = "interactive", description = "Start interactive shell") {
                     action { ctx ->
                         val terminal = TerminalBuilder.builder().system(true).build()

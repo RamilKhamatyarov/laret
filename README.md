@@ -788,7 +788,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Command aliases
 - [x] Persistent flag values
 - [x] Middleware/hooks system
-- [ ] Man page generation
+- [x] Man page generation
 - [ ] Localization support
 
 ---

@@ -1151,6 +1151,103 @@ jobs:
                     grep -q "START: read" /tmp/scope.stderr \
                       || (echo "ERROR: Global middleware did not run for 'read'" && cat /tmp/scope.stderr && exit 1)
                     echo "Global middleware applies to all commands"
+    integration-manpages:
+        name: Integration - Man Page Generation
+        runs-on: ubuntu-latest
+        needs: [ build ]
+
+        steps:
+            -   name: Download native binary
+                uses: actions/download-artifact@v4
+                with:
+                    name: laret-native
+                    path: ./bin
+
+            -   name: Make binary executable
+                run: chmod +x ./bin/laret
+
+            -   name: Install mandoc
+                run: sudo apt-get update && sudo apt-get install -y mandoc
+
+            -   name: Generate man page (overview - all groups)
+                run: |
+                    set -euo pipefail
+                    ./bin/laret completion man > /tmp/laret.1 2>/tmp/laret_man.stderr
+                    if [ -s /tmp/laret_man.stderr ]; then
+                        echo "=== man generation stderr ===" && cat /tmp/laret_man.stderr
+                    fi
+                    [ -s /tmp/laret.1 ] || (echo "ERROR: man page is empty" && exit 1)
+                    echo "Man page generated: $(wc -l < /tmp/laret.1) lines"
+
+            -   name: Validate man page with mandoc -T lint
+                run: |
+                    set -euo pipefail
+                    # mandoc -T lint exits non-zero on ERRORS; warnings are acceptable
+                    mandoc -T lint /tmp/laret.1 2>/tmp/mandoc_lint.out || {
+                        # Fail only on ERROR lines, not WARNING or just whitespace
+                        if grep -q "^/tmp/laret.1:[0-9]*: ERROR" /tmp/mandoc_lint.out; then
+                            echo "=== mandoc errors found ==="
+                            grep "ERROR" /tmp/mandoc_lint.out
+                            exit 1
+                        fi
+                    }
+                    echo "mandoc lint passed (warnings allowed)"
+                    cat /tmp/mandoc_lint.out || true
+
+            -   name: Generate man page for specific group and command
+                run: |
+                    set -euo pipefail
+                    ./bin/laret completion man --group file --command create                         > /tmp/laret-file-create.1 2>/tmp/laret_man_cmd.stderr
+                    [ -s /tmp/laret-file-create.1 ]                         || (echo "ERROR: command man page is empty" && exit 1)
+                    grep -q "^.TH" /tmp/laret-file-create.1                         || (echo "ERROR: Missing .TH macro" && cat /tmp/laret-file-create.1 && exit 1)
+                    grep -q "^.SH NAME" /tmp/laret-file-create.1                         || (echo "ERROR: Missing NAME section" && cat /tmp/laret-file-create.1 && exit 1)
+                    grep -q "^.SH SYNOPSIS" /tmp/laret-file-create.1                         || (echo "ERROR: Missing SYNOPSIS section" && cat /tmp/laret-file-create.1 && exit 1)
+                    grep -q "^.SH OPTIONS" /tmp/laret-file-create.1                         || (echo "ERROR: Missing OPTIONS section" && cat /tmp/laret-file-create.1 && exit 1)
+                    echo "Command-specific man page is structurally valid"
+
+            -   name: Validate command man page with mandoc -T lint
+                run: |
+                    set -euo pipefail
+                    mandoc -T lint /tmp/laret-file-create.1 2>/tmp/mandoc_cmd.out || {
+                        if grep -q "^/tmp/laret-file-create.1:[0-9]*: ERROR" /tmp/mandoc_cmd.out; then
+                            echo "=== mandoc errors ===" && grep "ERROR" /tmp/mandoc_cmd.out && exit 1
+                        fi
+                    }
+                    echo "Command man page passes mandoc lint"
+
+            -   name: Test --output flag writes to file
+                run: |
+                    set -euo pipefail
+                    ./bin/laret completion man --group file --command create                         --output /tmp/laret-create-out.1 2>/dev/null
+                    [ -f /tmp/laret-create-out.1 ]                         || (echo "ERROR: --output file not created" && exit 1)
+                    [ -s /tmp/laret-create-out.1 ]                         || (echo "ERROR: --output file is empty" && exit 1)
+                    grep -q ".TH" /tmp/laret-create-out.1
+                    echo "--output flag writes valid file"
+
+            -   name: Man page stdout is clean (no control chars)
+                run: |
+                    set -euo pipefail
+                    ./bin/laret completion man --group dir --command list > /tmp/man_clean.out 2>/dev/null
+                    if grep -qP "[--]" /tmp/man_clean.out 2>/dev/null; then
+                        echo "ERROR: control characters in man page stdout"
+                        exit 1
+                    fi
+                    echo "Man page stdout is clean"
+
+            -   name: Upload man pages and lint report
+                if: always()
+                uses: actions/upload-artifact@v4
+                with:
+                    name: man-pages
+                    path: |
+                        /tmp/laret.1
+                        /tmp/laret-file-create.1
+                        /tmp/laret-create-out.1
+                        /tmp/mandoc_lint.out
+                        /tmp/mandoc_cmd.out
+                    retention-days: 7
+
+
     summary:
         name: Build Summary
         runs-on: ubuntu-latest
@@ -1167,6 +1264,8 @@ jobs:
             - integration-aliases
             - integration-persistent-flags
             - integration-middleware-hooks
+            - integration-manpages
+            - integration-manpages
         if: always()
 
         steps:
@@ -1186,6 +1285,7 @@ jobs:
                     echo " integration-table:          ${{ needs.integration-table-rendering.result }}"
                     echo " integration-aliases:        ${{ needs.integration-aliases.result }}"
                     echo " integration-persist:        ${{ needs.integration-persistent-flags.result }}"
+                    echo " integration-manpages:       ${{ needs.integration-manpages.result }}"
                     echo "=========================================="
 
             -   name: Comment PR on failure
