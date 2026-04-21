@@ -8,16 +8,14 @@ import com.rkhamatyarov.laret.core.CliApp
 class BashCompletionGenerator(val templateEngine: TemplateEngine = TemplateEngine()) : CompletionGenerator {
     override fun generate(app: CliApp): String {
         val template = loadTemplate()
-        // Build the base TemplateContext (needed for options loops)
         val baseContext = buildContext(app)
         val contextMap = baseContext.toMap().toMutableMap()
-        // Build a flat list of items: groups + commands
         val items = mutableListOf<Map<String, String>>()
-        // Add groups
+
         app.groups.forEach { group ->
             items.add(mapOf("name" to group.name, "type" to "group"))
         }
-        // Add commands (sub‑commands inside groups)
+
         app.groups.forEach { group ->
             group.commands.forEach { cmd ->
                 items.add(mapOf("name" to cmd.name, "type" to "command"))

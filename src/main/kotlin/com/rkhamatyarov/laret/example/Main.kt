@@ -3,8 +3,10 @@ package com.rkhamatyarov.laret.example
 import com.rkhamatyarov.laret.completion.CompletionCommand
 import com.rkhamatyarov.laret.completion.ShellType
 import com.rkhamatyarov.laret.dsl.cli
+import com.rkhamatyarov.laret.i18n.Localization
 import com.rkhamatyarov.laret.man.ManPageGenerator
 import com.rkhamatyarov.laret.output.OutputStrategy
+import com.rkhamatyarov.laret.pipe.CommandPipeline
 import org.jline.reader.EndOfFileException
 import org.jline.reader.LineReaderBuilder
 import org.jline.reader.UserInterruptException
@@ -13,6 +15,11 @@ import java.io.File
 import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
+    val localeIdx = args.indexOf("--locale")
+    if (localeIdx >= 0 && localeIdx + 1 < args.size) {
+        Localization.setLocale(args[localeIdx + 1])
+    }
+
     val app =
         cli(
             name = "laret",
@@ -21,8 +28,8 @@ fun main(args: Array<String>) {
         ) {
             use(LoggingMiddleware())
 
-            onAppInit = { println("Laret initializing...") }
-            onAppShutdown = { println("Laret shutting down...") }
+            onAppInit = { println(Localization.t("app.initializing")) }
+            onAppShutdown = { println(Localization.t("app.shutting.down")) }
 
             group(name = "completion", description = "Shell completion") {
                 command(name = "bash", description = "Generate bash completion script") {
@@ -147,6 +154,41 @@ fun main(args: Array<String>) {
                                 println("Error: ${e.message}")
                             }
                         }
+                    }
+                }
+            }
+
+            group(name = "pipe", description = "Command piping") {
+                command(name = "run", description = "Run a pipeline of laret commands separated by ---") {
+                    action { ctx ->
+                        val app = ctx.app ?: return@action
+
+                        val rawArgs = pipeCommandArgs.get() ?: emptyArray()
+                        if (rawArgs.isEmpty()) {
+                            println(Localization.t("pipe.empty"))
+                            return@action
+                        }
+                        val pipeline = CommandPipeline(app)
+                        val stages = pipeline.splitStages(rawArgs)
+                        if (stages.isEmpty()) {
+                            println(Localization.t("pipe.empty"))
+                            return@action
+                        }
+                        System.err.println(Localization.t("pipe.started", stages.size))
+                        pipeline.execute(stages)
+                    }
+                }
+            }
+
+            group(name = "i18n", description = "Localization demo") {
+                command(name = "hello", description = "Greet the user in the active locale") {
+                    action { _ ->
+                        println(Localization.t("app.greeting"))
+                    }
+                }
+                command(name = "locale", description = "Print the currently active locale") {
+                    action { _ ->
+                        println(Localization.getLocale().toLanguageTag())
                     }
                 }
             }
@@ -399,7 +441,14 @@ fun main(args: Array<String>) {
         }
 
     app.init()
-    val exitCode = app.run(args)
+
+    val filteredArgs = stripLocaleArg(args)
+
+    if (filteredArgs.size >= 2 && filteredArgs[0] == "pipe" && filteredArgs[1] == "run") {
+        pipeCommandArgs.set(filteredArgs.copyOfRange(2, filteredArgs.size))
+    }
+
+    val exitCode = app.run(filteredArgs)
     exitProcess(exitCode)
 }
 
@@ -420,4 +469,13 @@ fun getCompletionPath(shellType: ShellType, appName: String): String {
             "$profileDir/${appName}_completion.ps1"
         }
     }
+}
+
+internal val pipeCommandArgs: ThreadLocal<Array<String>?> = ThreadLocal.withInitial { null }
+
+internal fun stripLocaleArg(args: Array<String>): Array<String> {
+    val idx = args.indexOf("--locale")
+    if (idx < 0) return args
+    val dropTo = if (idx + 1 < args.size) idx + 2 else idx + 1
+    return (args.take(idx) + args.drop(dropTo)).toTypedArray()
 }

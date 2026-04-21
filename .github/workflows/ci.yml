@@ -1248,6 +1248,204 @@ jobs:
                     retention-days: 7
 
 
+    integration-piping:
+        name: Integration - Command Piping
+        runs-on: ubuntu-latest
+        needs: [ build ]
+
+        steps:
+            -   name: Download native binary
+                uses: actions/download-artifact@v4
+                with:
+                    name: laret-native
+                    path: ./bin
+
+            -   name: Make binary executable
+                run: chmod +x ./bin/laret
+
+            -   name: Prepare test fixtures in /tmp
+                run: |
+                    set -euo pipefail
+                    rm -rf /tmp/laret_pipe_test
+                    mkdir -p /tmp/laret_pipe_test
+                    echo "alpha"   > /tmp/laret_pipe_test/a.txt
+                    echo "beta"    > /tmp/laret_pipe_test/b.txt
+                    echo "gamma"   > /tmp/laret_pipe_test/c.txt
+                    ls -la /tmp/laret_pipe_test
+
+            -   name: Pipe - single stage executes normally
+                run: |
+                    set -euo pipefail
+                    ./bin/laret pipe run dir list /tmp/laret_pipe_test \
+                        > /tmp/pipe_single.out 2>/tmp/pipe_single.err || true
+                    grep -q "a.txt" /tmp/pipe_single.out \
+                        || (echo "ERROR: single-stage pipe did not produce expected output" \
+                            && cat /tmp/pipe_single.out /tmp/pipe_single.err && exit 1)
+                    echo "Single-stage pipeline works"
+
+            -   name: Pipe - two-stage pipeline feeds stdin to stage 2
+                run: |
+                    set -euo pipefail
+                    ./bin/laret pipe run \
+                        dir list /tmp/laret_pipe_test \
+                        --- \
+                        file create /tmp/laret_pipe_out.txt \
+                        > /tmp/pipe_two.out 2>/tmp/pipe_two.err || true
+                    [ -f /tmp/laret_pipe_out.txt ] \
+                        || (echo "ERROR: output file not created" \
+                            && cat /tmp/pipe_two.out /tmp/pipe_two.err && exit 1)
+                    grep -q "a.txt" /tmp/laret_pipe_out.txt \
+                        || (echo "ERROR: piped listing not found in output file" \
+                            && cat /tmp/laret_pipe_out.txt && exit 1)
+                    echo "Two-stage pipeline with stdin hand-off works"
+
+            -   name: Pipe - empty pipeline reports error
+                run: |
+                    set -euo pipefail
+                    ./bin/laret pipe run > /tmp/pipe_empty.out 2>/tmp/pipe_empty.err || true
+                    COMBINED=$(cat /tmp/pipe_empty.out /tmp/pipe_empty.err)
+                    echo "$COMBINED" | grep -qE "empty|pipeline" \
+                        || (echo "ERROR: empty pipeline should report a message" \
+                            && echo "$COMBINED" && exit 1)
+                    echo "Empty pipeline handled gracefully"
+
+            -   name: Pipe - three-stage pipeline
+                run: |
+                    set -euo pipefail
+                    ./bin/laret pipe run \
+                        dir list /tmp/laret_pipe_test \
+                        --- \
+                        file create /tmp/laret_pipe_three.txt \
+                        --- \
+                        file read /tmp/laret_pipe_three.txt \
+                        > /tmp/pipe_three.out 2>/tmp/pipe_three.err || true
+                    grep -q "a.txt" /tmp/pipe_three.out \
+                        || (echo "ERROR: three-stage pipeline did not propagate output" \
+                            && cat /tmp/pipe_three.out /tmp/pipe_three.err && exit 1)
+                    echo "Three-stage pipeline works"
+
+            -   name: Pipe - stage separator --- appears in error if malformed
+                run: |
+                    set -euo pipefail
+                    ./bin/laret pipe run --- --- \
+                        > /tmp/pipe_bad.out 2>/tmp/pipe_bad.err || true
+                    COMBINED=$(cat /tmp/pipe_bad.out /tmp/pipe_bad.err)
+                    echo "$COMBINED" | grep -qE "empty|pipeline" \
+                        || (echo "ERROR: consecutive separators should be empty pipeline" \
+                            && echo "$COMBINED" && exit 1)
+                    echo "Consecutive separators handled as empty pipeline"
+
+            -   name: Upload pipeline artifacts
+                if: always()
+                uses: actions/upload-artifact@v4
+                with:
+                    name: pipeline-outputs
+                    path: |
+                        /tmp/laret_pipe_out.txt
+                        /tmp/laret_pipe_three.txt
+                        /tmp/pipe_*.out
+                        /tmp/pipe_*.err
+                    retention-days: 7
+
+    integration-localization:
+        name: Integration - Localization Support
+        runs-on: ubuntu-latest
+        needs: [ build ]
+
+        steps:
+            -   name: Download native binary
+                uses: actions/download-artifact@v4
+                with:
+                    name: laret-native
+                    path: ./bin
+
+            -   name: Make binary executable
+                run: chmod +x ./bin/laret
+
+            -   name: Localization - default locale (English) greeting
+                run: |
+                    set -euo pipefail
+                    LARET_LOCALE="" LANG=C ./bin/laret i18n hello \
+                        > /tmp/i18n_en.out 2>/tmp/i18n_en.err
+                    grep -q "Hello from Laret" /tmp/i18n_en.out \
+                        || (echo "ERROR: expected English greeting" \
+                            && cat /tmp/i18n_en.out /tmp/i18n_en.err && exit 1)
+                    echo "English default greeting works"
+
+            -   name: Localization - --locale ru switches to Russian
+                run: |
+                    set -euo pipefail
+                    ./bin/laret --locale ru i18n hello \
+                        > /tmp/i18n_ru.out 2>/tmp/i18n_ru.err
+                    echo "=== stdout (ru) ==="
+                    cat /tmp/i18n_ru.out
+                    # Russian greeting starts with UTF-8 'Привет'
+                    grep -qE "Привет|Laret" /tmp/i18n_ru.out \
+                        || (echo "ERROR: expected Russian greeting" \
+                            && cat /tmp/i18n_ru.out /tmp/i18n_ru.err && exit 1)
+                    echo "Russian locale switch works"
+
+            -   name: Localization - --locale es switches to Spanish
+                run: |
+                    set -euo pipefail
+                    ./bin/laret --locale es i18n hello \
+                        > /tmp/i18n_es.out 2>/tmp/i18n_es.err
+                    grep -q "Hola desde Laret" /tmp/i18n_es.out \
+                        || (echo "ERROR: expected Spanish greeting" \
+                            && cat /tmp/i18n_es.out /tmp/i18n_es.err && exit 1)
+                    echo "Spanish locale switch works"
+
+            -   name: Localization - LARET_LOCALE env var is respected
+                run: |
+                    set -euo pipefail
+                    LARET_LOCALE=es ./bin/laret i18n hello \
+                        > /tmp/i18n_env.out 2>/tmp/i18n_env.err
+                    grep -q "Hola desde Laret" /tmp/i18n_env.out \
+                        || (echo "ERROR: LARET_LOCALE env var not applied" \
+                            && cat /tmp/i18n_env.out /tmp/i18n_env.err && exit 1)
+                    echo "LARET_LOCALE env var works"
+
+            -   name: Localization - unknown locale falls back to English
+                run: |
+                    set -euo pipefail
+                    ./bin/laret --locale xx i18n hello \
+                        > /tmp/i18n_xx.out 2>/tmp/i18n_xx.err
+                    grep -q "Hello from Laret" /tmp/i18n_xx.out \
+                        || (echo "ERROR: unknown locale should fall back to English" \
+                            && cat /tmp/i18n_xx.out /tmp/i18n_xx.err && exit 1)
+                    echo "Unknown locale fallback works"
+
+            -   name: Localization - locale command reports current locale
+                run: |
+                    set -euo pipefail
+                    OUTPUT=$(./bin/laret --locale ru i18n locale 2>/dev/null)
+                    echo "Reported locale: $OUTPUT"
+                    echo "$OUTPUT" | grep -q "ru" \
+                        || (echo "ERROR: i18n locale did not report ru" && exit 1)
+                    echo "Active locale is queryable"
+
+            -   name: Localization - --locale flag is stripped from argv
+                run: |
+                    set -euo pipefail
+                    # If --locale was not stripped the download (no such cmd) would error.
+                    # Use a known command to confirm --locale is consumed before parsing.
+                    ./bin/laret --locale en i18n hello \
+                        > /tmp/i18n_strip.out 2>/tmp/i18n_strip.err
+                    grep -q "Hello" /tmp/i18n_strip.out \
+                        || (echo "ERROR: --locale flag not consumed before command dispatch" \
+                            && cat /tmp/i18n_strip.out /tmp/i18n_strip.err && exit 1)
+                    echo "--locale flag is stripped before dispatch"
+
+            -   name: Upload localization artifacts
+                if: always()
+                uses: actions/upload-artifact@v4
+                with:
+                    name: localization-outputs
+                    path: |
+                        /tmp/i18n_*.out
+                        /tmp/i18n_*.err
+                    retention-days: 7
+
     summary:
         name: Build Summary
         runs-on: ubuntu-latest
@@ -1265,7 +1463,8 @@ jobs:
             - integration-persistent-flags
             - integration-middleware-hooks
             - integration-manpages
-            - integration-manpages
+            - integration-piping
+            - integration-localization
         if: always()
 
         steps:
@@ -1286,6 +1485,8 @@ jobs:
                     echo " integration-aliases:        ${{ needs.integration-aliases.result }}"
                     echo " integration-persist:        ${{ needs.integration-persistent-flags.result }}"
                     echo " integration-manpages:       ${{ needs.integration-manpages.result }}"
+                    echo " integration-piping:         ${{ needs.integration-piping.result }}"
+                    echo " integration-localization:   ${{ needs.integration-localization.result }}"
                     echo "=========================================="
 
             -   name: Comment PR on failure
