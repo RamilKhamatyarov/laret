@@ -288,13 +288,17 @@ fun main(args: Array<String>) {
 
                     action { ctx ->
                         val path = ctx.argument("path")
-                        val content = ctx.option("content")
                         val force = ctx.optionBool("force")
                         val file = File(path)
 
                         if (file.exists() && !force) {
                             System.err.println("Error: File already exists: $path (use --force to overwrite)")
                             throw RuntimeException("File already exists")
+                        }
+
+                        var content = ctx.option("content")
+                        if (content.isBlank()) {
+                            content = System.`in`.bufferedReader().readText()
                         }
 
                         val spinner = ctx.spinner("Creating $path")
@@ -306,6 +310,7 @@ fun main(args: Array<String>) {
                             spinner.finish("File created: $path")
                         } catch (e: Exception) {
                             spinner.fail("Failed to create file: ${e.message}")
+                            throw e
                         }
                     }
                 }
