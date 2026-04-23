@@ -25,6 +25,14 @@ class CommandContext(
 
     fun optionInt(name: String): Int = options[name]?.toIntOrNull() ?: 0
 
+    fun optionLong(name: String): Long = options[name]?.toLongOrNull() ?: 0L
+
+    fun optionDouble(name: String): Double = options[name]?.toDoubleOrNull() ?: 0.0
+
+    fun argumentInt(name: String): Int = argument(name).toIntOrNull() ?: 0
+
+    fun argumentLong(name: String): Long = argument(name).toLongOrNull() ?: 0L
+
     fun render(data: Any): String = outputStrategy.render(data)
 
     fun progressBar(total: Int, label: String = "", width: Int = 40): ProgressBar =

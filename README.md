@@ -775,20 +775,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgments
 
 - Inspired by [Cobra](https://github.com/spf13/cobra) (Go)
-
-## Roadmap
-
-- [x] GraalVM Native Image support
-- [x] JSON/YAML output formatting
-- [x] Plugin system for extensibility
-- [x] Built-in config file support (YAML, TOML, JSON)
-- [x] Interactive prompts and menus
-- [x] Progress bars and spinners
-- [x] Table rendering utilities
-- [x] Command aliases
-- [x] Persistent flag values
-- [x] Middleware/hooks system
-- [x] Man page generation
-- [ ] Localization support
-
----
