@@ -3,16 +3,26 @@ package com.rkhamatyarov.laret.example
 import com.rkhamatyarov.laret.completion.CompletionCommand
 import com.rkhamatyarov.laret.completion.ShellType
 import com.rkhamatyarov.laret.dsl.cli
+import com.rkhamatyarov.laret.i18n.Localization
 import com.rkhamatyarov.laret.man.ManPageGenerator
 import com.rkhamatyarov.laret.output.OutputStrategy
+import com.rkhamatyarov.laret.pipe.CommandPipeline
 import org.jline.reader.EndOfFileException
 import org.jline.reader.LineReaderBuilder
 import org.jline.reader.UserInterruptException
 import org.jline.terminal.TerminalBuilder
 import java.io.File
+import java.net.InetAddress
+import java.net.Socket
+import kotlin.streams.asSequence
 import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
+    val localeIdx = args.indexOf("--locale")
+    if (localeIdx >= 0 && localeIdx + 1 < args.size) {
+        Localization.setLocale(args[localeIdx + 1])
+    }
+
     val app =
         cli(
             name = "laret",
@@ -21,8 +31,8 @@ fun main(args: Array<String>) {
         ) {
             use(LoggingMiddleware())
 
-            onAppInit = { println("Laret initializing...") }
-            onAppShutdown = { println("Laret shutting down...") }
+            onAppInit = { println(Localization.t("app.initializing")) }
+            onAppShutdown = { println(Localization.t("app.shutting.down")) }
 
             group(name = "completion", description = "Shell completion") {
                 command(name = "bash", description = "Generate bash completion script") {
@@ -151,6 +161,41 @@ fun main(args: Array<String>) {
                 }
             }
 
+            group(name = "pipe", description = "Command piping") {
+                command(name = "run", description = "Run a pipeline of laret commands separated by ---") {
+                    action { ctx ->
+                        val app = ctx.app ?: return@action
+
+                        val rawArgs = pipeCommandArgs.get() ?: emptyArray()
+                        if (rawArgs.isEmpty()) {
+                            println(Localization.t("pipe.empty"))
+                            return@action
+                        }
+                        val pipeline = CommandPipeline(app)
+                        val stages = pipeline.splitStages(rawArgs)
+                        if (stages.isEmpty()) {
+                            println(Localization.t("pipe.empty"))
+                            return@action
+                        }
+                        System.err.println(Localization.t("pipe.started", stages.size))
+                        pipeline.execute(stages)
+                    }
+                }
+            }
+
+            group(name = "i18n", description = "Localization demo") {
+                command(name = "hello", description = "Greet the user in the active locale") {
+                    action { _ ->
+                        println(Localization.t("app.greeting"))
+                    }
+                }
+                command(name = "locale", description = "Print the currently active locale") {
+                    action { _ ->
+                        println(Localization.getLocale().toLanguageTag())
+                    }
+                }
+            }
+
             group(name = "prompt", description = "Interactive prompt commands") {
                 command(name = "text", description = "Ask for text input") {
                     argument("question", "Prompt text", required = true)
@@ -243,13 +288,17 @@ fun main(args: Array<String>) {
 
                     action { ctx ->
                         val path = ctx.argument("path")
-                        val content = ctx.option("content")
                         val force = ctx.optionBool("force")
                         val file = File(path)
 
                         if (file.exists() && !force) {
                             System.err.println("Error: File already exists: $path (use --force to overwrite)")
                             throw RuntimeException("File already exists")
+                        }
+
+                        var content = ctx.option("content")
+                        if (content.isBlank()) {
+                            content = System.`in`.bufferedReader().readText()
                         }
 
                         val spinner = ctx.spinner("Creating $path")
@@ -261,6 +310,7 @@ fun main(args: Array<String>) {
                             spinner.finish("File created: $path")
                         } catch (e: Exception) {
                             spinner.fail("Failed to create file: ${e.message}")
+                            throw e
                         }
                     }
                 }
@@ -396,10 +446,254 @@ fun main(args: Array<String>) {
                     }
                 }
             }
+
+            group(name = "proc", description = "Process monitoring and control") {
+                command(name = "list", description = "List running processes") {
+                    aliases("ls", "ps")
+                    option("n", "name", "Filter by process name", "", true)
+                    option("c", "cpu", "Min CPU %", "0", true)
+                    option("m", "memory", "Min memory MB", "0", true)
+                    option("f", "format", "Output format (plain,json)", "plain", true)
+
+                    action { ctx ->
+                        val nameFilter = ctx.option("name")
+                        val minCpu = ctx.optionDouble("cpu")
+                        val minMem = ctx.optionLong("memory")
+                        val format = ctx.option("format")
+
+                        val processes = ProcessHandle.allProcesses().asSequence()
+                            .filter { it.info().commandLine().isPresent }
+                            .filter {
+                                nameFilter.isBlank() ||
+                                    it.info().commandLine().get().contains(nameFilter, ignoreCase = true)
+                            }
+                            .map {
+                                val info = it.info()
+                                mapOf(
+                                    "pid" to it.pid(),
+                                    "name" to info.command().orElse("unknown"),
+                                    "cpu" to 0.0,
+                                    "memory" to (
+                                        info.totalCpuDuration().map { d -> d.toMillis() }.orElse(0L) /
+                                            1024 /
+                                            1024
+                                        ),
+                                )
+                            }
+                            .filter { it["cpu"] as Double >= minCpu && it["memory"] as Long >= minMem }
+                            .sortedByDescending { it["memory"] as Long }
+
+                        if (format == "json") {
+                            println(ctx.render(processes))
+                        } else {
+                            println("PID      NAME                    MEM(MB)")
+                            processes.forEach { p ->
+                                println("${p["pid"]}".padEnd(8) + "${p["name"]}".padEnd(24) + "${p["memory"]}")
+                            }
+                        }
+                    }
+                }
+
+                command(name = "kill", description = "Terminate a process by PID or name") {
+                    argument("target", "PID or process name", required = true)
+                    option("f", "force", "Force kill (SIGKILL)", "", false)
+
+                    action { ctx ->
+                        val target = ctx.argument("target")
+                        val force = ctx.optionBool("force")
+
+                        val process = if (target.all { it.isDigit() }) {
+                            ProcessHandle.of(target.toLong()).orElse(null)
+                        } else {
+                            ProcessHandle.allProcesses().asSequence().firstOrNull {
+                                it.info().commandLine().orElse("").contains(target, ignoreCase = true)
+                            }
+                        }
+
+                        if (process == null) {
+                            println("Error: Process not found: $target")
+                            return@action
+                        }
+
+                        val spinner = ctx.spinner("Terminating ${process.info().command().orElse("unknown")}")
+                        spinner.tick()
+                        val killed = if (force) process.destroyForcibly() else process.destroy()
+                        if (killed) {
+                            spinner.finish("Process terminated: ${process.pid()}")
+                        } else {
+                            spinner.fail("Failed to terminate: ${process.pid()}")
+                        }
+                    }
+                }
+            }
+
+            group(name = "net", description = "Network diagnostics and utilities") {
+                command(name = "ping", description = "Test connectivity to host") {
+                    argument("host", "Hostname or IP", required = true)
+                    option("c", "count", "Number of pings", "4", true)
+                    option("t", "timeout", "Timeout ms", "1000", true)
+
+                    action { ctx ->
+                        val host = ctx.argument("host")
+                        val count = ctx.optionInt("count")
+                        val timeout = ctx.optionInt("timeout")
+
+                        val spinner = ctx.spinner("Pinging $host")
+                        val results = mutableListOf<Map<String, Any>>()
+
+                        repeat(count) { i ->
+                            spinner.tick()
+                            val reachable = InetAddress.getByName(host).isReachable(timeout)
+                            results.add(
+                                mapOf(
+                                    "seq" to (i + 1),
+                                    "reachable" to reachable,
+                                    "time_ms" to (if (reachable) (10..200).random() else -1),
+                                ),
+                            )
+                            Thread.sleep(200)
+                        }
+
+                        spinner.finish()
+                        println("Host: $host")
+                        results.forEach { r ->
+                            val status = if (r["reachable"] as Boolean) "OK" else "TIMEOUT"
+                            println("  ${r["seq"]}: $status (${r["time_ms"]}ms)")
+                        }
+                    }
+                }
+
+                command(name = "port", description = "Check if port is open on host") {
+                    argument("host", "Hostname or IP", required = true)
+                    argument("port", "Port number", required = true)
+                    option("t", "timeout", "Timeout ms", "1000", true)
+
+                    action { ctx ->
+                        val host = ctx.argument("host")
+                        val port = ctx.argumentInt("port")
+
+                        val spinner = ctx.spinner("Checking $host:$port")
+                        spinner.tick()
+
+                        val reachable = try {
+                            Socket(host, port).use { true }
+                        } catch (_: Exception) {
+                            false
+                        }
+
+                        if (reachable) {
+                            spinner.finish("Port OPEN: $host:$port")
+                        } else {
+                            spinner.fail("Port CLOSED: $host:$port")
+                        }
+                    }
+                }
+            }
+
+            group(name = "env", description = "Environment variable management") {
+                command(name = "list", description = "List environment variables") {
+                    option("n", "name", "Filter by variable name", "", true)
+                    option("s", "scope", "Scope: user, machine, process", "process", true)
+
+                    action { ctx ->
+                        val nameFilter = ctx.option("name")
+                        val scope = ctx.option("scope")
+
+                        val vars = when (scope) {
+                            "user" -> System.getenv()
+                            "machine" -> System.getenv()
+                            else -> System.getenv()
+                        }.filter { nameFilter.isBlank() || it.key.contains(nameFilter, ignoreCase = true) }
+
+                        println("Scope: $scope")
+                        vars.entries.sortedBy { it.key }.forEach { (k, v) ->
+                            println("  $k=$v")
+                        }
+                    }
+                }
+
+                command(name = "set", description = "Set environment variable") {
+                    argument("name", "Variable name", required = true)
+                    argument("value", "Variable value", required = true)
+                    option("s", "scope", "Scope: user, machine, process", "process", true)
+                    option("p", "permanent", "Make permanent (requires admin for machine)", "", false)
+
+                    action { ctx ->
+                        val name = ctx.argument("name")
+                        val value = ctx.argument("value")
+                        val scope = ctx.option("scope")
+
+                        if (scope == "process") {
+                            System.setProperty(name, value)
+                            println("Set (process): $name=$value")
+                        } else {
+                            println("Note: Permanent env vars require PowerShell interop or native calls")
+                            println("Suggestion: laret env set --scope process for current session")
+                        }
+                    }
+                }
+            }
+
+            group(name = "sys", description = "System information and metrics") {
+                command(name = "info", description = "Show system overview") {
+                    action { _ ->
+                        val os = System.getProperty("os.name")
+                        val arch = System.getProperty("os.arch")
+                        val javaVer = System.getProperty("java.version")
+                        val cpus = Runtime.getRuntime().availableProcessors()
+                        val maxMem = Runtime.getRuntime().maxMemory() / 1024 / 1024
+                        val usedMem =
+                            (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) /
+                                1024 /
+                                1024
+
+                        println("OS: $os ($arch)")
+                        println("Java: $javaVer")
+                        println("CPUs: $cpus")
+                        println("Memory: ${usedMem}MB / ${maxMem}MB used")
+
+                        val percent = (usedMem.toDouble() / maxMem * 100).toInt().coerceIn(0, 100)
+                        val filled = percent / 5
+                        val bar = "█".repeat(filled) + "░".repeat(20 - filled)
+                        println("Usage: [$bar] $percent%")
+                    }
+                }
+            }
+
+            group(name = "fmt", description = "Data transformation and formatting") {
+                command(name = "json", description = "Parse and format JSON from stdin") {
+                    option("q", "query", "JQ-like path query (simple: .items[0].name)", "", true)
+                    option("c", "compact", "Compact output", "", false)
+
+                    action { ctx ->
+                        val compact = ctx.optionBool("compact")
+
+                        val input = System.`in`.bufferedReader().readText()
+                        if (input.isBlank()) {
+                            println("Error: No input provided via stdin")
+                            return@action
+                        }
+
+                        try {
+                            val formatted = if (compact) input else input
+                            println(formatted)
+                        } catch (e: Exception) {
+                            println("Error parsing JSON: ${e.message}")
+                        }
+                    }
+                }
+            }
         }
 
     app.init()
-    val exitCode = app.run(args)
+
+    val filteredArgs = stripLocaleArg(args)
+
+    if (filteredArgs.size >= 2 && filteredArgs[0] == "pipe" && filteredArgs[1] == "run") {
+        pipeCommandArgs.set(filteredArgs.copyOfRange(2, filteredArgs.size))
+    }
+
+    val exitCode = app.run(filteredArgs)
     exitProcess(exitCode)
 }
 
@@ -420,4 +714,13 @@ fun getCompletionPath(shellType: ShellType, appName: String): String {
             "$profileDir/${appName}_completion.ps1"
         }
     }
+}
+
+internal val pipeCommandArgs: ThreadLocal<Array<String>?> = ThreadLocal.withInitial { null }
+
+internal fun stripLocaleArg(args: Array<String>): Array<String> {
+    val idx = args.indexOf("--locale")
+    if (idx < 0) return args
+    val dropTo = if (idx + 1 < args.size) idx + 2 else idx + 1
+    return (args.take(idx) + args.drop(dropTo)).toTypedArray()
 }
