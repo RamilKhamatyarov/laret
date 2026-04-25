@@ -7,6 +7,7 @@ import com.rkhamatyarov.laret.i18n.Localization
 import com.rkhamatyarov.laret.man.ManPageGenerator
 import com.rkhamatyarov.laret.output.OutputStrategy
 import com.rkhamatyarov.laret.pipe.CommandPipeline
+import com.rkhamatyarov.laret.ui.UnicodeSupport
 import org.jline.reader.EndOfFileException
 import org.jline.reader.LineReaderBuilder
 import org.jline.reader.UserInterruptException
@@ -451,44 +452,43 @@ fun main(args: Array<String>) {
                 command(name = "list", description = "List running processes") {
                     aliases("ls", "ps")
                     option("n", "name", "Filter by process name", "", true)
-                    option("c", "cpu", "Min CPU %", "0", true)
-                    option("m", "memory", "Min memory MB", "0", true)
+                    option("m", "min-cpu-ms", "Min CPU time in ms", "0", true)
                     option("f", "format", "Output format (plain,json)", "plain", true)
 
                     action { ctx ->
                         val nameFilter = ctx.option("name")
-                        val minCpu = ctx.optionDouble("cpu")
-                        val minMem = ctx.optionLong("memory")
+                        val minCpuMs = ctx.optionLong("min-cpu-ms")
                         val format = ctx.option("format")
 
+                        fun shortName(full: String): String =
+                            full.substringAfterLast('\\').substringAfterLast('/').ifBlank { "unknown" }
+
                         val processes = ProcessHandle.allProcesses().asSequence()
-                            .filter { it.info().commandLine().isPresent }
-                            .filter {
-                                nameFilter.isBlank() ||
-                                    it.info().commandLine().get().contains(nameFilter, ignoreCase = true)
-                            }
                             .map {
                                 val info = it.info()
+                                val commandLine = info.commandLine().orElse(info.command().orElse(""))
                                 mapOf(
                                     "pid" to it.pid(),
-                                    "name" to info.command().orElse("unknown"),
-                                    "cpu" to 0.0,
-                                    "memory" to (
-                                        info.totalCpuDuration().map { d -> d.toMillis() }.orElse(0L) /
-                                            1024 /
-                                            1024
-                                        ),
+                                    "name" to shortName(info.command().orElse("")),
+                                    "commandLine" to commandLine,
+                                    "cpuMs" to info.totalCpuDuration().map { d -> d.toMillis() }.orElse(0L),
                                 )
                             }
-                            .filter { it["cpu"] as Double >= minCpu && it["memory"] as Long >= minMem }
-                            .sortedByDescending { it["memory"] as Long }
+                            .filter { entry ->
+                                nameFilter.isBlank() ||
+                                    (entry["name"] as String).contains(nameFilter, ignoreCase = true) ||
+                                    (entry["commandLine"] as String).contains(nameFilter, ignoreCase = true)
+                            }
+                            .filter { (it["cpuMs"] as Long) >= minCpuMs }
+                            .sortedByDescending { it["cpuMs"] as Long }
+                            .toList()
 
                         if (format == "json") {
                             println(ctx.render(processes))
                         } else {
-                            println("PID      NAME                    MEM(MB)")
+                            println("PID      NAME                    CPU(ms)")
                             processes.forEach { p ->
-                                println("${p["pid"]}".padEnd(8) + "${p["name"]}".padEnd(24) + "${p["memory"]}")
+                                println("${p["pid"]}".padEnd(8) + "${p["name"]}".padEnd(24) + "${p["cpuMs"]}")
                             }
                         }
                     }
@@ -654,7 +654,9 @@ fun main(args: Array<String>) {
 
                         val percent = (usedMem.toDouble() / maxMem * 100).toInt().coerceIn(0, 100)
                         val filled = percent / 5
-                        val bar = "█".repeat(filled) + "░".repeat(20 - filled)
+                        val fillChar = UnicodeSupport.pick("█", "#")
+                        val emptyChar = UnicodeSupport.pick("░", "-")
+                        val bar = fillChar.repeat(filled) + emptyChar.repeat(20 - filled)
                         println("Usage: [$bar] $percent%")
                     }
                 }

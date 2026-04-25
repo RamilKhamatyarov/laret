@@ -58,6 +58,16 @@ object CommandRunner {
         val ctx = CommandContext(command, app, groupName = groupName)
         command.parseArgumentsAndOptions(args, ctx, groupName)
 
+        val positionalCount = args.count { !it.startsWith("-") }
+        val missingRequired = command.arguments.filterIndexed { idx, arg ->
+            arg.required && !arg.optional && idx >= positionalCount
+        }
+        if (missingRequired.isNotEmpty()) {
+            missingRequired.forEach { HelpFormatter.showArgumentMissingError(it.name) }
+            HelpFormatter.showCommandHelp(command)
+            return 1
+        }
+
         try {
             command.preExecute.invoke(ctx)
         } catch (e: Exception) {

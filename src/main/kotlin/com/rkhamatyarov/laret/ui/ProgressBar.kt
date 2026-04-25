@@ -36,7 +36,9 @@ class ProgressBar(
     private fun render() {
         val filled = ((current.toDouble() / total) * width).roundToInt().coerceIn(0, width)
         val empty = width - filled
-        val bar = "${Colors.GREEN_BOLD}${"█".repeat(filled)}${Colors.RESET}${"░".repeat(empty)}"
+        val fillChar = UnicodeSupport.pick("█", "#")
+        val emptyChar = UnicodeSupport.pick("░", "-")
+        val bar = "${Colors.GREEN_BOLD}${fillChar.repeat(filled)}${Colors.RESET}${emptyChar.repeat(empty)}"
         val pct = "$percent%".padStart(4)
         val prefix = if (label.isNotEmpty()) "$label " else ""
         out.print("\r$prefix[$bar] $pct ($current/$total)")
@@ -44,7 +46,10 @@ class ProgressBar(
 }
 
 class Spinner(val label: String = "", val out: PrintStream = System.err) {
-    private val frames = listOf("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
+    private val unicodeFrames = listOf("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
+    private val asciiFrames = listOf("|", "/", "-", "\\")
+    private val frames: List<String>
+        get() = if (UnicodeSupport.asciiMode) asciiFrames else unicodeFrames
     private var frameIndex: Int = 0
     private var finished: Boolean = false
 
@@ -61,7 +66,7 @@ class Spinner(val label: String = "", val out: PrintStream = System.err) {
 
     fun finish(message: String = "") {
         finished = true
-        val check = "${Colors.GREEN_BOLD}✔${Colors.RESET}"
+        val check = "${Colors.GREEN_BOLD}${UnicodeSupport.pick("✔", "v")}${Colors.RESET}"
         val suffix =
             if (message.isNotEmpty()) {
                 " $message"
@@ -75,7 +80,7 @@ class Spinner(val label: String = "", val out: PrintStream = System.err) {
 
     fun fail(message: String = "") {
         finished = true
-        val cross = "${Colors.RED_BOLD}✗${Colors.RESET}"
+        val cross = "${Colors.RED_BOLD}${UnicodeSupport.pick("✗", "x")}${Colors.RESET}"
         val suffix =
             if (message.isNotEmpty()) {
                 " $message"
