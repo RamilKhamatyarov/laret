@@ -386,7 +386,13 @@ jobs:
           set -euo pipefail
           ./bin/laret prompt multiselect "Pick formats" --options "json,yaml,toml" \
             > /tmp/multiselect.stdout 2>/tmp/multiselect.stderr
-          [ ! -s /tmp/multiselect.stdout ] || [ "$(tr -d '\r\n' < /tmp/multiselect.stdout)" = "" ]
+
+          if grep -qE "^(json|yaml|toml)$" /tmp/multiselect.stdout; then
+            echo "ERROR: multiselect returned selections in non-interactive mode"
+            cat /tmp/multiselect.stdout
+            exit 1
+          fi
+
           echo "Multiselect prompt valid"
 
       - name: Prompt stdout is clean (no control chars)
