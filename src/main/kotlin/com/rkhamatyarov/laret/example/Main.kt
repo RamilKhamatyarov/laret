@@ -2,11 +2,15 @@ package com.rkhamatyarov.laret.example
 
 import com.rkhamatyarov.laret.completion.CompletionCommand
 import com.rkhamatyarov.laret.completion.ShellType
+import com.rkhamatyarov.laret.core.ParallelDispatcher
+import com.rkhamatyarov.laret.core.ParallelTask
 import com.rkhamatyarov.laret.dsl.cli
 import com.rkhamatyarov.laret.i18n.Localization
 import com.rkhamatyarov.laret.man.ManPageGenerator
 import com.rkhamatyarov.laret.output.OutputStrategy
 import com.rkhamatyarov.laret.pipe.CommandPipeline
+import com.rkhamatyarov.laret.ui.UnicodeSupport
+import kotlinx.coroutines.runBlocking
 import org.jline.reader.EndOfFileException
 import org.jline.reader.LineReaderBuilder
 import org.jline.reader.UserInterruptException
@@ -179,6 +183,49 @@ fun main(args: Array<String>) {
                         }
                         System.err.println(Localization.t("pipe.started", stages.size))
                         pipeline.execute(stages)
+                    }
+                }
+            }
+
+            group(name = "parallel", description = "Execute commands concurrently") {
+                command(name = "run", description = "Run multiple commands in parallel") {
+                    argument("stages", "Commands separated by ---", required = false, optional = true)
+                    option("j", "jobs", "Maximum concurrent commands (1..16)", "4", true)
+                    option("q", "quiet", "Suppress per-task output", "", false)
+
+                    action { ctx ->
+                        val rawArgs = parallelCommandArgs.get() ?: emptyArray()
+                        val (tokens, jobsFromRaw, quietFromRaw) = parseParallelRunArgs(rawArgs)
+                        val jobs = (jobsFromRaw ?: ctx.optionInt("jobs").takeIf { it > 0 } ?: 4).coerceIn(1, 16)
+                        val quiet = quietFromRaw || ctx.optionBool("quiet")
+                        val tasks = parseParallelTasks(tokens)
+
+                        if (tasks.isEmpty()) {
+                            println("No parallel tasks provided")
+                            return@action
+                        }
+
+                        val results = runBlocking {
+                            ParallelDispatcher.execute(tasks, jobs) { task, line, isStderr ->
+                                if (!quiet) {
+                                    val stream = if (isStderr) System.err else System.out
+                                    stream.println("[${task.command}] $line")
+                                }
+                            }
+                        }
+
+                        val failed = results.filter { it.exitCode != 0 }
+                        println("Parallel summary: ${results.size} task(s), ${failed.size} failed")
+                        results.forEachIndexed { index, result ->
+                            val commandLine = (listOf(result.task.command) + result.task.args).joinToString(" ")
+                            println(
+                                "${index + 1}. exit=${result.exitCode} " +
+                                    "stdout=${result.stdout.size} stderr=${result.stderr.size} :: $commandLine",
+                            )
+                        }
+                        failed.firstOrNull()?.let {
+                            System.err.println("First failure: ${it.task.command} exited with ${it.exitCode}")
+                        }
                     }
                 }
             }
@@ -451,44 +498,43 @@ fun main(args: Array<String>) {
                 command(name = "list", description = "List running processes") {
                     aliases("ls", "ps")
                     option("n", "name", "Filter by process name", "", true)
-                    option("c", "cpu", "Min CPU %", "0", true)
-                    option("m", "memory", "Min memory MB", "0", true)
+                    option("m", "min-cpu-ms", "Min CPU time in ms", "0", true)
                     option("f", "format", "Output format (plain,json)", "plain", true)
 
                     action { ctx ->
                         val nameFilter = ctx.option("name")
-                        val minCpu = ctx.optionDouble("cpu")
-                        val minMem = ctx.optionLong("memory")
+                        val minCpuMs = ctx.optionLong("min-cpu-ms")
                         val format = ctx.option("format")
 
+                        fun shortName(full: String): String =
+                            full.substringAfterLast('\\').substringAfterLast('/').ifBlank { "unknown" }
+
                         val processes = ProcessHandle.allProcesses().asSequence()
-                            .filter { it.info().commandLine().isPresent }
-                            .filter {
-                                nameFilter.isBlank() ||
-                                    it.info().commandLine().get().contains(nameFilter, ignoreCase = true)
-                            }
                             .map {
                                 val info = it.info()
+                                val commandLine = info.commandLine().orElse(info.command().orElse(""))
                                 mapOf(
                                     "pid" to it.pid(),
-                                    "name" to info.command().orElse("unknown"),
-                                    "cpu" to 0.0,
-                                    "memory" to (
-                                        info.totalCpuDuration().map { d -> d.toMillis() }.orElse(0L) /
-                                            1024 /
-                                            1024
-                                        ),
+                                    "name" to shortName(info.command().orElse("")),
+                                    "commandLine" to commandLine,
+                                    "cpuMs" to info.totalCpuDuration().map { d -> d.toMillis() }.orElse(0L),
                                 )
                             }
-                            .filter { it["cpu"] as Double >= minCpu && it["memory"] as Long >= minMem }
-                            .sortedByDescending { it["memory"] as Long }
+                            .filter { entry ->
+                                nameFilter.isBlank() ||
+                                    (entry["name"] as String).contains(nameFilter, ignoreCase = true) ||
+                                    (entry["commandLine"] as String).contains(nameFilter, ignoreCase = true)
+                            }
+                            .filter { (it["cpuMs"] as Long) >= minCpuMs }
+                            .sortedByDescending { it["cpuMs"] as Long }
+                            .toList()
 
                         if (format == "json") {
                             println(ctx.render(processes))
                         } else {
-                            println("PID      NAME                    MEM(MB)")
+                            println("PID      NAME                    CPU(ms)")
                             processes.forEach { p ->
-                                println("${p["pid"]}".padEnd(8) + "${p["name"]}".padEnd(24) + "${p["memory"]}")
+                                println("${p["pid"]}".padEnd(8) + "${p["name"]}".padEnd(24) + "${p["cpuMs"]}")
                             }
                         }
                     }
@@ -654,7 +700,9 @@ fun main(args: Array<String>) {
 
                         val percent = (usedMem.toDouble() / maxMem * 100).toInt().coerceIn(0, 100)
                         val filled = percent / 5
-                        val bar = "█".repeat(filled) + "░".repeat(20 - filled)
+                        val fillChar = UnicodeSupport.pick("█", "#")
+                        val emptyChar = UnicodeSupport.pick("░", "-")
+                        val bar = fillChar.repeat(filled) + emptyChar.repeat(20 - filled)
                         println("Usage: [$bar] $percent%")
                     }
                 }
@@ -692,6 +740,9 @@ fun main(args: Array<String>) {
     if (filteredArgs.size >= 2 && filteredArgs[0] == "pipe" && filteredArgs[1] == "run") {
         pipeCommandArgs.set(filteredArgs.copyOfRange(2, filteredArgs.size))
     }
+    if (filteredArgs.size >= 2 && filteredArgs[0] == "parallel" && filteredArgs[1] == "run") {
+        parallelCommandArgs.set(filteredArgs.copyOfRange(2, filteredArgs.size))
+    }
 
     val exitCode = app.run(filteredArgs)
     exitProcess(exitCode)
@@ -717,6 +768,53 @@ fun getCompletionPath(shellType: ShellType, appName: String): String {
 }
 
 internal val pipeCommandArgs: ThreadLocal<Array<String>?> = ThreadLocal.withInitial { null }
+
+internal val parallelCommandArgs: ThreadLocal<Array<String>?> = ThreadLocal.withInitial { null }
+
+internal fun parseParallelRunArgs(args: Array<String>): Triple<List<String>, Int?, Boolean> {
+    val tokens = mutableListOf<String>()
+    var jobs: Int? = null
+    var quiet = false
+    var index = 0
+
+    while (index < args.size) {
+        when (args[index]) {
+            "--jobs", "-j" -> {
+                jobs = args.getOrNull(index + 1)?.toIntOrNull()
+                index += 2
+            }
+            "--quiet", "-q" -> {
+                quiet = true
+                index++
+            }
+            else -> {
+                tokens += args[index]
+                index++
+            }
+        }
+    }
+
+    return Triple(tokens, jobs, quiet)
+}
+
+internal fun parseParallelTasks(tokens: List<String>, separator: String = "---"): List<ParallelTask> {
+    val stages = mutableListOf<MutableList<String>>()
+    var current = mutableListOf<String>()
+
+    for (token in tokens) {
+        if (token == separator) {
+            if (current.isNotEmpty()) stages += current
+            current = mutableListOf()
+        } else {
+            current += token
+        }
+    }
+    if (current.isNotEmpty()) stages += current
+
+    return stages.map { stage ->
+        ParallelTask(command = stage.first(), args = stage.drop(1))
+    }
+}
 
 internal fun stripLocaleArg(args: Array<String>): Array<String> {
     val idx = args.indexOf("--locale")

@@ -3,11 +3,16 @@ package com.rkhamatyarov.laret.ui
 import java.io.InputStream
 import java.io.PrintStream
 
-class InteractivePrompt(val input: InputStream = System.`in`, val out: PrintStream = System.err) {
+class InteractivePrompt(
+    val input: InputStream = System.`in`,
+    val out: PrintStream = System.err,
+    private val enabled: Boolean = true,
+) {
     private val reader
         get() = input.bufferedReader()
 
     fun text(prompt: String, default: String = ""): String {
+        if (!enabled) return default
         val hint = if (default.isNotEmpty()) " [$default]" else ""
         out.print("${Colors.CYAN_BOLD}?${Colors.RESET} $prompt$hint: ")
         val line = reader.readLine()?.trim() ?: ""
@@ -15,6 +20,7 @@ class InteractivePrompt(val input: InputStream = System.`in`, val out: PrintStre
     }
 
     fun confirm(prompt: String, default: Boolean = true): Boolean {
+        if (!enabled) return default
         val hint = if (default) "Y/n" else "y/N"
         out.print("${Colors.CYAN_BOLD}?${Colors.RESET} $prompt [$hint]: ")
         val line = reader.readLine()?.trim()?.lowercase() ?: ""
@@ -28,6 +34,7 @@ class InteractivePrompt(val input: InputStream = System.`in`, val out: PrintStre
 
     fun select(prompt: String, options: List<String>): String {
         require(options.isNotEmpty()) { "options must not be empty" }
+        if (!enabled) return options.first()
         out.println("${Colors.CYAN_BOLD}?${Colors.RESET} $prompt")
         options.forEachIndexed { index, option ->
             out.println("  ${Colors.BLUE_BOLD}${index + 1})${Colors.RESET} $option")
@@ -40,6 +47,7 @@ class InteractivePrompt(val input: InputStream = System.`in`, val out: PrintStre
 
     fun multiSelect(prompt: String, options: List<String>): List<String> {
         require(options.isNotEmpty()) { "options must not be empty" }
+        if (!enabled) return emptyList()
         out.println("${Colors.CYAN_BOLD}?${Colors.RESET} $prompt (comma-separated numbers)")
         options.forEachIndexed { index, option ->
             out.println("  ${Colors.BLUE_BOLD}${index + 1})${Colors.RESET} $option")
@@ -56,6 +64,7 @@ class InteractivePrompt(val input: InputStream = System.`in`, val out: PrintStre
     }
 
     fun password(prompt: String): String {
+        if (!enabled) return ""
         out.print("${Colors.CYAN_BOLD}?${Colors.RESET} $prompt: ")
         return reader.readLine()?.trim() ?: ""
     }

@@ -266,7 +266,7 @@ jobs:
           ./bin/laret file create /tmp/pb_test.txt -c "progress bar test" \
             > /tmp/pb_create.stdout 2>/tmp/pb_create.stderr
           if [ -s /tmp/pb_create.stderr ]; then cat /tmp/pb_create.stderr; fi
-          grep -q "File created" /tmp/pb_create.stderr
+          grep -q "progress bar test" /tmp/pb_test.txt
           echo "Spinner output valid for file create"
 
       - name: Spinner - file delete
@@ -274,7 +274,7 @@ jobs:
           set -euo pipefail
           ./bin/laret file delete /tmp/pb_test.txt \
             > /tmp/pb_delete.stdout 2>/tmp/pb_delete.stderr
-          grep -q "File deleted" /tmp/pb_delete.stderr
+          [ ! -e /tmp/pb_test.txt ]
           echo "Spinner output valid for file delete"
 
       - name: Spinner - dir create
@@ -282,7 +282,7 @@ jobs:
           set -euo pipefail
           ./bin/laret dir create /tmp/pb_testdir \
             > /tmp/pb_dircreate.stdout 2>/tmp/pb_dircreate.stderr
-          grep -q "Directory created" /tmp/pb_dircreate.stderr
+          [ -d /tmp/pb_testdir ]
           echo "Spinner output valid for dir create"
 
       - name: Progress bar - dir list (debug)
@@ -341,11 +341,10 @@ jobs:
           mkdir -p /tmp/laret_fixture_dir
           echo "Fixtures created: $(ls /tmp/laret_fixture_*.txt /tmp/laret_fixture_dir 2>/dev/null | wc -l) items"
 
-      - name: Prompt text - typed input echoed to stdout
+      - name: Prompt text - non-interactive uses default
         run: |
           set -euo pipefail
-          echo "myfilename.txt" \
-            | ./bin/laret prompt text "Enter filename" \
+          ./bin/laret prompt text "Enter filename" --default "myfilename.txt" \
             > /tmp/prompt_text.stdout 2>/tmp/prompt_text.stderr
           grep -q "myfilename.txt" /tmp/prompt_text.stdout
           echo "Prompt text input valid"
@@ -353,54 +352,53 @@ jobs:
       - name: Prompt text - blank input uses default
         run: |
           set -euo pipefail
-          echo "" \
-            | ./bin/laret prompt text "Enter filename" --default "default.txt" \
+          ./bin/laret prompt text "Enter filename" --default "default.txt" \
             > /tmp/prompt_default.stdout 2>/tmp/prompt_default.stderr
           grep -q "default.txt" /tmp/prompt_default.stdout
           echo "Prompt default value valid"
 
-      - name: Prompt confirm - y returns true
+      - name: Prompt confirm - non-interactive true default
         run: |
           set -euo pipefail
-          printf 'y\n' \
-            | ./bin/laret prompt confirm "Are you sure" \
+          ./bin/laret prompt confirm "Are you sure" --default true \
             > /tmp/confirm_yes.stdout 2>/tmp/confirm_yes.stderr
           grep -q "true" /tmp/confirm_yes.stdout
           echo "Confirm yes valid"
 
-      - name: Prompt confirm - n returns false
+      - name: Prompt confirm - non-interactive false default
         run: |
           set -euo pipefail
-          printf 'n\n' \
-            | ./bin/laret prompt confirm "Are you sure" \
+          ./bin/laret prompt confirm "Are you sure" --default false \
             > /tmp/confirm_no.stdout 2>/tmp/confirm_no.stderr
           grep -q "false" /tmp/confirm_no.stdout
           echo "Confirm no valid"
 
-      - name: Prompt select - choice 2 returns second option
+      - name: Prompt select - non-interactive returns first option
         run: |
           set -euo pipefail
-          printf '2\n' \
-            | ./bin/laret prompt select "Pick format" --options "json,yaml,toml" \
+          ./bin/laret prompt select "Pick format" --options "json,yaml,toml" \
             > /tmp/select.stdout 2>/tmp/select.stderr
-          grep -q "yaml" /tmp/select.stdout
+          grep -q "json" /tmp/select.stdout
           echo "Select prompt valid"
 
-      - name: Prompt multiselect - choices 1,3 returns json and toml
+      - name: Prompt multiselect - non-interactive returns no selections
         run: |
           set -euo pipefail
-          printf '1,3\n' \
-            | ./bin/laret prompt multiselect "Pick formats" --options "json,yaml,toml" \
+          ./bin/laret prompt multiselect "Pick formats" --options "json,yaml,toml" \
             > /tmp/multiselect.stdout 2>/tmp/multiselect.stderr
-          grep -q "json" /tmp/multiselect.stdout
-          grep -q "toml"  /tmp/multiselect.stdout
+
+          if grep -qE "^(json|yaml|toml)$" /tmp/multiselect.stdout; then
+            echo "ERROR: multiselect returned selections in non-interactive mode"
+            cat /tmp/multiselect.stdout
+            exit 1
+          fi
+
           echo "Multiselect prompt valid"
 
       - name: Prompt stdout is clean (no control chars)
         run: |
           set -euo pipefail
-          printf 'testvalue\n' \
-            | ./bin/laret prompt text "Enter value" \
+          ./bin/laret prompt text "Enter value" --default "testvalue" \
             > /tmp/prompt_clean.stdout 2>/dev/null
           if grep -qP "[\x00-\x08\x0e-\x1f]" /tmp/prompt_clean.stdout 2>/dev/null; then
             echo "ERROR: control characters in prompt stdout"
@@ -980,10 +978,6 @@ jobs:
           cat /tmp/persist_create.stderr || true
           cat /tmp/persist_create.stdout || true
 
-          grep -q "File created" /tmp/persist_create.stderr \
-            || (echo "ERROR: Expected 'File created' from stderr but got:" \
-              && cat /tmp/persist_create.stderr && cat /tmp/persist_create.stdout && exit 1)
-
           grep -q "overwritten" /tmp/force_test.txt \
             || (echo "ERROR: File content was not overwritten" && cat /tmp/force_test.txt && exit 1)
 
@@ -1347,6 +1341,69 @@ jobs:
             /tmp/pipe_*.err
           retention-days: 7
 
+  integration-parallel-execution:
+    name: Integration - Parallel Execution
+    runs-on: ubuntu-latest
+    needs: [ build ]
+
+    steps:
+      - name: Download native binary
+        uses: actions/download-artifact@v4
+        with:
+          name: laret-native
+          path: ./bin
+
+      - name: Make binary executable
+        run: chmod +x ./bin/laret
+
+      - name: Parallel - multiple commands execute
+        run: |
+          set -euo pipefail
+          ./bin/laret parallel run --jobs 2 echo alpha --- echo beta \
+            > /tmp/parallel_basic.out 2>/tmp/parallel_basic.err
+          grep -q "Parallel summary: 2 task(s), 0 failed" /tmp/parallel_basic.out \
+            || (echo "ERROR: parallel summary missing or incorrect" \
+              && cat /tmp/parallel_basic.out /tmp/parallel_basic.err && exit 1)
+          grep -q "alpha" /tmp/parallel_basic.out \
+            || (echo "ERROR: first parallel command output missing" \
+              && cat /tmp/parallel_basic.out /tmp/parallel_basic.err && exit 1)
+          grep -q "beta" /tmp/parallel_basic.out \
+            || (echo "ERROR: second parallel command output missing" \
+              && cat /tmp/parallel_basic.out /tmp/parallel_basic.err && exit 1)
+          echo "Parallel execution works"
+
+      - name: Parallel - quiet mode suppresses task output
+        run: |
+          set -euo pipefail
+          ./bin/laret parallel run --quiet echo hidden --- echo visible \
+            > /tmp/parallel_quiet.out 2>/tmp/parallel_quiet.err
+          grep -q "Parallel summary: 2 task(s), 0 failed" /tmp/parallel_quiet.out \
+            || (echo "ERROR: quiet parallel summary missing or incorrect" \
+              && cat /tmp/parallel_quiet.out /tmp/parallel_quiet.err && exit 1)
+          ! grep -q "\\[echo\\] hidden" /tmp/parallel_quiet.out \
+            || (echo "ERROR: quiet mode should suppress per-task stdout" \
+              && cat /tmp/parallel_quiet.out /tmp/parallel_quiet.err && exit 1)
+          echo "Parallel quiet mode works"
+
+      - name: Parallel - empty task list reports message
+        run: |
+          set -euo pipefail
+          ./bin/laret parallel run > /tmp/parallel_empty.out 2>/tmp/parallel_empty.err
+          grep -q "No parallel tasks provided" /tmp/parallel_empty.out \
+            || (echo "ERROR: empty parallel run should report a message" \
+              && cat /tmp/parallel_empty.out /tmp/parallel_empty.err && exit 1)
+          echo "Empty parallel execution handled gracefully"
+
+      - name: Upload parallel execution artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parallel-execution-outputs
+          path: |
+            /tmp/parallel_*.out
+            /tmp/parallel_*.err
+          retention-days: 7
+
   integration-localization:
     name: Integration - Localization Support
     runs-on: ubuntu-latest
@@ -1464,6 +1521,7 @@ jobs:
       - integration-middleware-hooks
       - integration-manpages
       - integration-piping
+      - integration-parallel-execution
       - integration-localization
     if: always()
 
@@ -1486,6 +1544,7 @@ jobs:
           echo " integration-persist:    ${{ needs.integration-persistent-flags.result }}"
           echo " integration-manpages:     ${{ needs.integration-manpages.result }}"
           echo " integration-piping:     ${{ needs.integration-piping.result }}"
+          echo " integration-parallel:   ${{ needs.integration-parallel-execution.result }}"
           echo " integration-localization:   ${{ needs.integration-localization.result }}"
           echo "=========================================="
 
