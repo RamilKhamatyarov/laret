@@ -1347,6 +1347,69 @@ jobs:
             /tmp/pipe_*.err
           retention-days: 7
 
+  integration-parallel-execution:
+    name: Integration - Parallel Execution
+    runs-on: ubuntu-latest
+    needs: [ build ]
+
+    steps:
+      - name: Download native binary
+        uses: actions/download-artifact@v4
+        with:
+          name: laret-native
+          path: ./bin
+
+      - name: Make binary executable
+        run: chmod +x ./bin/laret
+
+      - name: Parallel - multiple commands execute
+        run: |
+          set -euo pipefail
+          ./bin/laret parallel run --jobs 2 echo alpha --- echo beta \
+            > /tmp/parallel_basic.out 2>/tmp/parallel_basic.err
+          grep -q "Parallel summary: 2 task(s), 0 failed" /tmp/parallel_basic.out \
+            || (echo "ERROR: parallel summary missing or incorrect" \
+              && cat /tmp/parallel_basic.out /tmp/parallel_basic.err && exit 1)
+          grep -q "alpha" /tmp/parallel_basic.out \
+            || (echo "ERROR: first parallel command output missing" \
+              && cat /tmp/parallel_basic.out /tmp/parallel_basic.err && exit 1)
+          grep -q "beta" /tmp/parallel_basic.out \
+            || (echo "ERROR: second parallel command output missing" \
+              && cat /tmp/parallel_basic.out /tmp/parallel_basic.err && exit 1)
+          echo "Parallel execution works"
+
+      - name: Parallel - quiet mode suppresses task output
+        run: |
+          set -euo pipefail
+          ./bin/laret parallel run --quiet echo hidden --- echo visible \
+            > /tmp/parallel_quiet.out 2>/tmp/parallel_quiet.err
+          grep -q "Parallel summary: 2 task(s), 0 failed" /tmp/parallel_quiet.out \
+            || (echo "ERROR: quiet parallel summary missing or incorrect" \
+              && cat /tmp/parallel_quiet.out /tmp/parallel_quiet.err && exit 1)
+          ! grep -q "\\[echo\\] hidden" /tmp/parallel_quiet.out \
+            || (echo "ERROR: quiet mode should suppress per-task stdout" \
+              && cat /tmp/parallel_quiet.out /tmp/parallel_quiet.err && exit 1)
+          echo "Parallel quiet mode works"
+
+      - name: Parallel - empty task list reports message
+        run: |
+          set -euo pipefail
+          ./bin/laret parallel run > /tmp/parallel_empty.out 2>/tmp/parallel_empty.err
+          grep -q "No parallel tasks provided" /tmp/parallel_empty.out \
+            || (echo "ERROR: empty parallel run should report a message" \
+              && cat /tmp/parallel_empty.out /tmp/parallel_empty.err && exit 1)
+          echo "Empty parallel execution handled gracefully"
+
+      - name: Upload parallel execution artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parallel-execution-outputs
+          path: |
+            /tmp/parallel_*.out
+            /tmp/parallel_*.err
+          retention-days: 7
+
   integration-localization:
     name: Integration - Localization Support
     runs-on: ubuntu-latest
@@ -1464,6 +1527,7 @@ jobs:
       - integration-middleware-hooks
       - integration-manpages
       - integration-piping
+      - integration-parallel-execution
       - integration-localization
     if: always()
 
@@ -1486,6 +1550,7 @@ jobs:
           echo " integration-persist:    ${{ needs.integration-persistent-flags.result }}"
           echo " integration-manpages:     ${{ needs.integration-manpages.result }}"
           echo " integration-piping:     ${{ needs.integration-piping.result }}"
+          echo " integration-parallel:   ${{ needs.integration-parallel-execution.result }}"
           echo " integration-localization:   ${{ needs.integration-localization.result }}"
           echo "=========================================="
 

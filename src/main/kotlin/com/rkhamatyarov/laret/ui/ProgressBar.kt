@@ -8,6 +8,7 @@ class ProgressBar(
     val width: Int = 40,
     val label: String = "",
     private val out: PrintStream = System.err,
+    private val enabled: Boolean = true,
 ) {
     private var current: Int = 0
     private var finished: Boolean = false
@@ -21,6 +22,7 @@ class ProgressBar(
 
     fun update(value: Int) {
         current = value.coerceIn(0, total)
+        if (!enabled) return
         render()
     }
 
@@ -29,6 +31,7 @@ class ProgressBar(
     fun finish() {
         current = total
         finished = true
+        if (!enabled) return
         render()
         out.println()
     }
@@ -45,7 +48,7 @@ class ProgressBar(
     }
 }
 
-class Spinner(val label: String = "", val out: PrintStream = System.err) {
+class Spinner(val label: String = "", val out: PrintStream = System.err, private val enabled: Boolean = true) {
     private val unicodeFrames = listOf("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
     private val asciiFrames = listOf("|", "/", "-", "\\")
     private val frames: List<String>
@@ -58,6 +61,7 @@ class Spinner(val label: String = "", val out: PrintStream = System.err) {
 
     fun tick() {
         if (finished) return
+        if (!enabled) return
         val frame = "${Colors.CYAN_BOLD}${frames[frameIndex % frames.size]}${Colors.RESET}"
         val prefix = if (label.isNotEmpty()) " $label" else ""
         out.print("\r$frame$prefix")
@@ -66,6 +70,7 @@ class Spinner(val label: String = "", val out: PrintStream = System.err) {
 
     fun finish(message: String = "") {
         finished = true
+        if (!enabled) return
         val check = "${Colors.GREEN_BOLD}${UnicodeSupport.pick("✔", "v")}${Colors.RESET}"
         val suffix =
             if (message.isNotEmpty()) {
@@ -80,6 +85,7 @@ class Spinner(val label: String = "", val out: PrintStream = System.err) {
 
     fun fail(message: String = "") {
         finished = true
+        if (!enabled) return
         val cross = "${Colors.RED_BOLD}${UnicodeSupport.pick("✗", "x")}${Colors.RESET}"
         val suffix =
             if (message.isNotEmpty()) {

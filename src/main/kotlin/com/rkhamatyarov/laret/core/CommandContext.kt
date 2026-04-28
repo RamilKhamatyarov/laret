@@ -36,9 +36,9 @@ class CommandContext(
     fun render(data: Any): String = outputStrategy.render(data)
 
     fun progressBar(total: Int, label: String = "", width: Int = 40): ProgressBar =
-        ProgressBar(total = total, width = width, label = label)
+        ProgressBar(total = total, width = width, label = label, enabled = isInteractive())
 
-    fun spinner(label: String = ""): Spinner = Spinner(label = label)
+    fun spinner(label: String = ""): Spinner = Spinner(label = label, enabled = isInteractive())
 
-    fun prompt(): InteractivePrompt = InteractivePrompt()
+    fun prompt(): InteractivePrompt = InteractivePrompt(enabled = isInteractive())
 }
