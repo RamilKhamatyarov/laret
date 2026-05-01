@@ -1404,6 +1404,176 @@ jobs:
             /tmp/parallel_*.err
           retention-days: 7
 
+  integration-watch:
+    name: Integration - Directory Watch
+    runs-on: ubuntu-latest
+    needs: [ build ]
+
+    steps:
+      - name: Download native binary
+        uses: actions/download-artifact@v4
+        with:
+          name: laret-native
+          path: ./bin
+
+      - name: Make binary executable
+        run: chmod +x ./bin/laret
+
+      - name: Prepare watch fixtures in /tmp
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/laret_watch_test /tmp/laret_watch_recursive
+          mkdir -p /tmp/laret_watch_test /tmp/laret_watch_recursive/sub
+          ls -la /tmp/laret_watch_test /tmp/laret_watch_recursive
+
+      - name: Watch - rejects non-directory path
+        run: |
+          set -euo pipefail
+          echo "not a directory" > /tmp/laret_watch_notdir.txt
+          ./bin/laret watch run /tmp/laret_watch_notdir.txt \
+            --duration 1 \
+            > /tmp/watch_notdir.out 2>/tmp/watch_notdir.err || true
+          cat /tmp/watch_notdir.err
+          grep -qi "Not a directory" /tmp/watch_notdir.err \
+            || (echo "ERROR: expected 'Not a directory' message" \
+              && cat /tmp/watch_notdir.out /tmp/watch_notdir.err && exit 1)
+          echo "Non-directory path rejected"
+
+      - name: Watch - missing path argument is reported
+        run: |
+          set -euo pipefail
+          ./bin/laret watch run --duration 1 \
+            > /tmp/watch_nopath.out 2>/tmp/watch_nopath.err || true
+          grep -qi "requires a directory path" /tmp/watch_nopath.err \
+            || (echo "ERROR: expected path-required message" \
+              && cat /tmp/watch_nopath.out /tmp/watch_nopath.err && exit 1)
+          echo "Missing path handled"
+
+      - name: Watch - duration timeout exits cleanly with no events
+        run: |
+          set -euo pipefail
+          /usr/bin/time -v ./bin/laret watch run /tmp/laret_watch_test \
+            --duration 2 \
+            > /tmp/watch_timeout.out 2>/tmp/watch_timeout.err || true
+          cat /tmp/watch_timeout.err
+          grep -qi "DURATION_EXPIRED" /tmp/watch_timeout.err \
+            || (echo "ERROR: expected DURATION_EXPIRED stop reason" \
+              && cat /tmp/watch_timeout.out /tmp/watch_timeout.err && exit 1)
+          if [ -s /tmp/watch_timeout.out ]; then
+            echo "ERROR: stdout should be empty when no events occur"
+            cat /tmp/watch_timeout.out
+            exit 1
+          fi
+          echo "Duration timeout works"
+
+      - name: Watch - detects CREATE event
+        run: |
+          set -euo pipefail
+          ( sleep 1 && touch /tmp/laret_watch_test/created.txt ) &
+          MUTATOR_PID=$!
+          ./bin/laret watch run /tmp/laret_watch_test \
+            --duration 5 --max-events 1 \
+            > /tmp/watch_create.out 2>/tmp/watch_create.err
+          wait $MUTATOR_PID || true
+          echo "=== STDOUT ==="
+          cat /tmp/watch_create.out
+          echo "=== STDERR ==="
+          cat /tmp/watch_create.err
+          grep -qE "^CREATE" /tmp/watch_create.out \
+            || (echo "ERROR: CREATE event not captured on stdout" && exit 1)
+          grep -q "created.txt" /tmp/watch_create.out \
+            || (echo "ERROR: created file path not in stdout" && exit 1)
+          grep -qi "MAX_EVENTS_REACHED" /tmp/watch_create.err \
+            || (echo "ERROR: expected MAX_EVENTS_REACHED stop reason" && exit 1)
+          echo "CREATE event detected"
+
+      - name: Watch - detects DELETE event with --events filter
+        run: |
+          set -euo pipefail
+          touch /tmp/laret_watch_test/victim.txt
+          ( sleep 1 && rm /tmp/laret_watch_test/victim.txt ) &
+          MUTATOR_PID=$!
+          ./bin/laret watch run /tmp/laret_watch_test \
+            --duration 5 --max-events 1 --events delete \
+            > /tmp/watch_delete.out 2>/tmp/watch_delete.err
+          wait $MUTATOR_PID || true
+          cat /tmp/watch_delete.out
+          grep -qE "^DELETE" /tmp/watch_delete.out \
+            || (echo "ERROR: DELETE event not captured" \
+              && cat /tmp/watch_delete.out /tmp/watch_delete.err && exit 1)
+          grep -q "victim.txt" /tmp/watch_delete.out \
+            || (echo "ERROR: deleted file path not in stdout" && exit 1)
+          # No CREATE/MODIFY events should leak through the filter
+          if grep -qE "^(CREATE|MODIFY)" /tmp/watch_delete.out; then
+            echo "ERROR: filter should suppress CREATE/MODIFY events"
+            cat /tmp/watch_delete.out
+            exit 1
+          fi
+          echo "DELETE event detected and filter respected"
+
+      - name: Watch - max-events caps event count
+        run: |
+          set -euo pipefail
+          (
+            sleep 1
+            for i in 1 2 3 4 5; do
+              touch /tmp/laret_watch_test/many_$i.txt
+            done
+          ) &
+          MUTATOR_PID=$!
+          ./bin/laret watch run /tmp/laret_watch_test \
+            --duration 5 --max-events 2 --events create \
+            > /tmp/watch_cap.out 2>/tmp/watch_cap.err
+          wait $MUTATOR_PID || true
+          EVENT_COUNT=$(grep -cE "^CREATE" /tmp/watch_cap.out || echo 0)
+          echo "Event lines emitted: $EVENT_COUNT"
+          if [ "$EVENT_COUNT" -ne 2 ]; then
+            echo "ERROR: expected exactly 2 CREATE events, got $EVENT_COUNT"
+            cat /tmp/watch_cap.out
+            exit 1
+          fi
+          grep -qi "MAX_EVENTS_REACHED" /tmp/watch_cap.err \
+            || (echo "ERROR: expected MAX_EVENTS_REACHED stop reason" && exit 1)
+          echo "max-events cap respected"
+
+      - name: Watch - recursive picks up nested file events
+        run: |
+          set -euo pipefail
+          ( sleep 1 && touch /tmp/laret_watch_recursive/sub/nested.txt ) &
+          MUTATOR_PID=$!
+          ./bin/laret watch run /tmp/laret_watch_recursive \
+            --recursive --duration 5 --max-events 1 --events create \
+            > /tmp/watch_recursive.out 2>/tmp/watch_recursive.err
+          wait $MUTATOR_PID || true
+          cat /tmp/watch_recursive.out
+          grep -q "nested.txt" /tmp/watch_recursive.out \
+            || (echo "ERROR: nested file event not detected" \
+              && cat /tmp/watch_recursive.out /tmp/watch_recursive.err && exit 1)
+          echo "Recursive watch detects nested events"
+
+      - name: Watch - stdout has no control characters
+        run: |
+          set -euo pipefail
+          ( sleep 1 && touch /tmp/laret_watch_test/clean.txt ) &
+          ./bin/laret watch run /tmp/laret_watch_test \
+            --duration 3 --max-events 1 \
+            > /tmp/watch_clean.out 2>/dev/null
+          if grep -qP "[\x00-\x08\x0e-\x1f]" /tmp/watch_clean.out 2>/dev/null; then
+            echo "ERROR: control characters in watch stdout"
+            exit 1
+          fi
+          echo "Watch stdout is clean"
+
+      - name: Upload watch artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: watch-outputs
+          path: |
+            /tmp/watch_*.out
+            /tmp/watch_*.err
+          retention-days: 7
+
   integration-localization:
     name: Integration - Localization Support
     runs-on: ubuntu-latest
@@ -1522,6 +1692,7 @@ jobs:
       - integration-manpages
       - integration-piping
       - integration-parallel-execution
+      - integration-watch
       - integration-localization
     if: always()
 
@@ -1545,6 +1716,7 @@ jobs:
           echo " integration-manpages:     ${{ needs.integration-manpages.result }}"
           echo " integration-piping:     ${{ needs.integration-piping.result }}"
           echo " integration-parallel:   ${{ needs.integration-parallel-execution.result }}"
+          echo " integration-watch:      ${{ needs.integration-watch.result }}"
           echo " integration-localization:   ${{ needs.integration-localization.result }}"
           echo "=========================================="
 

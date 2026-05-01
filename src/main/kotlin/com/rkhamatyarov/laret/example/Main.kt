@@ -10,6 +10,9 @@ import com.rkhamatyarov.laret.man.ManPageGenerator
 import com.rkhamatyarov.laret.output.OutputStrategy
 import com.rkhamatyarov.laret.pipe.CommandPipeline
 import com.rkhamatyarov.laret.ui.UnicodeSupport
+import com.rkhamatyarov.laret.watch.DirectoryWatcher
+import com.rkhamatyarov.laret.watch.WatchEventType
+import com.rkhamatyarov.laret.watch.WatchOptions
 import kotlinx.coroutines.runBlocking
 import org.jline.reader.EndOfFileException
 import org.jline.reader.LineReaderBuilder
@@ -226,6 +229,63 @@ fun main(args: Array<String>) {
                         failed.firstOrNull()?.let {
                             System.err.println("First failure: ${it.task.command} exited with ${it.exitCode}")
                         }
+                    }
+                }
+            }
+
+            group(name = "watch", description = "Watch a directory for filesystem changes") {
+                command(name = "run", description = "Watch <path> and emit CREATE/MODIFY/DELETE events to stdout") {
+                    argument("path", "Directory to watch", required = false, optional = true)
+                    option("d", "duration", "Stop after N seconds (0 = run until interrupted)", "0", true)
+                    option("r", "recursive", "Watch subdirectories", "", false)
+                    option("n", "max-events", "Stop after N events (0 = unlimited)", "0", true)
+                    option(
+                        "e",
+                        "events",
+                        "Comma-separated event filter (create,modify,delete). Default: all",
+                        "",
+                        true,
+                    )
+
+                    action { ctx ->
+                        val rawArgs = watchCommandArgs.get() ?: emptyArray()
+                        val parsed = parseWatchRunArgs(rawArgs)
+
+                        val path = parsed.path ?: run {
+                            System.err.println(Localization.t("watch.path.required"))
+                            return@action
+                        }
+
+                        val dir = File(path)
+                        if (!dir.isDirectory) {
+                            System.err.println(Localization.t("watch.not.a.directory", path))
+                            return@action
+                        }
+
+                        val duration = parsed.duration ?: ctx.optionLong("duration").coerceAtLeast(0)
+                        val recursive = parsed.recursive || ctx.optionBool("recursive")
+                        val maxEvents = parsed.maxEvents ?: ctx.optionInt("max-events").coerceAtLeast(0)
+                        val accepted = parseEventFilter(parsed.events ?: ctx.option("events"))
+
+                        val options = WatchOptions(
+                            recursive = recursive,
+                            durationSeconds = duration,
+                            maxEvents = maxEvents,
+                            acceptedTypes = accepted,
+                        )
+
+                        System.err.println(
+                            Localization.t("watch.started", dir.absolutePath, recursive, duration, maxEvents),
+                        )
+
+                        val watcher = DirectoryWatcher(dir.toPath(), options)
+                        val summary = watcher.watch { event ->
+                            println("${event.type}\t${event.path.toAbsolutePath()}")
+                        }
+
+                        System.err.println(
+                            Localization.t("watch.stopped", summary.emittedEvents, summary.stopReason.name),
+                        )
                     }
                 }
             }
@@ -743,6 +803,9 @@ fun main(args: Array<String>) {
     if (filteredArgs.size >= 2 && filteredArgs[0] == "parallel" && filteredArgs[1] == "run") {
         parallelCommandArgs.set(filteredArgs.copyOfRange(2, filteredArgs.size))
     }
+    if (filteredArgs.size >= 2 && filteredArgs[0] == "watch" && filteredArgs[1] == "run") {
+        watchCommandArgs.set(filteredArgs.copyOfRange(2, filteredArgs.size))
+    }
 
     val exitCode = app.run(filteredArgs)
     exitProcess(exitCode)
@@ -770,6 +833,62 @@ fun getCompletionPath(shellType: ShellType, appName: String): String {
 internal val pipeCommandArgs: ThreadLocal<Array<String>?> = ThreadLocal.withInitial { null }
 
 internal val parallelCommandArgs: ThreadLocal<Array<String>?> = ThreadLocal.withInitial { null }
+
+internal val watchCommandArgs: ThreadLocal<Array<String>?> = ThreadLocal.withInitial { null }
+
+internal data class WatchRunArgs(
+    val path: String?,
+    val duration: Long?,
+    val recursive: Boolean,
+    val maxEvents: Int?,
+    val events: String?,
+)
+
+internal fun parseWatchRunArgs(args: Array<String>): WatchRunArgs {
+    var path: String? = null
+    var duration: Long? = null
+    var recursive = false
+    var maxEvents: Int? = null
+    var events: String? = null
+    var index = 0
+
+    while (index < args.size) {
+        when (val token = args[index]) {
+            "--duration", "-d" -> {
+                duration = args.getOrNull(index + 1)?.toLongOrNull()?.coerceAtLeast(0)
+                index += 2
+            }
+            "--max-events", "-n" -> {
+                maxEvents = args.getOrNull(index + 1)?.toIntOrNull()?.coerceAtLeast(0)
+                index += 2
+            }
+            "--events", "-e" -> {
+                events = args.getOrNull(index + 1)
+                index += 2
+            }
+            "--recursive", "-r" -> {
+                recursive = true
+                index++
+            }
+            else -> {
+                if (path == null && !token.startsWith("-")) path = token
+                index++
+            }
+        }
+    }
+
+    return WatchRunArgs(path, duration, recursive, maxEvents, events)
+}
+
+internal fun parseEventFilter(raw: String): Set<WatchEventType> {
+    if (raw.isBlank()) return WatchEventType.values().toSet()
+    return raw.split(",")
+        .map { it.trim().uppercase() }
+        .filter { it.isNotEmpty() }
+        .mapNotNull { name -> runCatching { WatchEventType.valueOf(name) }.getOrNull() }
+        .toSet()
+        .ifEmpty { WatchEventType.values().toSet() }
+}
 
 internal fun parseParallelRunArgs(args: Array<String>): Triple<List<String>, Int?, Boolean> {
     val tokens = mutableListOf<String>()

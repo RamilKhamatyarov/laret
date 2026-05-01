@@ -13,8 +13,11 @@ enum class ConfigFormat {
             "yml",
             "yaml",
             -> YAML
+
             "toml" -> TOML
+
             "json" -> JSON
+
             else -> null
         }
 
