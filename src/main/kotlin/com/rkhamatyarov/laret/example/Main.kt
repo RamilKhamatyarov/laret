@@ -5,15 +5,15 @@ import com.rkhamatyarov.laret.completion.ShellType
 import com.rkhamatyarov.laret.core.ParallelDispatcher
 import com.rkhamatyarov.laret.core.ParallelTask
 import com.rkhamatyarov.laret.dsl.cli
-import com.rkhamatyarov.laret.i18n.Localization
-import com.rkhamatyarov.laret.man.ManPageGenerator
+import com.rkhamatyarov.laret.completion.ManPageGenerator
+import com.rkhamatyarov.laret.core.Localization
 import com.rkhamatyarov.laret.output.OutputStrategy
 import com.rkhamatyarov.laret.diff.DiffFormat
 import com.rkhamatyarov.laret.diff.JsonDiffFormatter
 import com.rkhamatyarov.laret.diff.PlainFormatter
 import com.rkhamatyarov.laret.diff.UnifiedFormatter
 import com.rkhamatyarov.laret.diff.diffFiles
-import com.rkhamatyarov.laret.pipe.CommandPipeline
+import com.rkhamatyarov.laret.core.CommandPipeline
 import com.rkhamatyarov.laret.stats.JsonStatsFormatter
 import com.rkhamatyarov.laret.stats.PlainStatsFormatter
 import com.rkhamatyarov.laret.stats.PrometheusFormatter
@@ -36,11 +36,6 @@ import kotlin.streams.asSequence
 import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
-    val localeIdx = args.indexOf("--locale")
-    if (localeIdx >= 0 && localeIdx + 1 < args.size) {
-        Localization.setLocale(args[localeIdx + 1])
-    }
-
     val app =
         cli(
             name = "laret",
@@ -396,15 +391,24 @@ fun main(args: Array<String>) {
                 }
             }
 
-            group(name = "i18n", description = "Localization demo") {
-                command(name = "hello", description = "Greet the user in the active locale") {
-                    action { _ ->
-                        println(Localization.t("app.greeting"))
-                    }
-                }
-                command(name = "locale", description = "Print the currently active locale") {
+            group(name = "locale", description = "Manage interface locale") {
+                command(name = "show", description = "Print the active locale tag") {
                     action { _ ->
                         println(Localization.getLocale().toLanguageTag())
+                    }
+                }
+                command(name = "set", description = "Set and persist locale for all future sessions") {
+                    argument("tag", "Locale tag (e.g. es, en_US, fr_FR)", required = true)
+                    action { ctx ->
+                        val tag = ctx.argument("tag")
+                        Localization.saveLocale(tag)
+                        println(Localization.t("locale.set.done", tag))
+                    }
+                }
+                command(name = "reset", description = "Reset locale to system default") {
+                    action { _ ->
+                        Localization.clearLocale()
+                        println(Localization.t("locale.reset.done", Localization.getLocale().toLanguageTag()))
                     }
                 }
             }
@@ -901,19 +905,17 @@ fun main(args: Array<String>) {
 
     app.init()
 
-    val filteredArgs = stripLocaleArg(args)
-
-    if (filteredArgs.size >= 2 && filteredArgs[0] == "pipe" && filteredArgs[1] == "run") {
-        pipeCommandArgs.set(filteredArgs.copyOfRange(2, filteredArgs.size))
+    if (args.size >= 2 && args[0] == "pipe" && args[1] == "run") {
+        pipeCommandArgs.set(args.copyOfRange(2, args.size))
     }
-    if (filteredArgs.size >= 2 && filteredArgs[0] == "parallel" && filteredArgs[1] == "run") {
-        parallelCommandArgs.set(filteredArgs.copyOfRange(2, filteredArgs.size))
+    if (args.size >= 2 && args[0] == "parallel" && args[1] == "run") {
+        parallelCommandArgs.set(args.copyOfRange(2, args.size))
     }
-    if (filteredArgs.size >= 2 && filteredArgs[0] == "watch" && filteredArgs[1] == "run") {
-        watchCommandArgs.set(filteredArgs.copyOfRange(2, filteredArgs.size))
+    if (args.size >= 2 && args[0] == "watch" && args[1] == "run") {
+        watchCommandArgs.set(args.copyOfRange(2, args.size))
     }
 
-    val exitCode = app.run(filteredArgs)
+    val exitCode = app.run(args)
     exitProcess(exitCode)
 }
 
@@ -1041,9 +1043,3 @@ internal fun parseParallelTasks(tokens: List<String>, separator: String = "---")
     }
 }
 
-internal fun stripLocaleArg(args: Array<String>): Array<String> {
-    val idx = args.indexOf("--locale")
-    if (idx < 0) return args
-    val dropTo = if (idx + 1 < args.size) idx + 2 else idx + 1
-    return (args.take(idx) + args.drop(dropTo)).toTypedArray()
-}

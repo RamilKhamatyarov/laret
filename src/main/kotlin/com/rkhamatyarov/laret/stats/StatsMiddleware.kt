@@ -8,9 +8,9 @@ import kotlinx.coroutines.CancellationException
 /**
  * Records every command execution into [StatsCollector].
  *
- * Runs at the lowest priority so it wraps all other middleware — its measured
- * duration includes the work other middlewares do, which is what users want
- * when reasoning about end-to-end command time.
+ * Runs at the highest priority (priority = -1000) so it is the outermost
+ * wrapper in the chain — its measured duration includes work done by all other
+ * middlewares, which is what users want for end-to-end command timing.
  */
 class StatsMiddleware(
     private val clock: () -> Long = System::currentTimeMillis,

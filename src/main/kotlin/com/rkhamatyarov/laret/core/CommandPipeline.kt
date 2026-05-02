@@ -1,6 +1,5 @@
-package com.rkhamatyarov.laret.pipe
+package com.rkhamatyarov.laret.core
 
-import com.rkhamatyarov.laret.core.CliApp
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream

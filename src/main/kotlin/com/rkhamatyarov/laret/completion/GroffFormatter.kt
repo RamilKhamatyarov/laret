@@ -1,4 +1,4 @@
-package com.rkhamatyarov.laret.man
+package com.rkhamatyarov.laret.completion
 
 /**
  * Low-level Groff/troff formatting helpers.

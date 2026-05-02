@@ -1,6 +1,5 @@
-package com.rkhamatyarov.laret.plugin
+package com.rkhamatyarov.laret.core
 
-import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.model.Command
 
 /** Base interface for Laret plugins */

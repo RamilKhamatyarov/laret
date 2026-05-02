@@ -2,6 +2,9 @@ package com.rkhamatyarov.laret.stats
 
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 enum class StatsFormat(val id: String) {
     PROMETHEUS("prometheus"),
@@ -10,7 +13,7 @@ enum class StatsFormat(val id: String) {
     ;
 
     companion object {
-        fun fromId(id: String): StatsFormat? = values().firstOrNull { it.id.equals(id, ignoreCase = true) }
+        fun fromId(id: String): StatsFormat? = entries.firstOrNull { it.id.equals(id, ignoreCase = true) }
     }
 }
 
@@ -163,10 +166,12 @@ class JsonStatsFormatter : StatsFormatter {
 }
 
 class PlainStatsFormatter : StatsFormatter {
+    private val fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneOffset.UTC)
+
     override fun render(snapshot: StatsSnapshot): String =
         buildString {
             append("Enabled: ${snapshot.enabled}\n")
-            append("Started: ${snapshot.startedAtEpochMs}\n")
+            append("Started: ${fmt.format(Instant.ofEpochMilli(snapshot.startedAtEpochMs))} UTC\n")
             append("Total commands: ${snapshot.totalCommandCount}\n")
             if (snapshot.commands.isEmpty()) {
                 append("No commands recorded yet.\n")

@@ -2,7 +2,7 @@ package com.rkhamatyarov.laret.example
 
 import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.model.Command
-import com.rkhamatyarov.laret.plugin.LaretPlugin
+import com.rkhamatyarov.laret.core.LaretPlugin
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 

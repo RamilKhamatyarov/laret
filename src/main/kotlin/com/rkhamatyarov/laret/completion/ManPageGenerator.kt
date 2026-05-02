@@ -1,4 +1,4 @@
-package com.rkhamatyarov.laret.man
+package com.rkhamatyarov.laret.completion
 
 import com.rkhamatyarov.laret.model.Command
 import com.rkhamatyarov.laret.model.CommandGroup

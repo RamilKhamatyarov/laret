@@ -1,6 +1,7 @@
 package com.rkhamatyarov.laret.pipe
 
 import com.rkhamatyarov.laret.core.CliApp
+import com.rkhamatyarov.laret.core.CommandPipeline
 import com.rkhamatyarov.laret.dsl.cli
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
