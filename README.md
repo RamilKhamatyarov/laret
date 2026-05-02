@@ -563,6 +563,82 @@ group(
 
 ```
 
+## Command Piping
+
+Laret lets you chain multiple commands together so the output of one becomes the input of the next — similar to Unix pipes.
+
+### Basic usage
+
+Use `pipe run` with the `---` separator:
+
+```bash
+# Two stages: list a directory, then write the output to a file
+$ laret pipe run dir list /tmp --- file create /tmp/listing.txt
+```
+
+### Pipe `|` separator
+
+The `|` token is also recognised as a stage separator. In a shell you must quote it so the shell does not interpret it as a native pipe:
+
+```bash
+$ laret pipe run echo print hello '|' upper convert
+HELLO
+```
+
+Chain four commands in a row:
+
+```bash
+$ laret pipe run cmd1 group '|' cmd2 group '|' cmd3 group '|' cmd4 group
+```
+
+Mixed separators work in a single call:
+
+```bash
+$ laret pipe run echo print abc '|' upper convert --- upper convert
+ABC
+```
+
+### Explicit stdin substitution with `-`
+
+Place `-` as an argument token to inject the previous stage's output at a specific position:
+
+```bash
+$ laret pipe run echo print "hello world" '|' upper convert -
+HELLO WORLD
+```
+
+Without `-`, the carry is fed into the next stage via `System.in` and your command can read it with `CommandPipeline.captureStdin()`.
+
+### Writing a pipeable command
+
+```kt
+command(name = "convert", description = "Uppercase input") {
+    argument("text", required = false, optional = true, default = "")
+    action { ctx ->
+        val input = if (ctx.argument("text").isNotEmpty()) {
+            ctx.argument("text")
+        } else {
+            CommandPipeline.captureStdin()   // reads from the pipe
+        }
+        print(input.uppercase())
+    }
+}
+```
+
+### Programmatic API
+
+```kt
+val pipeline = CommandPipeline(app)
+
+// Split a token array into stages
+val stages = pipeline.splitStages(
+    arrayOf("echo", "print", "hello", "|", "upper", "convert")
+)
+
+// Execute and get the final output
+val result = pipeline.execute(stages)  // returns "HELLO"
+```
+
 ## Project Structure
 
 ```

@@ -267,4 +267,75 @@ class CommandPipelineTest {
     fun `STAGE_SEPARATOR constant is three dashes`() {
         assertEquals("---", CommandPipeline.STAGE_SEPARATOR)
     }
+
+    @Test
+    fun `PIPE_SEPARATOR constant is vertical bar`() {
+        assertEquals("|", CommandPipeline.PIPE_SEPARATOR)
+    }
+
+    @Test
+    fun `DEFAULT_SEPARATORS contains both --- and pipe`() {
+        assertTrue(CommandPipeline.DEFAULT_SEPARATORS.contains("---"))
+        assertTrue(CommandPipeline.DEFAULT_SEPARATORS.contains("|"))
+    }
+
+    @Test
+    fun `pipe token is recognised as separator by default`() {
+        val stages = pipeline.splitStages(arrayOf("echo", "print", "hello", "|", "upper", "convert"))
+        assertEquals(2, stages.size)
+        assertTrue(stages[0].contentEquals(arrayOf("echo", "print", "hello")))
+        assertTrue(stages[1].contentEquals(arrayOf("upper", "convert")))
+    }
+
+    @Test
+    fun `mixed triple-dash and pipe tokens both split stages in a single call`() {
+        val stages = pipeline.splitStages(
+            arrayOf("a", "1", "|", "b", "2", "---", "c", "3"),
+        )
+        assertEquals(3, stages.size)
+        assertTrue(stages[0].contentEquals(arrayOf("a", "1")))
+        assertTrue(stages[1].contentEquals(arrayOf("b", "2")))
+        assertTrue(stages[2].contentEquals(arrayOf("c", "3")))
+    }
+
+    @Test
+    fun `consecutive pipe tokens do not emit empty stages`() {
+        val stages = pipeline.splitStages(arrayOf("a", "|", "|", "b"))
+        assertEquals(2, stages.size)
+    }
+
+    @Test
+    fun `only pipe tokens return empty list`() {
+        assertEquals(0, pipeline.splitStages(arrayOf("|", "|")).size)
+    }
+
+    @Test
+    fun `single-separator String overload treats pipe as regular token when not the separator`() {
+        val stages = pipeline.splitStages(arrayOf("a", "|", "b", "---", "c"), separator = "---")
+        assertEquals(2, stages.size)
+        assertTrue(stages[0].contentEquals(arrayOf("a", "|", "b")))
+        assertTrue(stages[1].contentEquals(arrayOf("c")))
+    }
+
+    @Test
+    fun `execute pipeline split by pipe token produces correct output`() {
+        val app = echoApp()
+        val pipe = CommandPipeline(app)
+        val stages = pipe.splitStages(arrayOf("echo", "print", "hello", "|", "upper", "convert"))
+        assertEquals(2, stages.size)
+        val result = pipe.execute(stages)
+        assertEquals("HELLO", result)
+    }
+
+    @Test
+    fun `execute three-stage pipeline with mixed triple-dash and pipe separators`() {
+        val app = echoApp()
+        val pipe = CommandPipeline(app)
+        val stages = pipe.splitStages(
+            arrayOf("echo", "print", "abc", "|", "upper", "convert", "---", "upper", "convert"),
+        )
+        assertEquals(3, stages.size)
+        val result = pipe.execute(stages)
+        assertEquals("ABC", result)
+    }
 }

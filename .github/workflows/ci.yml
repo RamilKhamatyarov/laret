@@ -1329,6 +1329,37 @@ jobs:
               && echo "$COMBINED" && exit 1)
           echo "Consecutive separators handled as empty pipeline"
 
+      - name: Pipe - two-stage pipeline with | separator
+        run: |
+          set -euo pipefail
+          ./bin/laret pipe run \
+            dir list /tmp/laret_pipe_test \
+            '|' \
+            file create /tmp/laret_pipe_bar.txt \
+            > /tmp/pipe_bar.out 2>/tmp/pipe_bar.err || true
+          [ -f /tmp/laret_pipe_bar.txt ] \
+            || (echo "ERROR: output file not created with | separator" \
+              && cat /tmp/pipe_bar.out /tmp/pipe_bar.err && exit 1)
+          grep -q "a.txt" /tmp/laret_pipe_bar.txt \
+            || (echo "ERROR: piped listing not found in output file" \
+              && cat /tmp/laret_pipe_bar.txt && exit 1)
+          echo "Two-stage pipeline with | separator works"
+
+      - name: Pipe - three-stage pipeline with mixed --- and | separators
+        run: |
+          set -euo pipefail
+          ./bin/laret pipe run \
+            dir list /tmp/laret_pipe_test \
+            '|' \
+            file create /tmp/laret_pipe_mixed.txt \
+            --- \
+            file read /tmp/laret_pipe_mixed.txt \
+            > /tmp/pipe_mixed.out 2>/tmp/pipe_mixed.err || true
+          grep -q "a.txt" /tmp/pipe_mixed.out \
+            || (echo "ERROR: mixed-separator pipeline did not propagate output" \
+              && cat /tmp/pipe_mixed.out /tmp/pipe_mixed.err && exit 1)
+          echo "Three-stage pipeline with mixed --- and | separators works"
+
       - name: Upload pipeline artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -1337,6 +1368,8 @@ jobs:
           path: |
             /tmp/laret_pipe_out.txt
             /tmp/laret_pipe_three.txt
+            /tmp/laret_pipe_bar.txt
+            /tmp/laret_pipe_mixed.txt
             /tmp/pipe_*.out
             /tmp/pipe_*.err
           retention-days: 7

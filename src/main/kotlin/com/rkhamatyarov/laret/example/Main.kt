@@ -176,7 +176,7 @@ fun main(args: Array<String>) {
             }
 
             group(name = "pipe", description = "Command piping") {
-                command(name = "run", description = "Run a pipeline of laret commands separated by ---") {
+                command(name = "run", description = "Run a pipeline of laret commands separated by --- or |") {
                     action { ctx ->
                         val app = ctx.app ?: return@action
 
