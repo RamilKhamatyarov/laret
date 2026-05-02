@@ -3,6 +3,7 @@ package com.rkhamatyarov.laret.stats
 import com.rkhamatyarov.laret.core.CommandContext
 import com.rkhamatyarov.laret.core.Middleware
 import com.rkhamatyarov.laret.core.MiddlewareScope
+import kotlinx.coroutines.CancellationException
 
 /**
  * Records every command execution into [StatsCollector].
@@ -23,7 +24,7 @@ class StatsMiddleware(
         try {
             next()
         } catch (e: Throwable) {
-            exitCode = 1
+            if (e !is CancellationException) exitCode = 1
             throw e
         } finally {
             val durationMs = clock() - start

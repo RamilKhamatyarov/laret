@@ -8,6 +8,11 @@ import com.rkhamatyarov.laret.dsl.cli
 import com.rkhamatyarov.laret.i18n.Localization
 import com.rkhamatyarov.laret.man.ManPageGenerator
 import com.rkhamatyarov.laret.output.OutputStrategy
+import com.rkhamatyarov.laret.diff.DiffFormat
+import com.rkhamatyarov.laret.diff.JsonDiffFormatter
+import com.rkhamatyarov.laret.diff.PlainFormatter
+import com.rkhamatyarov.laret.diff.UnifiedFormatter
+import com.rkhamatyarov.laret.diff.diffFiles
 import com.rkhamatyarov.laret.pipe.CommandPipeline
 import com.rkhamatyarov.laret.stats.JsonStatsFormatter
 import com.rkhamatyarov.laret.stats.PlainStatsFormatter
@@ -293,6 +298,53 @@ fun main(args: Array<String>) {
                         System.err.println(
                             Localization.t("watch.stopped", summary.emittedEvents, summary.stopReason.name),
                         )
+                    }
+                }
+            }
+
+            group(name = "diff", description = "Compare files line by line") {
+                command(name = "run", description = "Show differences between two text files") {
+                    argument("old-file", "Original file path", required = true)
+                    argument("new-file", "Modified file path", required = true)
+                    option("f", "format", "Output format (unified, plain, json)", "unified", true)
+                    option("w", "ignore-whitespace", "Ignore leading/trailing whitespace differences", "", false)
+                    option("c", "context", "Lines of context around each change", "3", true)
+
+                    action { ctx ->
+                        val oldFile = File(ctx.argument("old-file"))
+                        val newFile = File(ctx.argument("new-file"))
+
+                        if (!oldFile.exists()) {
+                            System.err.println(Localization.t("diff.file.not.found", oldFile.path))
+                            return@action
+                        }
+                        if (!newFile.exists()) {
+                            System.err.println(Localization.t("diff.file.not.found", newFile.path))
+                            return@action
+                        }
+
+                        val formatId = ctx.option("format").ifBlank { "unified" }
+                        val format = DiffFormat.fromId(formatId) ?: run {
+                            System.err.println(Localization.t("diff.format.unknown", formatId))
+                            return@action
+                        }
+
+                        val result = diffFiles(
+                            oldFile.toPath(),
+                            newFile.toPath(),
+                            ignoreWhitespace = ctx.optionBool("ignore-whitespace"),
+                            contextLines = ctx.optionInt("context").coerceAtLeast(0),
+                        )
+
+                        val rendered = when (format) {
+                            DiffFormat.UNIFIED -> UnifiedFormatter().render(result)
+                            DiffFormat.PLAIN -> PlainFormatter().render(result)
+                            DiffFormat.JSON -> JsonDiffFormatter().render(result)
+                        }
+                        if (rendered.isNotEmpty()) {
+                            print(rendered)
+                            if (!rendered.endsWith("\n")) println()
+                        }
                     }
                 }
             }

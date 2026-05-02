@@ -3,6 +3,7 @@ package com.rkhamatyarov.laret.stats
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -129,7 +130,6 @@ internal class CollectorState(
                 )
             }
         } catch (_: Exception) {
-            // Corrupt file — start fresh, do not crash the CLI.
         }
     }
 
@@ -155,13 +155,14 @@ internal class CollectorState(
                         )
                     },
             )
-            // Write to a sibling temp file then atomically move so a crash mid-write
-            // can never leave a half-written stats.json.
             val tmp = storagePath.resolveSibling("${storagePath.fileName}.tmp")
             mapper.writeValue(tmp.toFile(), payload)
-            Files.move(tmp, storagePath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            try {
+                Files.move(tmp, storagePath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(tmp, storagePath, StandardCopyOption.REPLACE_EXISTING)
+            }
         } catch (_: Exception) {
-            // Persistence is best-effort; never break command execution because of it.
         }
     }
 

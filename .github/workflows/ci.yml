@@ -1574,6 +1574,274 @@ jobs:
             /tmp/watch_*.err
           retention-days: 7
 
+  integration-stats:
+    name: Integration - Command Statistics
+    runs-on: ubuntu-latest
+    needs: [ build ]
+
+    steps:
+      - name: Download native binary
+        uses: actions/download-artifact@v4
+        with:
+          name: laret-native
+          path: ./bin
+
+      - name: Make binary executable
+        run: chmod +x ./bin/laret
+
+      - name: Stats - generate data then verify Prometheus output
+        run: |
+          set -euo pipefail
+          ./bin/laret file create /tmp/stats_seed.txt -c "seed" 2>/dev/null
+          ./bin/laret stats show --format prometheus > /tmp/stats_prom.out 2>/tmp/stats_prom.err
+          echo "=== Prometheus output ==="
+          cat /tmp/stats_prom.out
+          grep -q "laret_command_executions_total" /tmp/stats_prom.out \
+            || (echo "ERROR: missing executions_total metric" && exit 1)
+          grep -q "laret_stats_started_timestamp_seconds" /tmp/stats_prom.out \
+            || (echo "ERROR: missing started_timestamp metric" && exit 1)
+          grep -q "laret_stats_enabled" /tmp/stats_prom.out \
+            || (echo "ERROR: missing enabled metric" && exit 1)
+          grep -qE 'group="file",command="create"' /tmp/stats_prom.out \
+            || (echo "ERROR: file/create entry not found in metrics" && exit 1)
+          echo "Prometheus stats output valid"
+
+      - name: Stats - plain format shows table header
+        run: |
+          set -euo pipefail
+          ./bin/laret stats show --format plain > /tmp/stats_plain.out 2>/dev/null
+          echo "=== Plain output ==="
+          cat /tmp/stats_plain.out
+          grep -qE "Enabled:|Total commands:" /tmp/stats_plain.out \
+            || (echo "ERROR: expected plain header lines" && exit 1)
+          echo "Plain stats format valid"
+
+      - name: Stats - json format is valid JSON with required keys
+        run: |
+          set -euo pipefail
+          ./bin/laret stats show --format json > /tmp/stats_json.out 2>/dev/null
+          python3 - << 'PYEOF'
+          import json
+          data = json.load(open('/tmp/stats_json.out'))
+          assert 'commands' in data,          f"Missing 'commands': {list(data.keys())}"
+          assert 'totalCommandCount' in data, "Missing 'totalCommandCount'"
+          assert 'enabled' in data,           "Missing 'enabled'"
+          assert data['enabled'] == True,     "Stats should be enabled"
+          print(f"JSON stats valid: {data['totalCommandCount']} command(s) recorded")
+          PYEOF
+          echo "JSON stats format valid"
+
+      - name: Stats - show --reset clears metrics
+        run: |
+          set -euo pipefail
+          ./bin/laret stats show --format plain --reset > /tmp/stats_before.out 2>/dev/null
+          ./bin/laret stats show --format plain         > /tmp/stats_after.out  2>/dev/null
+          echo "=== Stats after reset ==="
+          cat /tmp/stats_after.out
+          TOTAL=$(grep "Total commands:" /tmp/stats_after.out | grep -oE "[0-9]+")
+          echo "Commands after reset: $TOTAL"
+          [ "$TOTAL" -le 2 ] \
+            || (echo "ERROR: expected ≤2 commands after reset, got $TOTAL" && exit 1)
+          echo "show --reset clears metrics"
+
+      - name: Stats - explicit reset command zeroes counters
+        run: |
+          set -euo pipefail
+          ./bin/laret stats reset 2>/dev/null
+          ./bin/laret stats show --format json > /tmp/stats_zeroed.out 2>/dev/null
+          python3 - << 'PYEOF'
+          import json
+          data = json.load(open('/tmp/stats_zeroed.out'))
+          # After reset the only possible entry is the stats/show that just ran
+          cmds = data['commands']
+          non_stats = [c for c in cmds if not (c['group'] == 'stats')]
+          assert not non_stats, f"Expected only stats/* commands after reset, found: {non_stats}"
+          print(f"Reset verified: {len(cmds)} entry(ies), all stats/*")
+          PYEOF
+          echo "Explicit reset works"
+
+      - name: Stats - LARET_STATS_DISABLED=1 suppresses recording
+        run: |
+          set -euo pipefail
+          ./bin/laret stats reset 2>/dev/null
+          LARET_STATS_DISABLED=1 ./bin/laret file create /tmp/stats_nodisable.txt \
+            -c "disabled" 2>/dev/null || true
+          ./bin/laret stats show --format json > /tmp/stats_disabled.out 2>/dev/null
+          python3 - << 'PYEOF'
+          import json
+          data = json.load(open('/tmp/stats_disabled.out'))
+          file_creates = [c for c in data['commands']
+                          if c['group'] == 'file' and c['command'] == 'create']
+          assert not file_creates, \
+            f"file/create should not be recorded when disabled, found: {file_creates}"
+          print(f"LARET_STATS_DISABLED verified: no file/create in {len(data['commands'])} entry(ies)")
+          PYEOF
+          echo "LARET_STATS_DISABLED=1 suppresses recording"
+
+      - name: Upload stats artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stats-outputs
+          path: |
+            /tmp/stats_*.out
+            /tmp/stats_*.err
+          retention-days: 7
+
+  integration-diff:
+    name: Integration - File Diff
+    runs-on: ubuntu-latest
+    needs: [ build ]
+
+    steps:
+      - name: Download native binary
+        uses: actions/download-artifact@v4
+        with:
+          name: laret-native
+          path: ./bin
+
+      - name: Make binary executable
+        run: chmod +x ./bin/laret
+
+      - name: Prepare diff fixtures
+        run: |
+          set -euo pipefail
+          printf '%s\n' 'line one' 'line two' 'line three' 'line four' \
+            > /tmp/diff_old.txt
+          printf '%s\n' 'line one' 'LINE TWO CHANGED' 'line three' 'line four' 'line five' \
+            > /tmp/diff_new.txt
+          cp /tmp/diff_old.txt /tmp/diff_identical.txt
+          printf '\x00\x01\x02binary content' > /tmp/diff_binary.bin
+          printf '%s\n' '  hello  ' > /tmp/diff_ws_old.txt
+          printf '%s\n' 'hello'     > /tmp/diff_ws_new.txt
+          echo "Diff fixtures prepared"
+
+      - name: Diff - unified format shows --- +++ and @@ headers
+        run: |
+          set -euo pipefail
+          ./bin/laret diff run /tmp/diff_old.txt /tmp/diff_new.txt \
+            > /tmp/diff_unified.out 2>/tmp/diff_unified.err
+          echo "=== Unified diff ==="
+          cat /tmp/diff_unified.out
+          grep -q "^---" /tmp/diff_unified.out \
+            || (echo "ERROR: missing --- header" && exit 1)
+          grep -q "^+++" /tmp/diff_unified.out \
+            || (echo "ERROR: missing +++ header" && exit 1)
+          grep -q "^@@" /tmp/diff_unified.out \
+            || (echo "ERROR: missing @@ hunk header" && exit 1)
+          grep -qE "^\-line two" /tmp/diff_unified.out \
+            || (echo "ERROR: removed line not shown" && exit 1)
+          grep -qE "^\+LINE TWO CHANGED" /tmp/diff_unified.out \
+            || (echo "ERROR: added line not shown" && exit 1)
+          echo "Unified diff output valid"
+
+      - name: Diff - plain format uses +/- markers
+        run: |
+          set -euo pipefail
+          ./bin/laret diff run /tmp/diff_old.txt /tmp/diff_new.txt --format plain \
+            > /tmp/diff_plain.out 2>/dev/null
+          echo "=== Plain diff ==="
+          cat /tmp/diff_plain.out
+          grep -qE "^\- " /tmp/diff_plain.out \
+            || (echo "ERROR: removed line marker not found" && exit 1)
+          grep -qE "^\+ " /tmp/diff_plain.out \
+            || (echo "ERROR: added line marker not found" && exit 1)
+          echo "Plain diff format valid"
+
+      - name: Diff - json format is valid JSON with hunks
+        run: |
+          set -euo pipefail
+          ./bin/laret diff run /tmp/diff_old.txt /tmp/diff_new.txt --format json \
+            > /tmp/diff_json.out 2>/dev/null
+          python3 - << 'PYEOF'
+          import json
+          data = json.load(open('/tmp/diff_json.out'))
+          assert 'hunks'    in data, "Missing 'hunks'"
+          assert 'identical' in data, "Missing 'identical'"
+          assert data['identical'] == False, "Files should not be identical"
+          assert len(data['hunks']) > 0, "Expected at least one hunk"
+          types = {l['type'] for h in data['hunks'] for l in h['lines']}
+          assert 'REMOVE' in types, f"Expected REMOVE line type, got {types}"
+          assert 'ADD'    in types, f"Expected ADD line type, got {types}"
+          print(f"JSON diff valid: {len(data['hunks'])} hunk(s), types={types}")
+          PYEOF
+          echo "JSON diff format valid"
+
+      - name: Diff - identical files produce no output
+        run: |
+          set -euo pipefail
+          ./bin/laret diff run /tmp/diff_old.txt /tmp/diff_identical.txt \
+            > /tmp/diff_same.out 2>/dev/null
+          if [ -s /tmp/diff_same.out ]; then
+            echo "ERROR: identical files should produce no output"
+            cat /tmp/diff_same.out
+            exit 1
+          fi
+          echo "Identical files: no output"
+
+      - name: Diff - binary file detection
+        run: |
+          set -euo pipefail
+          ./bin/laret diff run /tmp/diff_old.txt /tmp/diff_binary.bin \
+            > /tmp/diff_bin.out 2>/tmp/diff_bin.err || true
+          cat /tmp/diff_bin.out
+          grep -qi "binary" /tmp/diff_bin.out \
+            || (echo "ERROR: expected binary file message" && cat /tmp/diff_bin.out && exit 1)
+          echo "Binary file detection works"
+
+      - name: Diff - ignore-whitespace treats ws-only changes as equal
+        run: |
+          set -euo pipefail
+          ./bin/laret diff run /tmp/diff_ws_old.txt /tmp/diff_ws_new.txt \
+            --ignore-whitespace \
+            > /tmp/diff_ws.out 2>/dev/null
+          if [ -s /tmp/diff_ws.out ]; then
+            echo "ERROR: whitespace-only diff should be empty with --ignore-whitespace"
+            cat /tmp/diff_ws.out
+            exit 1
+          fi
+          echo "--ignore-whitespace works"
+
+      - name: Diff - without --ignore-whitespace, ws diff is detected
+        run: |
+          set -euo pipefail
+          ./bin/laret diff run /tmp/diff_ws_old.txt /tmp/diff_ws_new.txt \
+            > /tmp/diff_ws_strict.out 2>/dev/null
+          [ -s /tmp/diff_ws_strict.out ] \
+            || (echo "ERROR: whitespace diff should be shown without --ignore-whitespace" && exit 1)
+          echo "Whitespace diff detected without flag"
+
+      - name: Diff - missing file reports error to stderr
+        run: |
+          set -euo pipefail
+          ./bin/laret diff run /tmp/nonexistent_XXXXX.txt /tmp/diff_new.txt \
+            > /tmp/diff_missing.out 2>/tmp/diff_missing.err || true
+          grep -qi "not found\|error" /tmp/diff_missing.err \
+            || (echo "ERROR: expected error on stderr" \
+              && cat /tmp/diff_missing.err && exit 1)
+          echo "Missing file error reported to stderr"
+
+      - name: Diff - stdout is clean (no control characters)
+        run: |
+          set -euo pipefail
+          ./bin/laret diff run /tmp/diff_old.txt /tmp/diff_new.txt \
+            > /tmp/diff_clean.out 2>/dev/null
+          if grep -qP '[\x00-\x08\x0e-\x1f]' /tmp/diff_clean.out 2>/dev/null; then
+            echo "ERROR: control characters in diff stdout"
+            exit 1
+          fi
+          echo "Diff stdout is clean"
+
+      - name: Upload diff artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diff-outputs
+          path: |
+            /tmp/diff_*.out
+            /tmp/diff_*.err
+          retention-days: 7
+
   integration-localization:
     name: Integration - Localization Support
     runs-on: ubuntu-latest
@@ -1694,6 +1962,8 @@ jobs:
       - integration-parallel-execution
       - integration-watch
       - integration-localization
+      - integration-stats
+      - integration-diff
     if: always()
 
     steps:
@@ -1718,6 +1988,8 @@ jobs:
           echo " integration-parallel:   ${{ needs.integration-parallel-execution.result }}"
           echo " integration-watch:      ${{ needs.integration-watch.result }}"
           echo " integration-localization:   ${{ needs.integration-localization.result }}"
+          echo " integration-stats:          ${{ needs.integration-stats.result }}"
+          echo " integration-diff:           ${{ needs.integration-diff.result }}"
           echo "=========================================="
 
       - name: Comment PR on failure

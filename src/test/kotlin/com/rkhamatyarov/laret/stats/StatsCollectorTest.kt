@@ -65,7 +65,6 @@ class StatsCollectorTest {
         StatsCollector.record("file", "create", 8, 1)
         assertThat(Files.exists(storagePath)).isTrue()
 
-        // Reconfigure → triggers a fresh load() from the same file.
         StatsCollector.configureForTest(storagePath, enabledProvider = { true }, clock = { 1_700_000_000_000L })
 
         val snapshot = StatsCollector.snapshot()

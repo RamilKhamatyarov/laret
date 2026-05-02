@@ -56,7 +56,6 @@ class StatsMiddlewareTest {
                 middleware.handle(ctx) { throw RuntimeException("boom") }
             }
         } catch (_: RuntimeException) {
-            // expected — middleware must rethrow so CommandRunner can call onError
         }
 
         val stat = StatsCollector.snapshot().commands.getValue(CommandKey("file", "delete"))
@@ -68,8 +67,6 @@ class StatsMiddlewareTest {
 
     @Test
     fun runsAtLowerPriorityThanDefaultMiddleware() {
-        // Confirms the middleware wraps everything else, so its measured
-        // duration includes the work of any logging/metrics middleware too.
         assertThat(StatsMiddleware().priority).isLessThan(0)
     }
 
