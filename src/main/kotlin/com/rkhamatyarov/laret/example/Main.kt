@@ -393,22 +393,37 @@ fun main(args: Array<String>) {
 
             group(name = "locale", description = "Manage interface locale") {
                 command(name = "show", description = "Print the active locale tag") {
-                    action { _ ->
-                        println(Localization.getLocale().toLanguageTag())
+                    option("v", "verbose", "Also show the source of the active locale", "", false)
+                    action { ctx ->
+                        println(Localization.getLocale().toString())
+                        if (ctx.optionBool("verbose")) {
+                            println("Source: ${Localization.localeSource()}")
+                        }
                     }
                 }
                 command(name = "set", description = "Set and persist locale for all future sessions") {
                     argument("tag", "Locale tag (e.g. es, en_US, fr_FR)", required = true)
                     action { ctx ->
                         val tag = ctx.argument("tag")
+                        if (!Localization.isValidLocaleTag(tag)) {
+                            System.err.println(Localization.t("locale.invalid.tag", tag))
+                            return@action
+                        }
                         Localization.saveLocale(tag)
+                        if (Localization.isLocaleOverriddenByEnv()) {
+                            System.err.println(
+                                Localization.t("locale.env.override.warning", System.getenv("LARET_LOCALE")),
+                            )
+                        }
                         println(Localization.t("locale.set.done", tag))
                     }
                 }
                 command(name = "reset", description = "Reset locale to system default") {
                     action { _ ->
+                        val futureTag = Localization.resolveAfterClear().toString()
+                        val message = Localization.t("locale.reset.done", futureTag)
                         Localization.clearLocale()
-                        println(Localization.t("locale.reset.done", Localization.getLocale().toLanguageTag()))
+                        println(message)
                     }
                 }
             }

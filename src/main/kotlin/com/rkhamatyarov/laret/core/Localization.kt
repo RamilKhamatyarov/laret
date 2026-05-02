@@ -23,6 +23,11 @@ object Localization {
         return Locale.getDefault()
     }
 
+    internal fun resolveAfterClear(): Locale {
+        val envLocale = System.getenv("LARET_LOCALE")?.trim()?.takeIf { it.isNotEmpty() }
+        return if (envLocale != null) parseLocaleTag(envLocale) else Locale.getDefault()
+    }
+
     internal fun parseLocaleTag(tag: String): Locale {
         val parts = tag.split('_', '-')
         return when (parts.size) {
@@ -30,6 +35,18 @@ object Localization {
             2 -> Locale.of(parts[0], parts[1])
             else -> Locale.of(parts[0], parts[1], parts.drop(2).joinToString("_"))
         }
+    }
+
+    internal fun isValidLocaleTag(tag: String): Boolean {
+        if (tag.isBlank()) return false
+        val parts = tag.split('_', '-')
+        val lang = parts[0]
+        if (lang.length !in 2..3 || !lang.all { it.isLetter() }) return false
+        if (parts.size >= 2) {
+            val region = parts[1]
+            if (region.isNotEmpty() && (region.length !in 2..3 || !region.all { it.isLetterOrDigit() })) return false
+        }
+        return true
     }
 
     fun getLocale(): Locale = currentLocale
@@ -47,17 +64,32 @@ object Localization {
             val path = prefsFile()
             Files.createDirectories(path.parent)
             Files.writeString(path, tag)
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+        }
     }
 
-    /** Delete the persisted locale file and revert to system default for the current session. */
+    /** Delete the persisted locale file and revert the session locale accordingly. */
     fun clearLocale() {
-        try { Files.delete(prefsFile()) } catch (_: NoSuchFileException) {}
-        currentLocale = Locale.getDefault()
+        try {
+            Files.delete(prefsFile())
+        } catch (_: NoSuchFileException) {
+        } catch (e: Exception) {
+            System.err.println("Warning: could not delete locale preference file: ${e.message}")
+        }
+        currentLocale = resolveAfterClear()
     }
 
     /** The tag stored in `~/.laret/locale`, or null if none is persisted. */
     fun persistedTag(): String? = readPersistedTag()
+
+    fun localeSource(): String = when {
+        System.getenv("LARET_LOCALE")?.trim()?.isNotEmpty() == true -> "LARET_LOCALE (env)"
+        readPersistedTag() != null -> "~/.laret/locale (persisted)"
+        else -> "system default"
+    }
+
+    fun isLocaleOverriddenByEnv(): Boolean =
+        System.getenv("LARET_LOCALE")?.trim()?.isNotEmpty() == true
 
     fun t(key: String, vararg args: Any?): String {
         val rawPattern = lookup(key) ?: return key
