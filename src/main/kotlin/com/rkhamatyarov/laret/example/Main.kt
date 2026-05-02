@@ -9,6 +9,12 @@ import com.rkhamatyarov.laret.i18n.Localization
 import com.rkhamatyarov.laret.man.ManPageGenerator
 import com.rkhamatyarov.laret.output.OutputStrategy
 import com.rkhamatyarov.laret.pipe.CommandPipeline
+import com.rkhamatyarov.laret.stats.JsonStatsFormatter
+import com.rkhamatyarov.laret.stats.PlainStatsFormatter
+import com.rkhamatyarov.laret.stats.PrometheusFormatter
+import com.rkhamatyarov.laret.stats.StatsCollector
+import com.rkhamatyarov.laret.stats.StatsFormat
+import com.rkhamatyarov.laret.stats.StatsMiddleware
 import com.rkhamatyarov.laret.ui.UnicodeSupport
 import com.rkhamatyarov.laret.watch.DirectoryWatcher
 import com.rkhamatyarov.laret.watch.WatchEventType
@@ -37,6 +43,7 @@ fun main(args: Array<String>) {
             description = "Laret - A Cobra-like CLI framework for Kotlin",
         ) {
             use(LoggingMiddleware())
+            use(StatsMiddleware())
 
             onAppInit = { println(Localization.t("app.initializing")) }
             onAppShutdown = { println(Localization.t("app.shutting.down")) }
@@ -286,6 +293,53 @@ fun main(args: Array<String>) {
                         System.err.println(
                             Localization.t("watch.stopped", summary.emittedEvents, summary.stopReason.name),
                         )
+                    }
+                }
+            }
+
+            group(name = "stats", description = "Command-execution metrics") {
+                command(
+                    name = "show",
+                    description = "Print collected metrics (default format: prometheus)",
+                ) {
+                    option(
+                        "f",
+                        "format",
+                        "Output format (prometheus, json, plain)",
+                        "prometheus",
+                        true,
+                    )
+                    option("r", "reset", "Reset metrics after printing", "", false)
+
+                    action { ctx ->
+                        val formatId = ctx.option("format").ifBlank { "prometheus" }
+                        val format = StatsFormat.fromId(formatId) ?: run {
+                            System.err.println(
+                                Localization.t("stats.format.unknown", formatId),
+                            )
+                            return@action
+                        }
+
+                        val snapshot = StatsCollector.snapshot()
+                        val rendered = when (format) {
+                            StatsFormat.PROMETHEUS -> PrometheusFormatter().render(snapshot)
+                            StatsFormat.JSON -> JsonStatsFormatter().render(snapshot)
+                            StatsFormat.PLAIN -> PlainStatsFormatter().render(snapshot)
+                        }
+                        print(rendered)
+                        if (!rendered.endsWith("\n")) println()
+
+                        if (ctx.optionBool("reset")) {
+                            StatsCollector.reset()
+                            System.err.println(Localization.t("stats.reset.done"))
+                        }
+                    }
+                }
+
+                command(name = "reset", description = "Reset all collected metrics") {
+                    action { _ ->
+                        StatsCollector.reset()
+                        println(Localization.t("stats.reset.done"))
                     }
                 }
             }
