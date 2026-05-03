@@ -2073,6 +2073,172 @@ jobs:
             /tmp/redo_*.err
           retention-days: 7
 
+  integration-history:
+    name: Integration - Command History & Replay
+    runs-on: ubuntu-latest
+    needs: [ build ]
+
+    steps:
+      - name: Download native binary
+        uses: actions/download-artifact@v4
+        with:
+          name: laret-native
+          path: ./bin
+
+      - name: Make binary executable
+        run: chmod +x ./bin/laret
+
+      - name: History - empty history reports message
+        run: |
+          set -euo pipefail
+          ./bin/laret history show > /tmp/hist_empty.out 2>/tmp/hist_empty.err
+          grep -q "No command history" /tmp/hist_empty.out \
+            || (echo "ERROR: expected 'No command history'" && cat /tmp/hist_empty.out && exit 1)
+          echo "Empty history handled gracefully"
+
+      - name: History - replay on empty history reports message
+        run: |
+          set -euo pipefail
+          ./bin/laret history replay > /tmp/hist_replay_empty.out 2>/tmp/hist_replay_empty.err
+          grep -q "No command history" /tmp/hist_replay_empty.out \
+            || (echo "ERROR: expected 'No command history'" && cat /tmp/hist_replay_empty.out && exit 1)
+          echo "Empty replay handled gracefully"
+
+      - name: History - command appears in history show after execution
+        run: |
+          set -euo pipefail
+          ./bin/laret file create /tmp/hist_test.txt -c "history feature test" \
+            > /dev/null 2>&1
+          ./bin/laret history show > /tmp/hist_show.out 2>/tmp/hist_show.err
+          grep -q "file create" /tmp/hist_show.out \
+            || (echo "ERROR: expected 'file create' in history" && cat /tmp/hist_show.out && exit 1)
+          echo "Command recorded in history"
+
+      - name: History - replay reruns last command
+        run: |
+          set -euo pipefail
+          # Remove file so replay has a clean target
+          rm -f /tmp/hist_replay_target.txt
+          ./bin/laret file create /tmp/hist_replay_target.txt -c "replay content" \
+            > /dev/null 2>&1
+          rm -f /tmp/hist_replay_target.txt
+          ./bin/laret history replay > /tmp/hist_replay.out 2>/tmp/hist_replay.err
+          cat /tmp/hist_replay.out
+          grep -q "Replaying:" /tmp/hist_replay.out \
+            || (echo "ERROR: expected 'Replaying:' in output" && cat /tmp/hist_replay.out && exit 1)
+          [ -f /tmp/hist_replay_target.txt ] \
+            || (echo "ERROR: replayed file should exist" && exit 1)
+          grep -q "replay content" /tmp/hist_replay_target.txt \
+            || (echo "ERROR: replayed file should contain original content" && exit 1)
+          echo "Replay of last command succeeded"
+
+      - name: History - replay by index reruns specific command
+        run: |
+          set -euo pipefail
+          rm -f /tmp/hist_idx_a.txt /tmp/hist_idx_b.txt
+          ./bin/laret file create /tmp/hist_idx_a.txt -c "entry A" > /dev/null 2>&1
+          ./bin/laret file create /tmp/hist_idx_b.txt -c "entry B" > /dev/null 2>&1
+          # Get the index of the first create from history show
+          ./bin/laret history show > /tmp/hist_idx_show.out 2>&1
+          cat /tmp/hist_idx_show.out
+          FIRST_IDX=$(grep "hist_idx_a" /tmp/hist_idx_show.out | awk '{print $1}' | tr -d '.')
+          echo "Index of first command: $FIRST_IDX"
+          rm -f /tmp/hist_idx_a.txt
+          ./bin/laret history replay "$FIRST_IDX" > /tmp/hist_idx_replay.out 2>/tmp/hist_idx_replay.err
+          cat /tmp/hist_idx_replay.out
+          grep -q "hist_idx_a" /tmp/hist_idx_replay.out \
+            || (echo "ERROR: expected hist_idx_a in replay output" && cat /tmp/hist_idx_replay.out && exit 1)
+          [ -f /tmp/hist_idx_a.txt ] \
+            || (echo "ERROR: replay of first command should recreate hist_idx_a.txt" && exit 1)
+          echo "Replay by index succeeded"
+
+      - name: History - !! shorthand replays last command
+        run: |
+          set -euo pipefail
+          rm -f /tmp/hist_bang.txt
+          ./bin/laret file create /tmp/hist_bang.txt -c "bang content" > /dev/null 2>&1
+          rm -f /tmp/hist_bang.txt
+          ./bin/laret '!!' > /tmp/hist_bang.out 2>/tmp/hist_bang.err
+          cat /tmp/hist_bang.out
+          grep -q "Replaying:" /tmp/hist_bang.out \
+            || (echo "ERROR: expected 'Replaying:' from !!" && cat /tmp/hist_bang.out && exit 1)
+          [ -f /tmp/hist_bang.txt ] \
+            || (echo "ERROR: !! should have recreated the file" && exit 1)
+          echo "!! shorthand replay succeeded"
+
+      - name: History - clear empties history
+        run: |
+          set -euo pipefail
+          ./bin/laret file create /tmp/hist_clear.txt -c "clear test" > /dev/null 2>&1
+          ./bin/laret history clear > /tmp/hist_clear.out 2>/tmp/hist_clear.err
+          grep -q "cleared" /tmp/hist_clear.out \
+            || (echo "ERROR: expected 'cleared' in output" && cat /tmp/hist_clear.out && exit 1)
+          ./bin/laret history show > /tmp/hist_after_clear.out 2>/tmp/hist_after_clear.err
+          grep -q "No command history" /tmp/hist_after_clear.out \
+            || (echo "ERROR: expected empty history after clear" && cat /tmp/hist_after_clear.out && exit 1)
+          echo "History clear succeeded"
+
+      - name: History - show --limit restricts output
+        run: |
+          set -euo pipefail
+          ./bin/laret file create /tmp/hist_lim_a.txt -c "a" > /dev/null 2>&1
+          ./bin/laret file create /tmp/hist_lim_b.txt -c "b" > /dev/null 2>&1
+          ./bin/laret file create /tmp/hist_lim_c.txt -c "c" > /dev/null 2>&1
+          ./bin/laret history show --limit 1 > /tmp/hist_lim.out 2>/tmp/hist_lim.err
+          COUNT=$(grep -c "\." /tmp/hist_lim.out || true)
+          [ "$COUNT" -le 1 ] \
+            || (echo "ERROR: --limit 1 should show at most 1 entry, got $COUNT" && cat /tmp/hist_lim.out && exit 1)
+          echo "History --limit works"
+
+      - name: History - replay exit code is propagated when replayed command fails (B1)
+        run: |
+          set -euo pipefail
+          ./bin/laret history clear > /dev/null 2>&1
+          ./bin/laret file create /tmp/hist_b1.txt -c "b1 content" > /dev/null 2>&1
+          # File still exists; replaying the same create without --force will fail
+          ./bin/laret history show > /tmp/hist_b1_show.out 2>&1
+          cat /tmp/hist_b1_show.out
+          IDX=$(grep "hist_b1" /tmp/hist_b1_show.out | awk '{print $1}' | tr -d '.')
+          echo "Replaying index: $IDX"
+          set +e
+          ./bin/laret history replay "$IDX" > /tmp/hist_b1_replay.out 2>/tmp/hist_b1_replay.err
+          CODE=$?
+          set -e
+          echo "Exit code: $CODE"
+          cat /tmp/hist_b1_replay.out
+          cat /tmp/hist_b1_replay.err
+          [ "$CODE" -ne 0 ] \
+            || (echo "ERROR: replay of a failing command must exit non-zero" && exit 1)
+          echo "Replay exit code correctly propagated"
+
+      - name: History - failed commands are not recorded (B2)
+        run: |
+          set -euo pipefail
+          ./bin/laret history clear > /dev/null 2>&1
+          # Successful create — should be recorded
+          ./bin/laret file create /tmp/hist_b2.txt -c "b2 content" > /dev/null 2>&1
+          # Failed create (file exists, no --force) — must NOT be recorded
+          set +e
+          ./bin/laret file create /tmp/hist_b2.txt -c "overwrite" > /dev/null 2>&1
+          set -e
+          ./bin/laret history show > /tmp/hist_b2_show.out 2>/tmp/hist_b2_show.err
+          cat /tmp/hist_b2_show.out
+          COUNT=$(grep -c "\." /tmp/hist_b2_show.out || true)
+          [ "$COUNT" -eq 1 ] \
+            || (echo "ERROR: only 1 entry expected (failed cmd must not be recorded), got $COUNT" \
+              && cat /tmp/hist_b2_show.out && exit 1)
+          echo "Failed command correctly excluded from history"
+
+      - name: Upload history artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: history-outputs
+          path: |
+            /tmp/hist_*.out
+            /tmp/hist_*.err
+          retention-days: 7
+
   summary:
     name: Build Summary
     runs-on: ubuntu-latest
@@ -2097,6 +2263,7 @@ jobs:
       - integration-stats
       - integration-diff
       - integration-undo
+      - integration-history
     if: always()
 
     steps:
@@ -2124,6 +2291,7 @@ jobs:
           echo " integration-stats:          ${{ needs.integration-stats.result }}"
           echo " integration-diff:           ${{ needs.integration-diff.result }}"
           echo " integration-undo:           ${{ needs.integration-undo.result }}"
+          echo " integration-history:        ${{ needs.integration-history.result }}"
           echo "=========================================="
 
       - name: Comment PR on failure

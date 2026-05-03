@@ -3,6 +3,7 @@ package com.rkhamatyarov.laret.example
 import com.rkhamatyarov.laret.completion.CompletionCommand
 import com.rkhamatyarov.laret.completion.ManPageGenerator
 import com.rkhamatyarov.laret.completion.ShellType
+import com.rkhamatyarov.laret.core.CommandHistory
 import com.rkhamatyarov.laret.core.CommandPipeline
 import com.rkhamatyarov.laret.core.Localization
 import com.rkhamatyarov.laret.core.ParallelDispatcher
@@ -502,6 +503,70 @@ fun main(args: Array<String>) {
                 }
             }
 
+            group(name = "history", description = "Command history and replay") {
+                command(name = "show", description = "List recent commands") {
+                    option("n", "limit", "Max entries to show", "20", true)
+                    action { ctx ->
+                        val limit = ctx.optionInt("limit").coerceAtLeast(1)
+                        val all = CommandHistory.list()
+                        if (all.isEmpty()) {
+                            println("No command history.")
+                            return@action
+                        }
+                        val start = (all.size - limit).coerceAtLeast(0)
+                        val shown = all.subList(start, all.size)
+                        shown.forEachIndexed { i, e ->
+                            println("  ${start + i + 1}. ${e.args.joinToString(" ")}")
+                        }
+                    }
+                }
+                command(
+                    name = "replay",
+                    description = "Replay a command (default: last). Use index from 'history show'.",
+                ) {
+                    argument(
+                        "index",
+                        "Entry index to replay (0 = last)",
+                        required = false,
+                        optional = true,
+                        default = "0",
+                    )
+                    action { ctx ->
+                        val index = ctx.argument("index").toIntOrNull() ?: 0
+                        val entry = if (index <= 0) CommandHistory.last() else CommandHistory.get(index)
+                        if (entry == null) {
+                            println("No command history.")
+                            return@action
+                        }
+                        val app = ctx.app ?: return@action
+                        println("Replaying: ${entry.args.joinToString(" ")}")
+                        val replayArgs = entry.args.toTypedArray()
+                        if (replayArgs.size >= 2 && replayArgs[0] == "pipe" && replayArgs[1] == "run") {
+                            pipeCommandArgs.set(replayArgs.copyOfRange(2, replayArgs.size))
+                        }
+                        if (replayArgs.size >= 2 && replayArgs[0] == "parallel" && replayArgs[1] == "run") {
+                            parallelCommandArgs.set(replayArgs.copyOfRange(2, replayArgs.size))
+                        }
+                        if (replayArgs.size >= 2 && replayArgs[0] == "watch" && replayArgs[1] == "run") {
+                            watchCommandArgs.set(replayArgs.copyOfRange(2, replayArgs.size))
+                        }
+                        val exitCode = CommandHistory.withSuppressedRecording {
+                            app.runForTest(replayArgs)
+                        }
+                        if (exitCode != 0) {
+                            System.err.println("Replay failed (exit $exitCode)")
+                            throw RuntimeException("Replay failed (exit $exitCode)")
+                        }
+                    }
+                }
+                command(name = "clear", description = "Clear command history") {
+                    action { _ ->
+                        CommandHistory.clear()
+                        println("Command history cleared.")
+                    }
+                }
+            }
+
             group(name = "undo", description = "Undo last recorded action") {
                 command(name = "run", description = "Undo the most recent undoable command") {
                     action { ctx ->
@@ -996,18 +1061,30 @@ fun main(args: Array<String>) {
 
     app.init()
     UndoManager.load()
+    CommandHistory.load()
 
-    if (args.size >= 2 && args[0] == "pipe" && args[1] == "run") {
-        pipeCommandArgs.set(args.copyOfRange(2, args.size))
+    // Translate !! shorthand to history replay (works in PowerShell and programmatic invocations;
+    // in bash, quote it as '!!' to prevent shell history expansion)
+    val resolvedArgs = if (args.size == 1 && args[0] == "!!") arrayOf("history", "replay") else args
+
+    if (resolvedArgs.size >= 2 && resolvedArgs[0] == "pipe" && resolvedArgs[1] == "run") {
+        pipeCommandArgs.set(resolvedArgs.copyOfRange(2, resolvedArgs.size))
     }
-    if (args.size >= 2 && args[0] == "parallel" && args[1] == "run") {
-        parallelCommandArgs.set(args.copyOfRange(2, args.size))
+    if (resolvedArgs.size >= 2 && resolvedArgs[0] == "parallel" && resolvedArgs[1] == "run") {
+        parallelCommandArgs.set(resolvedArgs.copyOfRange(2, resolvedArgs.size))
     }
-    if (args.size >= 2 && args[0] == "watch" && args[1] == "run") {
-        watchCommandArgs.set(args.copyOfRange(2, args.size))
+    if (resolvedArgs.size >= 2 && resolvedArgs[0] == "watch" && resolvedArgs[1] == "run") {
+        watchCommandArgs.set(resolvedArgs.copyOfRange(2, resolvedArgs.size))
     }
 
-    val exitCode = app.run(args)
+    val exitCode = app.run(resolvedArgs)
+
+    // Record only successful commands; skip meta-groups (history/undo/redo describe state, not work)
+    val group = resolvedArgs.firstOrNull()
+    if (exitCode == 0 && group != null && group != "history" && group != "undo" && group != "redo") {
+        CommandHistory.record(resolvedArgs)
+    }
+
     exitProcess(exitCode)
 }
 
