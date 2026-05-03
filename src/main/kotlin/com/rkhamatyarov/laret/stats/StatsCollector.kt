@@ -10,8 +10,7 @@ import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 
 data class CommandKey(val group: String, val command: String) : Comparable<CommandKey> {
-    override fun compareTo(other: CommandKey): Int =
-        compareValuesBy(this, other, { it.group }, { it.command })
+    override fun compareTo(other: CommandKey): Int = compareValuesBy(this, other, { it.group }, { it.command })
 }
 
 data class CommandStat(

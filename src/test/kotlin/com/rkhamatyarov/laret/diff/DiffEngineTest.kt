@@ -82,7 +82,6 @@ class DiffEngineTest {
         }
     }
 
-
     @Nested
     inner class EditsToHunks {
         @Test

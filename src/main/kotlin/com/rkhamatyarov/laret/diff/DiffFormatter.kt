@@ -10,8 +10,7 @@ enum class DiffFormat(val id: String) {
     ;
 
     companion object {
-        fun fromId(id: String): DiffFormat? =
-            entries.firstOrNull { it.id.equals(id, ignoreCase = true) }
+        fun fromId(id: String): DiffFormat? = entries.firstOrNull { it.id.equals(id, ignoreCase = true) }
     }
 }
 

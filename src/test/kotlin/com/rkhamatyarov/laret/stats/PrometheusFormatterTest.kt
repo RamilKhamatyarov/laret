@@ -131,11 +131,10 @@ class PrometheusFormatterTest {
         assertThat(abIdx).isLessThan(zzIdx)
     }
 
-    private fun emptySnapshot(enabled: Boolean = true): StatsSnapshot =
-        StatsSnapshot(
-            commands = emptyMap(),
-            startedAtEpochMs = 0,
-            totalCommandCount = 0,
-            enabled = enabled,
-        )
+    private fun emptySnapshot(enabled: Boolean = true): StatsSnapshot = StatsSnapshot(
+        commands = emptyMap(),
+        startedAtEpochMs = 0,
+        totalCommandCount = 0,
+        enabled = enabled,
+    )
 }

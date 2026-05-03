@@ -1,19 +1,20 @@
 package com.rkhamatyarov.laret.example
 
 import com.rkhamatyarov.laret.completion.CompletionCommand
+import com.rkhamatyarov.laret.completion.ManPageGenerator
 import com.rkhamatyarov.laret.completion.ShellType
+import com.rkhamatyarov.laret.core.CommandPipeline
+import com.rkhamatyarov.laret.core.Localization
 import com.rkhamatyarov.laret.core.ParallelDispatcher
 import com.rkhamatyarov.laret.core.ParallelTask
-import com.rkhamatyarov.laret.dsl.cli
-import com.rkhamatyarov.laret.completion.ManPageGenerator
-import com.rkhamatyarov.laret.core.Localization
-import com.rkhamatyarov.laret.output.OutputStrategy
+import com.rkhamatyarov.laret.core.UndoManager
 import com.rkhamatyarov.laret.diff.DiffFormat
 import com.rkhamatyarov.laret.diff.JsonDiffFormatter
 import com.rkhamatyarov.laret.diff.PlainFormatter
 import com.rkhamatyarov.laret.diff.UnifiedFormatter
 import com.rkhamatyarov.laret.diff.diffFiles
-import com.rkhamatyarov.laret.core.CommandPipeline
+import com.rkhamatyarov.laret.dsl.cli
+import com.rkhamatyarov.laret.output.OutputStrategy
 import com.rkhamatyarov.laret.stats.JsonStatsFormatter
 import com.rkhamatyarov.laret.stats.PlainStatsFormatter
 import com.rkhamatyarov.laret.stats.PrometheusFormatter
@@ -501,6 +502,70 @@ fun main(args: Array<String>) {
                 }
             }
 
+            group(name = "undo", description = "Undo last recorded action") {
+                command(name = "run", description = "Undo the most recent undoable command") {
+                    action { ctx ->
+                        val entry = UndoManager.peekUndo()
+                        if (entry == null) {
+                            println("Nothing to undo.")
+                            return@action
+                        }
+                        println("Undoing: ${entry.description}")
+                        val app = ctx.app ?: return@action
+                        val exitCode = UndoManager.withSuppressedRecording {
+                            app.runForTest(entry.undoArgs.toTypedArray())
+                        }
+                        if (exitCode == 0) {
+                            UndoManager.popUndo()
+                            println("Undo complete.")
+                        } else {
+                            System.err.println("Undo failed (exit $exitCode) — action was not undone.")
+                        }
+                    }
+                }
+                command(name = "history", description = "Show undo/redo history") {
+                    action { _ ->
+                        val undos = UndoManager.undoHistory()
+                        val redos = UndoManager.redoHistory()
+                        if (undos.isEmpty() && redos.isEmpty()) {
+                            println("No history recorded.")
+                            return@action
+                        }
+                        if (undos.isNotEmpty()) {
+                            println("Undo stack (oldest → newest):")
+                            undos.forEachIndexed { i, e -> println("  ${i + 1}. ${e.description}") }
+                        }
+                        if (redos.isNotEmpty()) {
+                            println("Redo stack:")
+                            redos.asReversed().forEachIndexed { i, e -> println("  ${i + 1}. ${e.description}") }
+                        }
+                    }
+                }
+            }
+
+            group(name = "redo", description = "Redo last undone action") {
+                command(name = "run", description = "Redo the most recently undone command") {
+                    action { ctx ->
+                        val entry = UndoManager.peekRedo()
+                        if (entry == null) {
+                            println("Nothing to redo.")
+                            return@action
+                        }
+                        println("Redoing: ${entry.description}")
+                        val app = ctx.app ?: return@action
+                        val exitCode = UndoManager.withSuppressedRecording {
+                            app.runForTest(entry.redoArgs.toTypedArray())
+                        }
+                        if (exitCode == 0) {
+                            UndoManager.popRedo()
+                            println("Redo complete.")
+                        } else {
+                            System.err.println("Redo failed (exit $exitCode) — action was not redone.")
+                        }
+                    }
+                }
+            }
+
             group(name = "file", description = "File operations") {
                 aliases("f")
                 command(name = "create", description = "Create a new file") {
@@ -540,6 +605,11 @@ fun main(args: Array<String>) {
                             spinner.tick()
                             file.writeText(content)
                             spinner.finish("File created: $path")
+                            ctx.registerUndo(
+                                "file create $path",
+                                undoArgs = arrayOf("file", "delete", path),
+                                redoArgs = arrayOf("file", "create", path, "-c", content, "-f", "true"),
+                            )
                         } catch (e: Exception) {
                             spinner.fail("Failed to create file: ${e.message}")
                             throw e
@@ -559,10 +629,16 @@ fun main(args: Array<String>) {
                             return@action
                         }
 
+                        val originalContent = file.readText()
                         val spinner = ctx.spinner("Deleting $path")
                         spinner.tick()
                         if (file.delete()) {
                             spinner.finish("File deleted: $path")
+                            ctx.registerUndo(
+                                "file delete $path",
+                                undoArgs = arrayOf("file", "create", path, "-c", originalContent),
+                                redoArgs = arrayOf("file", "delete", path),
+                            )
                         } else {
                             spinner.fail("Failed to delete file: $path")
                         }
@@ -919,6 +995,7 @@ fun main(args: Array<String>) {
         }
 
     app.init()
+    UndoManager.load()
 
     if (args.size >= 2 && args[0] == "pipe" && args[1] == "run") {
         pipeCommandArgs.set(args.copyOfRange(2, args.size))
@@ -1057,4 +1134,3 @@ internal fun parseParallelTasks(tokens: List<String>, separator: String = "---")
         ParallelTask(command = stage.first(), args = stage.drop(1))
     }
 }
-

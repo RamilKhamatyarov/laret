@@ -29,55 +29,54 @@ interface StatsFormatter {
  * are sorted by (group, command) so diffs between exports stay readable.
  */
 class PrometheusFormatter : StatsFormatter {
-    override fun render(snapshot: StatsSnapshot): String =
-        buildString {
-            appendCounter(
-                snapshot,
-                "laret_command_executions_total",
-                "Total number of command executions, partitioned by result.",
-            ) { stat ->
-                listOf(
-                    Sample(extraLabels = mapOf("result" to "success"), value = stat.successCount.toString()),
-                    Sample(extraLabels = mapOf("result" to "failure"), value = stat.failureCount.toString()),
-                )
-            }
-
-            appendSimple(
-                snapshot,
-                "laret_command_duration_milliseconds_total",
-                "counter",
-                "Total cumulative duration of command executions in milliseconds.",
-            ) { it.totalDurationMs.toString() }
-
-            appendSimple(
-                snapshot,
-                "laret_command_last_duration_milliseconds",
-                "gauge",
-                "Duration of the last command execution in milliseconds.",
-            ) { it.lastDurationMs.toString() }
-
-            appendSimple(
-                snapshot,
-                "laret_command_last_exit_code",
-                "gauge",
-                "Exit code of the last command execution.",
-            ) { it.lastExitCode.toString() }
-
-            appendSimple(
-                snapshot,
-                "laret_command_last_execution_timestamp_seconds",
-                "gauge",
-                "Unix timestamp of the last command execution.",
-            ) { (it.lastTimestampEpochMs / 1000L).toString() }
-
-            append("# HELP laret_stats_started_timestamp_seconds Unix timestamp when stats collection started.\n")
-            append("# TYPE laret_stats_started_timestamp_seconds gauge\n")
-            append("laret_stats_started_timestamp_seconds ${snapshot.startedAtEpochMs / 1000L}\n")
-
-            append("# HELP laret_stats_enabled 1 if stats collection is currently enabled, 0 otherwise.\n")
-            append("# TYPE laret_stats_enabled gauge\n")
-            append("laret_stats_enabled ${if (snapshot.enabled) 1 else 0}\n")
+    override fun render(snapshot: StatsSnapshot): String = buildString {
+        appendCounter(
+            snapshot,
+            "laret_command_executions_total",
+            "Total number of command executions, partitioned by result.",
+        ) { stat ->
+            listOf(
+                Sample(extraLabels = mapOf("result" to "success"), value = stat.successCount.toString()),
+                Sample(extraLabels = mapOf("result" to "failure"), value = stat.failureCount.toString()),
+            )
         }
+
+        appendSimple(
+            snapshot,
+            "laret_command_duration_milliseconds_total",
+            "counter",
+            "Total cumulative duration of command executions in milliseconds.",
+        ) { it.totalDurationMs.toString() }
+
+        appendSimple(
+            snapshot,
+            "laret_command_last_duration_milliseconds",
+            "gauge",
+            "Duration of the last command execution in milliseconds.",
+        ) { it.lastDurationMs.toString() }
+
+        appendSimple(
+            snapshot,
+            "laret_command_last_exit_code",
+            "gauge",
+            "Exit code of the last command execution.",
+        ) { it.lastExitCode.toString() }
+
+        appendSimple(
+            snapshot,
+            "laret_command_last_execution_timestamp_seconds",
+            "gauge",
+            "Unix timestamp of the last command execution.",
+        ) { (it.lastTimestampEpochMs / 1000L).toString() }
+
+        append("# HELP laret_stats_started_timestamp_seconds Unix timestamp when stats collection started.\n")
+        append("# TYPE laret_stats_started_timestamp_seconds gauge\n")
+        append("laret_stats_started_timestamp_seconds ${snapshot.startedAtEpochMs / 1000L}\n")
+
+        append("# HELP laret_stats_enabled 1 if stats collection is currently enabled, 0 otherwise.\n")
+        append("# TYPE laret_stats_enabled gauge\n")
+        append("laret_stats_enabled ${if (snapshot.enabled) 1 else 0}\n")
+    }
 
     private data class Sample(val extraLabels: Map<String, String> = emptyMap(), val value: String)
 
@@ -124,17 +123,16 @@ class PrometheusFormatter : StatsFormatter {
         return "{$rendered}"
     }
 
-    private fun escapeLabel(value: String): String =
-        buildString(value.length) {
-            for (ch in value) {
-                when (ch) {
-                    '\\' -> append("\\\\")
-                    '"' -> append("\\\"")
-                    '\n' -> append("\\n")
-                    else -> append(ch)
-                }
+    private fun escapeLabel(value: String): String = buildString(value.length) {
+        for (ch in value) {
+            when (ch) {
+                '\\' -> append("\\\\")
+                '"' -> append("\\\"")
+                '\n' -> append("\\n")
+                else -> append(ch)
             }
         }
+    }
 }
 
 class JsonStatsFormatter : StatsFormatter {
@@ -168,42 +166,41 @@ class JsonStatsFormatter : StatsFormatter {
 class PlainStatsFormatter : StatsFormatter {
     private val fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneOffset.UTC)
 
-    override fun render(snapshot: StatsSnapshot): String =
-        buildString {
-            append("Enabled: ${snapshot.enabled}\n")
-            append("Started: ${fmt.format(Instant.ofEpochMilli(snapshot.startedAtEpochMs))} UTC\n")
-            append("Total commands: ${snapshot.totalCommandCount}\n")
-            if (snapshot.commands.isEmpty()) {
-                append("No commands recorded yet.\n")
-                return@buildString
+    override fun render(snapshot: StatsSnapshot): String = buildString {
+        append("Enabled: ${snapshot.enabled}\n")
+        append("Started: ${fmt.format(Instant.ofEpochMilli(snapshot.startedAtEpochMs))} UTC\n")
+        append("Total commands: ${snapshot.totalCommandCount}\n")
+        if (snapshot.commands.isEmpty()) {
+            append("No commands recorded yet.\n")
+            return@buildString
+        }
+        append("\n")
+        val header = listOf("GROUP", "COMMAND", "COUNT", "OK", "FAIL", "TOTAL_MS", "LAST_MS", "LAST_EXIT")
+        val rows = snapshot.commands.entries
+            .sortedBy { it.key }
+            .map { (k, v) ->
+                listOf(
+                    k.group,
+                    k.command,
+                    v.count.toString(),
+                    v.successCount.toString(),
+                    v.failureCount.toString(),
+                    v.totalDurationMs.toString(),
+                    v.lastDurationMs.toString(),
+                    v.lastExitCode.toString(),
+                )
+            }
+        val widths = header.indices.map { col ->
+            (listOf(header[col]) + rows.map { it[col] }).maxOf { it.length }
+        }
+        fun appendRow(row: List<String>) {
+            row.forEachIndexed { i, cell ->
+                append(cell.padEnd(widths[i]))
+                if (i < row.lastIndex) append("  ")
             }
             append("\n")
-            val header = listOf("GROUP", "COMMAND", "COUNT", "OK", "FAIL", "TOTAL_MS", "LAST_MS", "LAST_EXIT")
-            val rows = snapshot.commands.entries
-                .sortedBy { it.key }
-                .map { (k, v) ->
-                    listOf(
-                        k.group,
-                        k.command,
-                        v.count.toString(),
-                        v.successCount.toString(),
-                        v.failureCount.toString(),
-                        v.totalDurationMs.toString(),
-                        v.lastDurationMs.toString(),
-                        v.lastExitCode.toString(),
-                    )
-                }
-            val widths = header.indices.map { col ->
-                (listOf(header[col]) + rows.map { it[col] }).maxOf { it.length }
-            }
-            fun appendRow(row: List<String>) {
-                row.forEachIndexed { i, cell ->
-                    append(cell.padEnd(widths[i]))
-                    if (i < row.lastIndex) append("  ")
-                }
-                append("\n")
-            }
-            appendRow(header)
-            rows.forEach(::appendRow)
         }
+        appendRow(header)
+        rows.forEach(::appendRow)
+    }
 }

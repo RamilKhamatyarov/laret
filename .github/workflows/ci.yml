@@ -1974,6 +1974,105 @@ jobs:
             /tmp/i18n_*.err
           retention-days: 7
 
+  integration-undo:
+    name: Integration - Undo / Redo
+    runs-on: ubuntu-latest
+    needs: [ build ]
+
+    steps:
+      - name: Download native binary
+        uses: actions/download-artifact@v4
+        with:
+          name: laret-native
+          path: ./bin
+
+      - name: Make binary executable
+        run: chmod +x ./bin/laret
+
+      - name: Undo - nothing to undo reports message
+        run: |
+          set -euo pipefail
+          ./bin/laret undo run > /tmp/undo_empty.out 2>/tmp/undo_empty.err
+          grep -q "Nothing to undo" /tmp/undo_empty.out \
+            || (echo "ERROR: expected 'Nothing to undo'" && cat /tmp/undo_empty.out && exit 1)
+          echo "Empty undo handled gracefully"
+
+      - name: Redo - nothing to redo reports message
+        run: |
+          set -euo pipefail
+          ./bin/laret redo run > /tmp/redo_empty.out 2>/tmp/redo_empty.err
+          grep -q "Nothing to redo" /tmp/redo_empty.out \
+            || (echo "ERROR: expected 'Nothing to redo'" && cat /tmp/redo_empty.out && exit 1)
+          echo "Empty redo handled gracefully"
+
+      - name: Undo - file create is reversed by undo run
+        run: |
+          set -euo pipefail
+          ./bin/laret file create /tmp/undo_file.txt -c "undo me" \
+            > /tmp/undo_create.out 2>/tmp/undo_create.err
+          [ -f /tmp/undo_file.txt ] \
+            || (echo "ERROR: file should exist after create" && exit 1)
+          ./bin/laret undo run > /tmp/undo_run.out 2>/tmp/undo_run.err
+          cat /tmp/undo_run.out
+          grep -q "Undoing: file create" /tmp/undo_run.out \
+            || (echo "ERROR: expected undo description" && cat /tmp/undo_run.out && exit 1)
+          [ ! -f /tmp/undo_file.txt ] \
+            || (echo "ERROR: file should be gone after undo" && exit 1)
+          echo "file create undone successfully"
+
+      - name: Redo - re-creates file after undo
+        run: |
+          set -euo pipefail
+          ./bin/laret redo run > /tmp/redo_run.out 2>/tmp/redo_run.err
+          cat /tmp/redo_run.out
+          grep -q "Redoing: file create" /tmp/redo_run.out \
+            || (echo "ERROR: expected redo description" && cat /tmp/redo_run.out && exit 1)
+          [ -f /tmp/undo_file.txt ] \
+            || (echo "ERROR: file should exist after redo" && exit 1)
+          grep -q "undo me" /tmp/undo_file.txt \
+            || (echo "ERROR: redo file should contain original content" \
+              && cat /tmp/undo_file.txt && exit 1)
+          echo "file create redone successfully"
+
+      - name: Undo - file delete is reversed by undo run
+        run: |
+          set -euo pipefail
+          echo "delete me" > /tmp/undo_delete.txt
+          ./bin/laret file create /tmp/undo_delete.txt -c "delete me" -f true \
+            > /dev/null 2>&1
+          ./bin/laret file delete /tmp/undo_delete.txt > /dev/null 2>&1
+          [ ! -f /tmp/undo_delete.txt ] \
+            || (echo "ERROR: file should be deleted" && exit 1)
+          ./bin/laret undo run > /tmp/undo_delete_run.out 2>/tmp/undo_delete_run.err
+          grep -q "Undoing: file delete" /tmp/undo_delete_run.out \
+            || (echo "ERROR: expected delete undo description" && cat /tmp/undo_delete_run.out && exit 1)
+          [ -f /tmp/undo_delete.txt ] \
+            || (echo "ERROR: file should be restored after undo of delete" && exit 1)
+          grep -q "delete me" /tmp/undo_delete.txt \
+            || (echo "ERROR: restored file should contain original content" && exit 1)
+          echo "file delete undone (file restored) successfully"
+
+      - name: History - shows recorded actions
+        run: |
+          set -euo pipefail
+          ./bin/laret file create /tmp/undo_hist.txt -c "history test" > /dev/null 2>&1
+          ./bin/laret undo history > /tmp/undo_hist.out 2>/tmp/undo_hist.err
+          grep -qE "file create|file delete" /tmp/undo_hist.out \
+            || (echo "ERROR: expected history entries" && cat /tmp/undo_hist.out && exit 1)
+          echo "History listing works"
+
+      - name: Upload undo artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: undo-outputs
+          path: |
+            /tmp/undo_*.out
+            /tmp/undo_*.err
+            /tmp/redo_*.out
+            /tmp/redo_*.err
+          retention-days: 7
+
   summary:
     name: Build Summary
     runs-on: ubuntu-latest
@@ -1997,6 +2096,7 @@ jobs:
       - integration-localization
       - integration-stats
       - integration-diff
+      - integration-undo
     if: always()
 
     steps:
@@ -2023,6 +2123,7 @@ jobs:
           echo " integration-localization:   ${{ needs.integration-localization.result }}"
           echo " integration-stats:          ${{ needs.integration-stats.result }}"
           echo " integration-diff:           ${{ needs.integration-diff.result }}"
+          echo " integration-undo:           ${{ needs.integration-undo.result }}"
           echo "=========================================="
 
       - name: Comment PR on failure

@@ -88,8 +88,7 @@ object Localization {
         else -> "system default"
     }
 
-    fun isLocaleOverriddenByEnv(): Boolean =
-        System.getenv("LARET_LOCALE")?.trim()?.isNotEmpty() == true
+    fun isLocaleOverriddenByEnv(): Boolean = System.getenv("LARET_LOCALE")?.trim()?.isNotEmpty() == true
 
     fun t(key: String, vararg args: Any?): String {
         val rawPattern = lookup(key) ?: return key
@@ -116,10 +115,13 @@ object Localization {
 
     private fun readPersistedTag(): String? = try {
         Files.readString(prefsFile()).trim().takeIf { it.isNotEmpty() }
-    } catch (_: Exception) { null }
+    } catch (_: Exception) {
+        null
+    }
 
     private fun prefsFile() = Paths.get(
         System.getProperty("user.home") ?: ".",
-        ".laret", "locale",
+        ".laret",
+        "locale",
     )
 }

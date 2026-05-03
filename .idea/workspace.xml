@@ -4,7 +4,25 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="b738c91b-45d4-40b5-832d-fbeb0d3a6334" name="Changes" comment="feature(refactor-local-cmd): refactor local command: add validation, add feature tag and overrite by system env variable" />
+    <list default="true" id="b738c91b-45d4-40b5-832d-fbeb0d3a6334" name="Changes" comment="feature(add-undo-redo-commands): add undo and redo commands for reverting command in shell">
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/com/rkhamatyarov/laret/core/UndoManager.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/kotlin/com/rkhamatyarov/laret/core/UndoManagerTest.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.claude/settings.local.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.github/workflows/ci.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/ci.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/com/rkhamatyarov/laret/core/CommandContext.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/com/rkhamatyarov/laret/core/CommandContext.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/com/rkhamatyarov/laret/core/Localization.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/com/rkhamatyarov/laret/core/Localization.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/com/rkhamatyarov/laret/diff/DiffEngine.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/com/rkhamatyarov/laret/diff/DiffEngine.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/com/rkhamatyarov/laret/diff/DiffFormatter.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/com/rkhamatyarov/laret/diff/DiffFormatter.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/com/rkhamatyarov/laret/example/LoggingPlugin.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/com/rkhamatyarov/laret/example/LoggingPlugin.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/com/rkhamatyarov/laret/example/Main.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/com/rkhamatyarov/laret/example/Main.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/com/rkhamatyarov/laret/stats/StatsCollector.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/com/rkhamatyarov/laret/stats/StatsCollector.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/com/rkhamatyarov/laret/stats/StatsFormatters.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/com/rkhamatyarov/laret/stats/StatsFormatters.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/test/kotlin/com/rkhamatyarov/laret/diff/DiffEngineTest.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/kotlin/com/rkhamatyarov/laret/diff/DiffEngineTest.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/test/kotlin/com/rkhamatyarov/laret/stats/PrometheusFormatterTest.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/kotlin/com/rkhamatyarov/laret/stats/PrometheusFormatterTest.kt" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -339,10 +357,16 @@
     <option name="OPEN_GENERIC_TABS">
       <map>
         <entry key="3d094790-afa1-40e2-b304-9a92d5308762" value="TOOL_WINDOW" />
+        <entry key="337e3d28-1e14-423e-b7a6-62e8135eda61" value="TOOL_WINDOW" />
       </map>
     </option>
     <option name="TAB_STATES">
       <map>
+        <entry key="337e3d28-1e14-423e-b7a6-62e8135eda61">
+          <value>
+            <State />
+          </value>
+        </entry>
         <entry key="3d094790-afa1-40e2-b304-9a92d5308762">
           <value>
             <State />
@@ -369,8 +393,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="hotfix(fix-ci): fix progress bar dir list test for GraalVM warnings" />
-    <MESSAGE value="bugfix(fix-interactive-prompts): fix interactive prompts, add integration tests in github CI workflow" />
     <MESSAGE value="bugfix(fix-interactive-prompts): add ci github workflow steps for progress, prompts, configuration files, plugins, output formattings" />
     <MESSAGE value="feature(add-table-rendering): add table output format for given commands" />
     <MESSAGE value="feature(add-command-aliases): add command aliases for shell commands" />
@@ -394,7 +416,9 @@
     <MESSAGE value="feature(add-file-diff): add file diff commands implementation, and unit tests, and integration tests" />
     <MESSAGE value="feature(refactor-packages): merge package for flat structure, refactor localization" />
     <MESSAGE value="feature(refactor-local-cmd): refactor local command: add validation, add feature tag and overrite by system env variable" />
-    <option name="LAST_COMMIT_MESSAGE" value="feature(refactor-local-cmd): refactor local command: add validation, add feature tag and overrite by system env variable" />
+    <MESSAGE value="feature(extend-pipe-command): add piping command by | separaotr, cover by unit tests" />
+    <MESSAGE value="feature(add-undo-redo-commands): add undo and redo commands for reverting command in shell" />
+    <option name="LAST_COMMIT_MESSAGE" value="feature(add-undo-redo-commands): add undo and redo commands for reverting command in shell" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />

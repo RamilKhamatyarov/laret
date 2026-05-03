@@ -644,36 +644,70 @@ val result = pipeline.execute(stages)  // returns "HELLO"
 ```
 
 com.rkhamatyarov.laret/
-├── core/
-│   ├── CliApp.kt              # Main application class
-│   ├── CommandContext.kt      # Execution context
-│   └── CommandRunner.kt       # Command execution logic
-├── dsl/
-│   ├── LaretDsl.kt           # DSL entry point
-│   ├── CliBuilder.kt         # App builder
-│   ├── GroupBuilder.kt       # Group builder
-│   └── CommandBuilder.kt     # Command builder
-├── model/
-│   ├── CommandGroup.kt       # Group model
-│   ├── Command.kt            # Command model
-│   ├── Argument.kt           # Argument model
-│   └── Option.kt             # Option model
-├── output/
+├── core/                          # Framework engine
+│   ├── CliApp.kt                  # Main application class
+│   ├── CommandContext.kt          # Execution context + registerUndo()
+│   ├── CommandRunner.kt           # Command dispatch and middleware chain
+│   ├── CommandPipeline.kt         # Stage-based command piping (--- and |)
+│   ├── FlagPersistence.kt         # Persistent flag loading from config
+│   ├── LaretPlugin.kt             # Plugin interface
+│   ├── Localization.kt            # i18n facade (ResourceBundle + persistence)
+│   ├── Middleware.kt              # Middleware interface + chain
+│   ├── ParallelDispatcher.kt      # Concurrent command execution
+│   ├── PluginManager.kt           # Plugin registry and lifecycle
+│   └── UndoManager.kt             # Undo/redo stack with file persistence
+├── dsl/                           # Builder DSL
+│   ├── LaretDsl.kt                # cli {} entry point
+│   ├── CliBuilder.kt              # App builder
+│   ├── GroupBuilder.kt            # Group builder
+│   └── CommandBuilder.kt          # Command builder
+├── model/                         # Data classes
+│   ├── CommandGroup.kt
+│   ├── Command.kt
+│   ├── Argument.kt
+│   └── Option.kt
+├── output/                        # Output strategies
 │   ├── OutputStrategy.kt          # Strategy interface
-│   ├── JsonOutput.kt              # JSON formatter
-│   ├── YamlOutput.kt              # YAML formatter
-│   ├── PlainOutput.kt             # Plain text formatter
-│   └── OutputFormat.kt            # Jackson factory
-├── completion/
-│   ├── CompletionGenerator.kt          # Base interface
-│   ├── BashCompletionGenerator.kt      # Bash implementation
-│   ├── ZshCompletionGenerator.kt       # Zsh implementation
-│   ├── PowerShellCompletionGenerator.kt # PowerShell implementation
-│   └── CompletionExtensions.kt         # Extension functions
-└── ui/
-    ├── Colors.kt             # ANSI color codes
-    ├── ColorHelpers.kt       # Color helper functions
-    └── HelpFormatter.kt      # Help text formatting
+│   ├── JsonOutput.kt
+│   ├── YamlOutput.kt
+│   ├── TomlOutput.kt
+│   ├── PlainOutput.kt
+│   └── TableOutput.kt
+├── completion/                    # Shell completion + man pages
+│   ├── BashCompletionGenerator.kt
+│   ├── ZshCompletionGenerator.kt
+│   ├── PowerShellCompletionGenerator.kt
+│   ├── ManPageGenerator.kt        # Groff man-page generator
+│   ├── GroffFormatter.kt
+│   └── ManSection.kt
+├── config/                        # Config file loading
+│   ├── AppConfig.kt
+│   ├── ConfigLoader.kt            # YAML/TOML/JSON loader
+│   └── ConfigValidator.kt
+├── diff/                          # File diff engine
+│   ├── DiffEngine.kt              # LCS-based diff
+│   ├── UnifiedFormatter.kt
+│   ├── PlainFormatter.kt
+│   └── JsonDiffFormatter.kt
+├── stats/                         # Command metrics
+│   ├── StatsCollector.kt          # Singleton collector (~/.laret/stats.json)
+│   ├── StatsMiddleware.kt         # Priority -1000 outermost middleware
+│   ├── PrometheusFormatter.kt
+│   ├── JsonStatsFormatter.kt
+│   └── PlainStatsFormatter.kt
+├── watch/                         # Filesystem event monitoring
+│   ├── DirectoryWatcher.kt
+│   ├── WatchEventType.kt
+│   └── WatchOptions.kt
+├── ui/                            # Terminal UI components
+│   ├── Colors.kt
+│   ├── ProgressBar.kt
+│   ├── Spinner.kt
+│   ├── InteractivePrompt.kt
+│   └── HelpFormatter.kt
+└── example/                       # Demo application
+    ├── Main.kt                    # Full feature showcase
+    └── LoggingPlugin.kt           # Example middleware/plugin
 
 ```
 

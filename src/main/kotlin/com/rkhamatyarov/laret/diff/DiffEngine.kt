@@ -4,7 +4,6 @@ import java.nio.charset.MalformedInputException
 import java.nio.file.Files
 import java.nio.file.Path
 
-
 enum class DiffLineType { CONTEXT, ADD, REMOVE }
 
 data class DiffLine(
@@ -31,7 +30,6 @@ data class DiffResult(
     val newBinary: Boolean = false,
 )
 
-
 /**
  * Compare two files and return a [DiffResult].
  *
@@ -39,12 +37,7 @@ data class DiffResult(
  * native-image compatible.  Files larger than [MAX_LCS_CELLS] cells fall back
  * to a full-replace diff to avoid OOM.
  */
-fun diffFiles(
-    oldPath: Path,
-    newPath: Path,
-    ignoreWhitespace: Boolean = false,
-    contextLines: Int = 3,
-): DiffResult {
+fun diffFiles(oldPath: Path, newPath: Path, ignoreWhitespace: Boolean = false, contextLines: Int = 3): DiffResult {
     val oldStr = oldPath.toString()
     val newStr = newPath.toString()
 
@@ -133,7 +126,8 @@ internal fun lcsEdits(
         when {
             i > 0 && j > 0 && oldKeys[i - 1] == newKeys[j - 1] -> {
                 result.addFirst(Edit(EditType.EQUAL, oldLines[i - 1]))
-                i--; j--
+                i--
+                j--
             }
             j > 0 && (i == 0 || dp[i][j - 1] >= dp[i - 1][j]) -> {
                 result.addFirst(Edit(EditType.INSERT, newLines[j - 1]))
@@ -155,7 +149,8 @@ internal fun editsToHunks(edits: List<Edit>, contextLines: Int): List<DiffHunk> 
     var newNo = 1
     val numbered = edits.map { e ->
         Numbered(
-            e.type, e.content,
+            e.type,
+            e.content,
             if (e.type == EditType.INSERT) 0 else oldNo,
             if (e.type == EditType.DELETE) 0 else newNo,
         ).also {
@@ -178,7 +173,8 @@ internal fun editsToHunks(edits: List<Edit>, contextLines: Int): List<DiffHunk> 
             re = maxOf(re, ne)
         } else {
             ranges += rs..re
-            rs = ns; re = ne
+            rs = ns
+            re = ne
         }
     }
     ranges += rs..re
