@@ -1072,13 +1072,39 @@ fun main(args: Array<String>) {
             }
         }
 
-    app.init()
+    var configPath: String? = null
+    val stripped = mutableListOf<String>()
+    var idx = 0
+    while (idx < args.size) {
+        when {
+            args[idx] == "--locale" && idx + 1 < args.size -> {
+                Localization.setLocale(args[idx + 1])
+                idx += 2
+            }
+            args[idx] == "--config" && idx + 1 < args.size -> {
+                configPath = args[idx + 1]
+                idx += 2
+            }
+            else -> {
+                stripped.add(args[idx])
+                idx++
+            }
+        }
+    }
+    val strippedArgs = stripped.toTypedArray()
+
+    app.init(configPath)
     UndoManager.load()
     CommandHistory.load()
 
-    // Translate !! shorthand to history replay (works in PowerShell and programmatic invocations;
-    // in bash, quote it as '!!' to prevent shell history expansion)
-    val resolvedArgs = if (args.size == 1 && args[0] == "!!") arrayOf("history", "replay") else args
+    val resolvedArgs = if (strippedArgs.size == 1 && strippedArgs[0] == "!!") {
+        arrayOf(
+            "history",
+            "replay",
+        )
+    } else {
+        strippedArgs
+    }
 
     if (resolvedArgs.size >= 2 && resolvedArgs[0] == "pipe" && resolvedArgs[1] == "run") {
         pipeCommandArgs.set(resolvedArgs.copyOfRange(2, resolvedArgs.size))
@@ -1092,7 +1118,6 @@ fun main(args: Array<String>) {
 
     val exitCode = app.run(resolvedArgs)
 
-    // Record only successful commands; skip meta-groups (history/undo/redo describe state, not work)
     val group = resolvedArgs.firstOrNull()
     if (exitCode == 0 && group != null && group != "history" && group != "undo" && group != "redo") {
         CommandHistory.record(resolvedArgs)
@@ -1171,13 +1196,13 @@ internal fun parseWatchRunArgs(args: Array<String>): WatchRunArgs {
 }
 
 internal fun parseEventFilter(raw: String): Set<WatchEventType> {
-    if (raw.isBlank()) return WatchEventType.values().toSet()
+    if (raw.isBlank()) return WatchEventType.entries.toSet()
     return raw.split(",")
         .map { it.trim().uppercase() }
         .filter { it.isNotEmpty() }
         .mapNotNull { name -> runCatching { WatchEventType.valueOf(name) }.getOrNull() }
         .toSet()
-        .ifEmpty { WatchEventType.values().toSet() }
+        .ifEmpty { WatchEventType.entries.toSet() }
 }
 
 internal fun parseParallelRunArgs(args: Array<String>): Triple<List<String>, Int?, Boolean> {
