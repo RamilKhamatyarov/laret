@@ -1,4 +1,4 @@
-name: Build and Test Laret CLI
+name: Build and Test Laret CLI (zsh)
 
 on:
   push:
@@ -13,7 +13,6 @@ permissions:
   statuses: write
   checks: write
   pull-requests: write
-  security-events: write
 
 jobs:
 
@@ -57,26 +56,14 @@ jobs:
       - name: Run unit tests
         run: ./gradlew test --info
 
-      - name: List test result files
-        if: always()
-        run: find . -name "*.xml" -path "*/test-results/*" | head -20
-
       - name: Upload test results
         if: always()
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
           files: build/test-results/**/*.xml
-          check_name: "Unit Test Results"
+          check_name: "Unit Test Results (zsh)"
           comment_mode: "always"
           report_individual_runs: true
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          files: ./build/reports/jacoco/test/jacocoTestReport.xml
-          flags: unittests
-          name: codecov-umbrella
-        continue-on-error: true
 
       - name: Build native image
         run: ./gradlew nativeCompile
@@ -84,98 +71,27 @@ jobs:
       - name: Upload native binary
         uses: actions/upload-artifact@v4
         with:
-          name: laret-native
+          name: laret-native-zsh
           path: build/native/nativeCompile/laret
           retention-days: 1
 
-  code-quality:
-    name: Code Quality
-    runs-on: ubuntu-latest
-    needs: [ build ]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Java 24
-        uses: actions/setup-java@v4
-        with:
-          java-version: '24'
-          distribution: 'temurin'
-          cache: gradle
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
-      - name: KTLint check
-        run: ./gradlew ktlintCheck
-        continue-on-error: true
-
-      - name: KTLint with ReviewDog (PR annotations)
-        if: github.event_name == 'pull_request'
-        uses: ScaCap/action-ktlint@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          reporter: github-pr-review
-        continue-on-error: true
-
-      - name: Spotless style check
-        run: ./gradlew tasks --all | grep -q spotlessCheck && ./gradlew spotlessCheck || echo "Spotless not configured - skipping"
-        continue-on-error: true
-
-      - name: Install PMD
-        run: |
-          PMD_VERSION="7.7.0"
-          curl -sSL "https://github.com/pmd/pmd/releases/download/pmd_releases%2F${PMD_VERSION}/pmd-dist-${PMD_VERSION}-bin.zip" \
-            -o /tmp/pmd.zip
-          unzip -q /tmp/pmd.zip -d /tmp/pmd-dist
-          echo "/tmp/pmd-dist/pmd-bin-${PMD_VERSION}/bin" >> $GITHUB_PATH
-
-      - name: Run PMD on Kotlin sources
-        run: |
-          pmd check \
-            --dir src/main/kotlin \
-            --rulesets config/pmd/ruleset.xml \
-            --format text \
-            --fail-on-violation false \
-            --no-progress \
-            2>&1 | tee /tmp/pmd-report.txt || true
-          echo "PMD analysis complete"
-          wc -l /tmp/pmd-report.txt
-
-      - name: Upload PMD report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pmd-report
-          path: /tmp/pmd-report.txt
-          retention-days: 7
-
-      - name: Super-Linter
-        uses: super-linter/super-linter@v8.0.0
-        env:
-          DEFAULT_BRANCH: main
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DISABLE_ALL_LINTERS: false
-          VALIDATE_KOTLIN: true
-          VALIDATE_YAML: true
-          DISABLE_GITHUB_STATUS_API: true
-          VALIDATE_GIT_COMMIT_HISTORY: false
-          HTTP_TIMEOUT: 30
-        continue-on-error: false
-
   integration-completions:
-    name: Integration - Shell Completions
+    name: Integration - Shell Completions (zsh)
     runs-on: ubuntu-latest
     needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
 
     steps:
+      - name: Install zsh
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
-          name: laret-native
+          name: laret-native-zsh
           path: ./bin
 
       - name: Make binary executable
@@ -203,9 +119,6 @@ jobs:
         run: |
           bash -c "source /tmp/laret_bash.sh && echo 'Bash completion sourced successfully'"
 
-      - name: Install zsh
-        run: sudo apt-get update && sudo apt-get install -y zsh
-
       - name: Test zsh completion generation
         run: |
           set -euo pipefail
@@ -221,6 +134,7 @@ jobs:
           zsh -c "source /tmp/laret_zsh.sh && echo 'Zsh completion sourced successfully'"
 
       - name: Install PowerShell
+        shell: bash
         run: sudo apt-get install -y powershell
 
       - name: Test PowerShell completion generation
@@ -238,15 +152,22 @@ jobs:
           pwsh -NoProfile -Command ". '/tmp/laret_ps.ps1'; Write-Host 'PowerShell completion sourced successfully'"
 
   integration-progress:
-    name: Integration - Progress Bars & Spinners
+    name: Integration - Progress Bars & Spinners (zsh)
     runs-on: ubuntu-latest
     needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
 
     steps:
+      - name: Install zsh
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
-          name: laret-native
+          name: laret-native-zsh
           path: ./bin
 
       - name: Make binary executable
@@ -293,13 +214,11 @@ jobs:
           cat /tmp/pb_dirlist.stdout
           echo "=== STDERR ==="
           cat /tmp/pb_dirlist.stderr
-          # In CI, progress bars may be suppressed, so we only warn, not fail
           if grep -q "Scanning" /tmp/pb_dirlist.stderr; then
             echo "Progress bar output present on stderr"
           else
             echo "Progress bar output not found on stderr (may be suppressed in CI)"
           fi
-          # Temporary: do not fail if "Directory:" is missing (known bug)
           if grep -q "Directory:" /tmp/pb_dirlist.stdout; then
             echo "Directory header found"
           else
@@ -319,15 +238,22 @@ jobs:
           echo "stdout is clean"
 
   integration-prompts:
-    name: Integration - Interactive Prompts
+    name: Integration - Interactive Prompts (zsh)
     runs-on: ubuntu-latest
     needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
 
     steps:
+      - name: Install zsh
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
-          name: laret-native
+          name: laret-native-zsh
           path: ./bin
 
       - name: Make binary executable
@@ -407,15 +333,22 @@ jobs:
           echo "Prompt stdout is clean"
 
   integration-config:
-    name: Integration - Config File Support
+    name: Integration - Config File Support (zsh)
     runs-on: ubuntu-latest
     needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
 
     steps:
+      - name: Install zsh
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
-          name: laret-native
+          name: laret-native-zsh
           path: ./bin
 
       - name: Make binary executable
@@ -556,15 +489,22 @@ jobs:
           echo "File roundtrip valid"
 
   integration-plugins:
-    name: Integration - Plugin System
+    name: Integration - Plugin System (zsh)
     runs-on: ubuntu-latest
     needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
 
     steps:
+      - name: Install zsh
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
-          name: laret-native
+          name: laret-native-zsh
           path: ./bin
 
       - name: Make binary executable
@@ -615,19 +555,27 @@ jobs:
           echo "Multiple sequential commands completed - plugin lifecycle stable"
 
   integration-output-formatting:
-    name: Integration - Output Formatting
+    name: Integration - Output Formatting (zsh)
     runs-on: ubuntu-latest
     needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
 
     steps:
+      - name: Install zsh
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
-          name: laret-native
+          name: laret-native-zsh
           path: ./bin
 
       - name: Make binary executable
         run: chmod +x ./bin/laret
+
       - name: Prepare test fixtures in /tmp
         run: |
           for i in 1 2 3 4 5; do
@@ -635,7 +583,6 @@ jobs:
           done
           mkdir -p /tmp/laret_fixture_dir
           echo "Fixtures created: $(ls /tmp/laret_fixture_*.txt /tmp/laret_fixture_dir 2>/dev/null | wc -l) items"
-
 
       - name: JSON output - is parseable (with debug)
         run: |
@@ -762,19 +709,27 @@ jobs:
           echo "JSON stdout is clean"
 
   integration-table-rendering:
-    name: Integration - Table Rendering
+    name: Integration - Table Rendering (zsh)
     runs-on: ubuntu-latest
     needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
 
     steps:
+      - name: Install zsh
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
-          name: laret-native
+          name: laret-native-zsh
           path: ./bin
 
       - name: Make binary executable
         run: chmod +x ./bin/laret
+
       - name: Prepare test fixtures in /tmp
         run: |
           for i in 1 2 3 4 5; do
@@ -782,7 +737,6 @@ jobs:
           done
           mkdir -p /tmp/laret_fixture_dir
           echo "Fixtures created: $(ls /tmp/laret_fixture_*.txt /tmp/laret_fixture_dir 2>/dev/null | wc -l) items"
-
 
       - name: Table - dir list long produces output
         run: |
@@ -858,15 +812,22 @@ jobs:
           fi
 
   integration-aliases:
-    name: Integration - Command Aliases
+    name: Integration - Command Aliases (zsh)
     runs-on: ubuntu-latest
     needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
 
     steps:
+      - name: Install zsh
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
-          name: laret-native
+          name: laret-native-zsh
           path: ./bin
 
       - name: Make binary executable
@@ -904,7 +865,6 @@ jobs:
       - name: Test group alias for dir (d -> dir)
         run: |
           set -euo pipefail
-          # Create a file to ensure directory listing is not empty
           touch /tmp/laret_alias_test/somefile.txt
           ./bin/laret d list /tmp/laret_alias_test | grep -q "somefile.txt"
           echo "Group alias 'd' works for dir"
@@ -936,15 +896,22 @@ jobs:
           echo "Unknown alias exits with error"
 
   integration-persistent-flags:
-    name: Integration - Persistent Flag Values
+    name: Integration - Persistent Flag Values (zsh)
     runs-on: ubuntu-latest
     needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
 
     steps:
+      - name: Install zsh
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
-          name: laret-native
+          name: laret-native-zsh
           path: ./bin
 
       - name: Make binary executable
@@ -961,7 +928,6 @@ jobs:
       - name: Persistent flag - config overrides default (force=true from YAML)
         run: |
           set -euo pipefail
-          # Write config with force: true for file create
           cat > /tmp/laret_persist.yml << 'EOF'
           flags:
             file:
@@ -969,10 +935,8 @@ jobs:
               force: true
           EOF
 
-          # Create a file that will be overwritten
           echo "original" > /tmp/force_test.txt
 
-          # Run WITHOUT -f flag; config should supply force=true allowing overwrite
           ./bin/laret --config /tmp/laret_persist.yml file create /tmp/force_test.txt \
             -c "overwritten" > /tmp/persist_create.stdout 2>/tmp/persist_create.stderr
           cat /tmp/persist_create.stderr || true
@@ -986,7 +950,6 @@ jobs:
       - name: Persistent flag - CLI value overrides config
         run: |
           set -euo pipefail
-          # Config still has force: true but CLI supplies -f false → file must NOT be overwritten
           echo "must_stay" > /tmp/cli_override_test.txt
 
           set +e
@@ -998,7 +961,6 @@ jobs:
           cat /tmp/persist_cli.stderr || true
           cat /tmp/persist_cli.stdout || true
 
-          # Command should succeed (exit 0) but file must not be overwritten
           COMBINED=$(cat /tmp/persist_cli.stdout /tmp/persist_cli.stderr)
           echo "$COMBINED" | grep -q "File already exists" \
             || (echo "ERROR: Expected 'File already exists', got:" && echo "$COMBINED" && exit 1)
@@ -1011,10 +973,8 @@ jobs:
       - name: Persistent flag - no config uses compile-time default
         run: |
           set -euo pipefail
-          # Create a file first
           echo "existing" > /tmp/no_config_test.txt
 
-          # Run WITHOUT config and WITHOUT -f flag → default is false → should report already exists
           ./bin/laret file create /tmp/no_config_test.txt \
             -c "new_content" > /tmp/no_config.stdout 2>/tmp/no_config.stderr || true
 
@@ -1034,12 +994,10 @@ jobs:
             format: json
           EOF
 
-          # dir list should use format=json from global key without -f flag
           ./bin/laret --config /tmp/laret_global.yml dir list /tmp \
             > /tmp/global_flag.stdout 2>/tmp/global_flag.stderr
           cat /tmp/global_flag.stderr || true
 
-          # JSON output should be parseable
           python3 - << 'PYEOF' || echo "WARNING: JSON validation failed"
           import json, re
           raw = open('/tmp/global_flag.stdout').read()
@@ -1053,17 +1011,23 @@ jobs:
 
           echo "Global persistent flag test complete"
 
-
   integration-middleware-hooks:
-    name: Integration - Middleware & Hooks
+    name: Integration - Middleware & Hooks (zsh)
     runs-on: ubuntu-latest
     needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
 
     steps:
+      - name: Install zsh
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
-          name: laret-native
+          name: laret-native-zsh
           path: ./bin
 
       - name: Make binary executable
@@ -1082,7 +1046,6 @@ jobs:
           set -euo pipefail
           ./bin/laret file create /tmp/mw_order.txt -c "middleware test" \
             > /tmp/mw_order.stdout 2>/tmp/mw_order.stderr
-          # LoggingMiddleware should print START and END lines
           grep -q "START: create" /tmp/mw_order.stderr \
             || (echo "ERROR: START log not found in middleware chain" && cat /tmp/mw_order.stderr && exit 1)
           grep -q "END: create took" /tmp/mw_order.stderr \
@@ -1092,7 +1055,6 @@ jobs:
       - name: Test preExecute hook validates before action
         run: |
           set -euo pipefail
-          # preExecute hook in file create requires non-empty path
           set +e
           ./bin/laret file create "" -c "test" > /tmp/preexec.stdout 2>/tmp/preexec.stderr
           EXIT=$?
@@ -1114,14 +1076,12 @@ jobs:
       - name: Test onError hook handles exceptions gracefully
         run: |
           set -euo pipefail
-          # Create a file, then try to create it again without --force to trigger error
           echo "original" > /tmp/error_test.txt
           set +e
           ./bin/laret file create /tmp/error_test.txt -c "overwrite" \
             > /tmp/error.stdout 2>/tmp/error.stderr
           EXIT=$?
           set -e
-          # Command should fail, but onError hook should print a friendly message
           [ $EXIT -ne 0 ] || (echo "ERROR: duplicate create should fail" && exit 1)
           grep -q "File already exists" /tmp/error.stderr \
             || (echo "ERROR: onError hook did not handle duplicate file gracefully" && cat /tmp/error.stderr && exit 1)
@@ -1130,9 +1090,7 @@ jobs:
       - name: Test context data sharing between middlewares
         run: |
           set -euo pipefail
-          # AuthMiddleware adds user info to context; LoggingMiddleware should read it
           ./bin/laret dir list /tmp --long > /tmp/context.stdout 2>/tmp/context.stderr
-          # The LoggingMiddleware from example/Main.kt logs the command name; we check that it ran
           grep -q "START: list" /tmp/context.stderr \
             || (echo "ERROR: Middleware did not execute, context sharing failed" && cat /tmp/context.stderr && exit 1)
           echo "Context data sharing works between middlewares"
@@ -1140,28 +1098,32 @@ jobs:
       - name: Test multiple middleware scopes (global + command-specific)
         run: |
           set -euo pipefail
-          # LoggingMiddleware is global, any command triggers it
           ./bin/laret file read /tmp/laret_fixture_1.txt > /tmp/scope.stdout 2>/tmp/scope.stderr
           grep -q "START: read" /tmp/scope.stderr \
             || (echo "ERROR: Global middleware did not run for 'read'" && cat /tmp/scope.stderr && exit 1)
           echo "Global middleware applies to all commands"
+
   integration-manpages:
-    name: Integration - Man Page Generation
+    name: Integration - Man Page Generation (zsh)
     runs-on: ubuntu-latest
     needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
 
     steps:
+      - name: Install zsh and mandoc
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh mandoc
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
-          name: laret-native
+          name: laret-native-zsh
           path: ./bin
 
       - name: Make binary executable
         run: chmod +x ./bin/laret
-
-      - name: Install mandoc
-        run: sudo apt-get update && sudo apt-get install -y mandoc
 
       - name: Generate man page (overview - all groups)
         run: |
@@ -1176,9 +1138,7 @@ jobs:
       - name: Validate man page with mandoc -T lint
         run: |
           set -euo pipefail
-          # mandoc -T lint exits non-zero on ERRORS; warnings are acceptable
           mandoc -T lint /tmp/laret.1 2>/tmp/mandoc_lint.out || {
-            # Fail only on ERROR lines, not WARNING or just whitespace
             if grep -q "^/tmp/laret.1:[0-9]*: ERROR" /tmp/mandoc_lint.out; then
               echo "=== mandoc errors found ==="
               grep "ERROR" /tmp/mandoc_lint.out
@@ -1191,12 +1151,18 @@ jobs:
       - name: Generate man page for specific group and command
         run: |
           set -euo pipefail
-          ./bin/laret completion man --group file --command create             > /tmp/laret-file-create.1 2>/tmp/laret_man_cmd.stderr
-          [ -s /tmp/laret-file-create.1 ]             || (echo "ERROR: command man page is empty" && exit 1)
-          grep -q "^.TH" /tmp/laret-file-create.1             || (echo "ERROR: Missing .TH macro" && cat /tmp/laret-file-create.1 && exit 1)
-          grep -q "^.SH NAME" /tmp/laret-file-create.1             || (echo "ERROR: Missing NAME section" && cat /tmp/laret-file-create.1 && exit 1)
-          grep -q "^.SH SYNOPSIS" /tmp/laret-file-create.1             || (echo "ERROR: Missing SYNOPSIS section" && cat /tmp/laret-file-create.1 && exit 1)
-          grep -q "^.SH OPTIONS" /tmp/laret-file-create.1             || (echo "ERROR: Missing OPTIONS section" && cat /tmp/laret-file-create.1 && exit 1)
+          ./bin/laret completion man --group file --command create \
+            > /tmp/laret-file-create.1 2>/tmp/laret_man_cmd.stderr
+          [ -s /tmp/laret-file-create.1 ] \
+            || (echo "ERROR: command man page is empty" && exit 1)
+          grep -q "^.TH" /tmp/laret-file-create.1 \
+            || (echo "ERROR: Missing .TH macro" && cat /tmp/laret-file-create.1 && exit 1)
+          grep -q "^.SH NAME" /tmp/laret-file-create.1 \
+            || (echo "ERROR: Missing NAME section" && cat /tmp/laret-file-create.1 && exit 1)
+          grep -q "^.SH SYNOPSIS" /tmp/laret-file-create.1 \
+            || (echo "ERROR: Missing SYNOPSIS section" && cat /tmp/laret-file-create.1 && exit 1)
+          grep -q "^.SH OPTIONS" /tmp/laret-file-create.1 \
+            || (echo "ERROR: Missing OPTIONS section" && cat /tmp/laret-file-create.1 && exit 1)
           echo "Command-specific man page is structurally valid"
 
       - name: Validate command man page with mandoc -T lint
@@ -1212,9 +1178,12 @@ jobs:
       - name: Test --output flag writes to file
         run: |
           set -euo pipefail
-          ./bin/laret completion man --group file --command create             --output /tmp/laret-create-out.1 2>/dev/null
-          [ -f /tmp/laret-create-out.1 ]             || (echo "ERROR: --output file not created" && exit 1)
-          [ -s /tmp/laret-create-out.1 ]             || (echo "ERROR: --output file is empty" && exit 1)
+          ./bin/laret completion man --group file --command create \
+            --output /tmp/laret-create-out.1 2>/dev/null
+          [ -f /tmp/laret-create-out.1 ] \
+            || (echo "ERROR: --output file not created" && exit 1)
+          [ -s /tmp/laret-create-out.1 ] \
+            || (echo "ERROR: --output file is empty" && exit 1)
           grep -q ".TH" /tmp/laret-create-out.1
           echo "--output flag writes valid file"
 
@@ -1232,7 +1201,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: man-pages
+          name: man-pages-zsh
           path: |
             /tmp/laret.1
             /tmp/laret-file-create.1
@@ -1241,17 +1210,23 @@ jobs:
             /tmp/mandoc_cmd.out
           retention-days: 7
 
-
   integration-piping:
-    name: Integration - Command Piping
+    name: Integration - Command Piping (zsh)
     runs-on: ubuntu-latest
     needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
 
     steps:
+      - name: Install zsh
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
-          name: laret-native
+          name: laret-native-zsh
           path: ./bin
 
       - name: Make binary executable
@@ -1364,7 +1339,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pipeline-outputs
+          name: pipeline-outputs-zsh
           path: |
             /tmp/laret_pipe_out.txt
             /tmp/laret_pipe_three.txt
@@ -1375,15 +1350,22 @@ jobs:
           retention-days: 7
 
   integration-parallel-execution:
-    name: Integration - Parallel Execution
+    name: Integration - Parallel Execution (zsh)
     runs-on: ubuntu-latest
     needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
 
     steps:
+      - name: Install zsh
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
-          name: laret-native
+          name: laret-native-zsh
           path: ./bin
 
       - name: Make binary executable
@@ -1431,22 +1413,29 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: parallel-execution-outputs
+          name: parallel-execution-outputs-zsh
           path: |
             /tmp/parallel_*.out
             /tmp/parallel_*.err
           retention-days: 7
 
   integration-watch:
-    name: Integration - Directory Watch
+    name: Integration - Directory Watch (zsh)
     runs-on: ubuntu-latest
     needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
 
     steps:
+      - name: Install zsh
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
-          name: laret-native
+          name: laret-native-zsh
           path: ./bin
 
       - name: Make binary executable
@@ -1485,15 +1474,15 @@ jobs:
       - name: Watch - duration timeout exits cleanly with no events
         run: |
           set -euo pipefail
-          ./bin/laret watch run /tmp/laret_watch_test \
+          /usr/bin/time -v ./bin/laret watch run /tmp/laret_watch_test \
             --duration 2 \
             > /tmp/watch_timeout.out 2>/tmp/watch_timeout.err || true
           cat /tmp/watch_timeout.err
           grep -qi "DURATION_EXPIRED" /tmp/watch_timeout.err \
             || (echo "ERROR: expected DURATION_EXPIRED stop reason" \
               && cat /tmp/watch_timeout.out /tmp/watch_timeout.err && exit 1)
-          if grep -qE "^(CREATE|DELETE|MODIFY)" /tmp/watch_timeout.out; then
-            echo "ERROR: no file events should appear when no changes occur"
+          if [ -s /tmp/watch_timeout.out ]; then
+            echo "ERROR: stdout should be empty when no events occur"
             cat /tmp/watch_timeout.out
             exit 1
           fi
@@ -1536,7 +1525,6 @@ jobs:
               && cat /tmp/watch_delete.out /tmp/watch_delete.err && exit 1)
           grep -q "victim.txt" /tmp/watch_delete.out \
             || (echo "ERROR: deleted file path not in stdout" && exit 1)
-          # No CREATE/MODIFY events should leak through the filter
           if grep -qE "^(CREATE|MODIFY)" /tmp/watch_delete.out; then
             echo "ERROR: filter should suppress CREATE/MODIFY events"
             cat /tmp/watch_delete.out
@@ -1601,22 +1589,29 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: watch-outputs
+          name: watch-outputs-zsh
           path: |
             /tmp/watch_*.out
             /tmp/watch_*.err
           retention-days: 7
 
   integration-stats:
-    name: Integration - Command Statistics
+    name: Integration - Command Statistics (zsh)
     runs-on: ubuntu-latest
     needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
 
     steps:
+      - name: Install zsh
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
-          name: laret-native
+          name: laret-native-zsh
           path: ./bin
 
       - name: Make binary executable
@@ -1685,7 +1680,6 @@ jobs:
           python3 - << 'PYEOF'
           import json
           data = json.load(open('/tmp/stats_zeroed.out'))
-          # After reset the only possible entry is the stats/show that just ran
           cmds = data['commands']
           non_stats = [c for c in cmds if not (c['group'] == 'stats')]
           assert not non_stats, f"Expected only stats/* commands after reset, found: {non_stats}"
@@ -1715,22 +1709,29 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: stats-outputs
+          name: stats-outputs-zsh
           path: |
             /tmp/stats_*.out
             /tmp/stats_*.err
           retention-days: 7
 
   integration-diff:
-    name: Integration - File Diff
+    name: Integration - File Diff (zsh)
     runs-on: ubuntu-latest
     needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
 
     steps:
+      - name: Install zsh
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
-          name: laret-native
+          name: laret-native-zsh
           path: ./bin
 
       - name: Make binary executable
@@ -1869,22 +1870,29 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: diff-outputs
+          name: diff-outputs-zsh
           path: |
             /tmp/diff_*.out
             /tmp/diff_*.err
           retention-days: 7
 
   integration-localization:
-    name: Integration - Localization Support
+    name: Integration - Localization Support (zsh)
     runs-on: ubuntu-latest
     needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
 
     steps:
+      - name: Install zsh
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
-          name: laret-native
+          name: laret-native-zsh
           path: ./bin
 
       - name: Make binary executable
@@ -1907,7 +1915,6 @@ jobs:
             > /tmp/i18n_ru.out 2>/tmp/i18n_ru.err
           echo "=== stdout (ru) ==="
           cat /tmp/i18n_ru.out
-          # Russian greeting starts with UTF-8 'Привет'
           grep -qE "Привет|Laret" /tmp/i18n_ru.out \
             || (echo "ERROR: expected Russian greeting" \
               && cat /tmp/i18n_ru.out /tmp/i18n_ru.err && exit 1)
@@ -1955,8 +1962,6 @@ jobs:
       - name: Localization - --locale flag is stripped from argv
         run: |
           set -euo pipefail
-          # If --locale was not stripped the download (no such cmd) would error.
-          # Use a known command to confirm --locale is consumed before parsing.
           ./bin/laret --locale en i18n hello \
             > /tmp/i18n_strip.out 2>/tmp/i18n_strip.err
           grep -q "Hello" /tmp/i18n_strip.out \
@@ -1968,22 +1973,29 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: localization-outputs
+          name: localization-outputs-zsh
           path: |
             /tmp/i18n_*.out
             /tmp/i18n_*.err
           retention-days: 7
 
   integration-undo:
-    name: Integration - Undo / Redo
+    name: Integration - Undo / Redo (zsh)
     runs-on: ubuntu-latest
     needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
 
     steps:
+      - name: Install zsh
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
-          name: laret-native
+          name: laret-native-zsh
           path: ./bin
 
       - name: Make binary executable
@@ -2065,7 +2077,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: undo-outputs
+          name: undo-outputs-zsh
           path: |
             /tmp/undo_*.out
             /tmp/undo_*.err
@@ -2074,15 +2086,22 @@ jobs:
           retention-days: 7
 
   integration-history:
-    name: Integration - Command History & Replay
+    name: Integration - Command History & Replay (zsh)
     runs-on: ubuntu-latest
     needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
 
     steps:
+      - name: Install zsh
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
-          name: laret-native
+          name: laret-native-zsh
           path: ./bin
 
       - name: Make binary executable
@@ -2117,7 +2136,6 @@ jobs:
       - name: History - replay reruns last command
         run: |
           set -euo pipefail
-          # Remove file so replay has a clean target
           rm -f /tmp/hist_replay_target.txt
           ./bin/laret file create /tmp/hist_replay_target.txt -c "replay content" \
             > /dev/null 2>&1
@@ -2138,7 +2156,6 @@ jobs:
           rm -f /tmp/hist_idx_a.txt /tmp/hist_idx_b.txt
           ./bin/laret file create /tmp/hist_idx_a.txt -c "entry A" > /dev/null 2>&1
           ./bin/laret file create /tmp/hist_idx_b.txt -c "entry B" > /dev/null 2>&1
-          # Get the index of the first create from history show
           ./bin/laret history show > /tmp/hist_idx_show.out 2>&1
           cat /tmp/hist_idx_show.out
           FIRST_IDX=$(grep "hist_idx_a" /tmp/hist_idx_show.out | awk '{print $1}' | tr -d '.')
@@ -2195,7 +2212,6 @@ jobs:
           set -euo pipefail
           ./bin/laret history clear > /dev/null 2>&1
           ./bin/laret file create /tmp/hist_b1.txt -c "b1 content" > /dev/null 2>&1
-          # File still exists; replaying the same create without --force will fail
           ./bin/laret history show > /tmp/hist_b1_show.out 2>&1
           cat /tmp/hist_b1_show.out
           IDX=$(grep "hist_b1" /tmp/hist_b1_show.out | awk '{print $1}' | tr -d '.')
@@ -2215,9 +2231,7 @@ jobs:
         run: |
           set -euo pipefail
           ./bin/laret history clear > /dev/null 2>&1
-          # Successful create — should be recorded
           ./bin/laret file create /tmp/hist_b2.txt -c "b2 content" > /dev/null 2>&1
-          # Failed create (file exists, no --force) — must NOT be recorded
           set +e
           ./bin/laret file create /tmp/hist_b2.txt -c "overwrite" > /dev/null 2>&1
           set -e
@@ -2233,18 +2247,17 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: history-outputs
+          name: history-outputs-zsh
           path: |
             /tmp/hist_*.out
             /tmp/hist_*.err
           retention-days: 7
 
   summary:
-    name: Build Summary
+    name: Build Summary (zsh)
     runs-on: ubuntu-latest
     needs:
       - build
-      - code-quality
       - integration-completions
       - integration-progress
       - integration-prompts
@@ -2270,50 +2283,26 @@ jobs:
       - name: Print build summary
         run: |
           echo "=========================================="
-          echo " Laret CI Summary"
+          echo " Laret CI Summary (zsh)"
           echo "=========================================="
-          echo " build:            ${{ needs.build.result }}"
-          echo " code-quality:         ${{ needs.code-quality.result }}"
-          echo " integration-completions:  ${{ needs.integration-completions.result }}"
-          echo " integration-progress:     ${{ needs.integration-progress.result }}"
-          echo " integration-prompts:    ${{ needs.integration-prompts.result }}"
-          echo " integration-config:     ${{ needs.integration-config.result }}"
-          echo " integration-plugins:    ${{ needs.integration-plugins.result }}"
-          echo " integration-output:     ${{ needs.integration-output-formatting.result }}"
-          echo " integration-table:      ${{ needs.integration-table-rendering.result }}"
-          echo " integration-aliases:    ${{ needs.integration-aliases.result }}"
-          echo " integration-persist:    ${{ needs.integration-persistent-flags.result }}"
-          echo " integration-manpages:     ${{ needs.integration-manpages.result }}"
-          echo " integration-piping:     ${{ needs.integration-piping.result }}"
-          echo " integration-parallel:   ${{ needs.integration-parallel-execution.result }}"
-          echo " integration-watch:      ${{ needs.integration-watch.result }}"
-          echo " integration-localization:   ${{ needs.integration-localization.result }}"
-          echo " integration-stats:          ${{ needs.integration-stats.result }}"
-          echo " integration-diff:           ${{ needs.integration-diff.result }}"
-          echo " integration-undo:           ${{ needs.integration-undo.result }}"
-          echo " integration-history:        ${{ needs.integration-history.result }}"
+          echo " build:                        ${{ needs.build.result }}"
+          echo " integration-completions:      ${{ needs.integration-completions.result }}"
+          echo " integration-progress:         ${{ needs.integration-progress.result }}"
+          echo " integration-prompts:          ${{ needs.integration-prompts.result }}"
+          echo " integration-config:           ${{ needs.integration-config.result }}"
+          echo " integration-plugins:          ${{ needs.integration-plugins.result }}"
+          echo " integration-output:           ${{ needs.integration-output-formatting.result }}"
+          echo " integration-table:            ${{ needs.integration-table-rendering.result }}"
+          echo " integration-aliases:          ${{ needs.integration-aliases.result }}"
+          echo " integration-persist:          ${{ needs.integration-persistent-flags.result }}"
+          echo " integration-middleware-hooks: ${{ needs.integration-middleware-hooks.result }}"
+          echo " integration-manpages:         ${{ needs.integration-manpages.result }}"
+          echo " integration-piping:           ${{ needs.integration-piping.result }}"
+          echo " integration-parallel:         ${{ needs.integration-parallel-execution.result }}"
+          echo " integration-watch:            ${{ needs.integration-watch.result }}"
+          echo " integration-localization:     ${{ needs.integration-localization.result }}"
+          echo " integration-stats:            ${{ needs.integration-stats.result }}"
+          echo " integration-diff:             ${{ needs.integration-diff.result }}"
+          echo " integration-undo:             ${{ needs.integration-undo.result }}"
+          echo " integration-history:          ${{ needs.integration-history.result }}"
           echo "=========================================="
-
-      - name: Comment PR on failure
-        if: failure() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: 'Build failed. Please check the Actions tab for details.'
-            })
-
-      - name: Comment PR on success
-        if: success() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: 'All checks passed! Ready to merge.'
-            })

@@ -4,8 +4,6 @@ import com.rkhamatyarov.laret.config.ConfigLoader
 import com.rkhamatyarov.laret.config.model.AppConfig
 import com.rkhamatyarov.laret.config.validator.ConfigValidator
 import com.rkhamatyarov.laret.model.CommandGroup
-import com.rkhamatyarov.laret.plugin.LaretPlugin
-import com.rkhamatyarov.laret.plugin.PluginManager
 import kotlinx.coroutines.runBlocking
 import org.fusesource.jansi.AnsiConsole
 

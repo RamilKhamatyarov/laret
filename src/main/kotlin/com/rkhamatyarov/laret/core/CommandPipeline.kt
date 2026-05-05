@@ -1,6 +1,5 @@
-package com.rkhamatyarov.laret.pipe
+package com.rkhamatyarov.laret.core
 
-import com.rkhamatyarov.laret.core.CliApp
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
@@ -8,11 +7,15 @@ import java.io.PrintStream
 
 class CommandPipeline(private val app: CliApp) {
 
-    fun splitStages(tokens: Array<String>, separator: String = "---"): List<Array<String>> {
+    /**
+     * Split [tokens] into stages wherever a separator token is found.
+     * Both `---` and `|` are recognised by default; empty stages are dropped.
+     */
+    fun splitStages(tokens: Array<String>, separators: Set<String> = DEFAULT_SEPARATORS): List<Array<String>> {
         val stages = mutableListOf<MutableList<String>>()
         var current = mutableListOf<String>()
         for (tok in tokens) {
-            if (tok == separator) {
+            if (tok in separators) {
                 if (current.isNotEmpty()) stages += current
                 current = mutableListOf()
             } else {
@@ -22,6 +25,10 @@ class CommandPipeline(private val app: CliApp) {
         if (current.isNotEmpty()) stages += current
         return stages.map { it.toTypedArray() }
     }
+
+    /** Single-separator overload kept for backward compatibility. */
+    fun splitStages(tokens: Array<String>, separator: String): List<Array<String>> =
+        splitStages(tokens, setOf(separator))
 
     fun execute(stages: List<Array<String>>): String {
         require(stages.isNotEmpty()) { "Pipeline must contain at least one stage" }
@@ -57,6 +64,10 @@ class CommandPipeline(private val app: CliApp) {
 
     companion object {
         const val STAGE_SEPARATOR: String = "---"
+        const val PIPE_SEPARATOR: String = "|"
+
+        /** Both separators are active by default; quote `|` in shells to pass it as a token. */
+        val DEFAULT_SEPARATORS: Set<String> = setOf(STAGE_SEPARATOR, PIPE_SEPARATOR)
 
         fun captureStdin(input: InputStream = System.`in`): String = input.readBytes().toString(Charsets.UTF_8)
     }

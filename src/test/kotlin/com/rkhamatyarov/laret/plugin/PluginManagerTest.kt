@@ -1,6 +1,8 @@
 package com.rkhamatyarov.laret.plugin
 
 import com.rkhamatyarov.laret.core.CliApp
+import com.rkhamatyarov.laret.core.LaretPlugin
+import com.rkhamatyarov.laret.core.PluginManager
 import com.rkhamatyarov.laret.dsl.cli
 import com.rkhamatyarov.laret.model.Command
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow

@@ -1,4 +1,4 @@
-package com.rkhamatyarov.laret.man
+package com.rkhamatyarov.laret.completion
 
 /**
  * Standard sections of a UNIX man page in display order.

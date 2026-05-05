@@ -1,5 +1,8 @@
 package com.rkhamatyarov.laret.man
 
+import com.rkhamatyarov.laret.completion.GroffFormatter
+import com.rkhamatyarov.laret.completion.ManPageGenerator
+import com.rkhamatyarov.laret.completion.ManSection
 import com.rkhamatyarov.laret.model.Argument
 import com.rkhamatyarov.laret.model.Command
 import com.rkhamatyarov.laret.model.Option

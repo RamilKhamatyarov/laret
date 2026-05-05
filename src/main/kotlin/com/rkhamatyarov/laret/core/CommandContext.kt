@@ -41,4 +41,8 @@ class CommandContext(
     fun spinner(label: String = ""): Spinner = Spinner(label = label, enabled = isInteractive())
 
     fun prompt(): InteractivePrompt = InteractivePrompt(enabled = isInteractive())
+
+    fun registerUndo(description: String, undoArgs: Array<String>, redoArgs: Array<String> = emptyArray()) {
+        UndoManager.push(UndoManager.newEntry(description, undoArgs.toList(), redoArgs.toList()))
+    }
 }

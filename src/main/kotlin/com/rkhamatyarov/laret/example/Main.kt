@@ -1,15 +1,31 @@
 package com.rkhamatyarov.laret.example
 
 import com.rkhamatyarov.laret.completion.CompletionCommand
+import com.rkhamatyarov.laret.completion.ManPageGenerator
 import com.rkhamatyarov.laret.completion.ShellType
+import com.rkhamatyarov.laret.core.CommandHistory
+import com.rkhamatyarov.laret.core.CommandPipeline
+import com.rkhamatyarov.laret.core.Localization
 import com.rkhamatyarov.laret.core.ParallelDispatcher
 import com.rkhamatyarov.laret.core.ParallelTask
+import com.rkhamatyarov.laret.core.UndoManager
+import com.rkhamatyarov.laret.diff.DiffFormat
+import com.rkhamatyarov.laret.diff.JsonDiffFormatter
+import com.rkhamatyarov.laret.diff.PlainFormatter
+import com.rkhamatyarov.laret.diff.UnifiedFormatter
+import com.rkhamatyarov.laret.diff.diffFiles
 import com.rkhamatyarov.laret.dsl.cli
-import com.rkhamatyarov.laret.i18n.Localization
-import com.rkhamatyarov.laret.man.ManPageGenerator
 import com.rkhamatyarov.laret.output.OutputStrategy
-import com.rkhamatyarov.laret.pipe.CommandPipeline
+import com.rkhamatyarov.laret.stats.JsonStatsFormatter
+import com.rkhamatyarov.laret.stats.PlainStatsFormatter
+import com.rkhamatyarov.laret.stats.PrometheusFormatter
+import com.rkhamatyarov.laret.stats.StatsCollector
+import com.rkhamatyarov.laret.stats.StatsFormat
+import com.rkhamatyarov.laret.stats.StatsMiddleware
 import com.rkhamatyarov.laret.ui.UnicodeSupport
+import com.rkhamatyarov.laret.watch.DirectoryWatcher
+import com.rkhamatyarov.laret.watch.WatchEventType
+import com.rkhamatyarov.laret.watch.WatchOptions
 import kotlinx.coroutines.runBlocking
 import org.jline.reader.EndOfFileException
 import org.jline.reader.LineReaderBuilder
@@ -22,11 +38,6 @@ import kotlin.streams.asSequence
 import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
-    val localeIdx = args.indexOf("--locale")
-    if (localeIdx >= 0 && localeIdx + 1 < args.size) {
-        Localization.setLocale(args[localeIdx + 1])
-    }
-
     val app =
         cli(
             name = "laret",
@@ -34,9 +45,10 @@ fun main(args: Array<String>) {
             description = "Laret - A Cobra-like CLI framework for Kotlin",
         ) {
             use(LoggingMiddleware())
+            use(StatsMiddleware())
 
-            onAppInit = { println(Localization.t("app.initializing")) }
-            onAppShutdown = { println(Localization.t("app.shutting.down")) }
+            onAppInit = { System.err.println(Localization.t("app.initializing")) }
+            onAppShutdown = { System.err.println(Localization.t("app.shutting.down")) }
 
             group(name = "completion", description = "Shell completion") {
                 command(name = "bash", description = "Generate bash completion script") {
@@ -121,7 +133,7 @@ fun main(args: Array<String>) {
                         }
 
                         if (outputPath.isNotBlank()) {
-                            val file = java.io.File(outputPath)
+                            val file = File(outputPath)
                             file.parentFile?.mkdirs()
                             file.writeText(content)
                             println("Man page written to $outputPath")
@@ -166,7 +178,7 @@ fun main(args: Array<String>) {
             }
 
             group(name = "pipe", description = "Command piping") {
-                command(name = "run", description = "Run a pipeline of laret commands separated by ---") {
+                command(name = "run", description = "Run a pipeline of laret commands separated by --- or |") {
                     action { ctx ->
                         val app = ctx.app ?: return@action
 
@@ -230,15 +242,203 @@ fun main(args: Array<String>) {
                 }
             }
 
-            group(name = "i18n", description = "Localization demo") {
-                command(name = "hello", description = "Greet the user in the active locale") {
+            group(name = "watch", description = "Watch a directory for filesystem changes") {
+                command(name = "run", description = "Watch <path> and emit CREATE/MODIFY/DELETE events to stdout") {
+                    argument("path", "Directory to watch", required = false, optional = true)
+                    option("d", "duration", "Stop after N seconds (0 = run until interrupted)", "0", true)
+                    option("r", "recursive", "Watch subdirectories", "", false)
+                    option("n", "max-events", "Stop after N events (0 = unlimited)", "0", true)
+                    option(
+                        "e",
+                        "events",
+                        "Comma-separated event filter (create,modify,delete). Default: all",
+                        "",
+                        true,
+                    )
+
+                    action { ctx ->
+                        val rawArgs = watchCommandArgs.get() ?: emptyArray()
+                        val parsed = parseWatchRunArgs(rawArgs)
+
+                        val path = parsed.path ?: run {
+                            System.err.println(Localization.t("watch.path.required"))
+                            return@action
+                        }
+
+                        val dir = File(path)
+                        if (!dir.isDirectory) {
+                            System.err.println(Localization.t("watch.not.a.directory", path))
+                            return@action
+                        }
+
+                        val duration = parsed.duration ?: ctx.optionLong("duration").coerceAtLeast(0)
+                        val recursive = parsed.recursive || ctx.optionBool("recursive")
+                        val maxEvents = parsed.maxEvents ?: ctx.optionInt("max-events").coerceAtLeast(0)
+                        val accepted = parseEventFilter(parsed.events ?: ctx.option("events"))
+
+                        val options = WatchOptions(
+                            recursive = recursive,
+                            durationSeconds = duration,
+                            maxEvents = maxEvents,
+                            acceptedTypes = accepted,
+                        )
+
+                        System.err.println(
+                            Localization.t("watch.started", dir.absolutePath, recursive, duration, maxEvents),
+                        )
+
+                        val watcher = DirectoryWatcher(dir.toPath(), options)
+                        val summary = watcher.watch { event ->
+                            println("${event.type}\t${event.path.toAbsolutePath()}")
+                        }
+
+                        System.err.println(
+                            Localization.t("watch.stopped", summary.emittedEvents, summary.stopReason.name),
+                        )
+                    }
+                }
+            }
+
+            group(name = "diff", description = "Compare files line by line") {
+                command(name = "run", description = "Show differences between two text files") {
+                    argument("old-file", "Original file path", required = true)
+                    argument("new-file", "Modified file path", required = true)
+                    option("f", "format", "Output format (unified, plain, json)", "unified", true)
+                    option("w", "ignore-whitespace", "Ignore leading/trailing whitespace differences", "", false)
+                    option("c", "context", "Lines of context around each change", "3", true)
+
+                    action { ctx ->
+                        val oldFile = File(ctx.argument("old-file"))
+                        val newFile = File(ctx.argument("new-file"))
+
+                        if (!oldFile.exists()) {
+                            System.err.println(Localization.t("diff.file.not.found", oldFile.path))
+                            return@action
+                        }
+                        if (!newFile.exists()) {
+                            System.err.println(Localization.t("diff.file.not.found", newFile.path))
+                            return@action
+                        }
+
+                        val formatId = ctx.option("format").ifBlank { "unified" }
+                        val format = DiffFormat.fromId(formatId) ?: run {
+                            System.err.println(Localization.t("diff.format.unknown", formatId))
+                            return@action
+                        }
+
+                        val result = diffFiles(
+                            oldFile.toPath(),
+                            newFile.toPath(),
+                            ignoreWhitespace = ctx.optionBool("ignore-whitespace"),
+                            contextLines = ctx.optionInt("context").coerceAtLeast(0),
+                        )
+
+                        val rendered = when (format) {
+                            DiffFormat.UNIFIED -> UnifiedFormatter().render(result)
+                            DiffFormat.PLAIN -> PlainFormatter().render(result)
+                            DiffFormat.JSON -> JsonDiffFormatter().render(result)
+                        }
+                        if (rendered.isNotEmpty()) {
+                            print(rendered)
+                            if (!rendered.endsWith("\n")) println()
+                        }
+                    }
+                }
+            }
+
+            group(name = "stats", description = "Command-execution metrics") {
+                command(
+                    name = "show",
+                    description = "Print collected metrics (default format: prometheus)",
+                ) {
+                    option(
+                        "f",
+                        "format",
+                        "Output format (prometheus, json, plain)",
+                        "prometheus",
+                        true,
+                    )
+                    option("r", "reset", "Reset metrics after printing", "", false)
+
+                    action { ctx ->
+                        val formatId = ctx.option("format").ifBlank { "prometheus" }
+                        val format = StatsFormat.fromId(formatId) ?: run {
+                            System.err.println(
+                                Localization.t("stats.format.unknown", formatId),
+                            )
+                            return@action
+                        }
+
+                        val snapshot = StatsCollector.snapshot()
+                        val rendered = when (format) {
+                            StatsFormat.PROMETHEUS -> PrometheusFormatter().render(snapshot)
+                            StatsFormat.JSON -> JsonStatsFormatter().render(snapshot)
+                            StatsFormat.PLAIN -> PlainStatsFormatter().render(snapshot)
+                        }
+                        print(rendered)
+                        if (!rendered.endsWith("\n")) println()
+
+                        if (ctx.optionBool("reset")) {
+                            StatsCollector.reset()
+                            System.err.println(Localization.t("stats.reset.done"))
+                        }
+                    }
+                }
+
+                command(name = "reset", description = "Reset all collected metrics") {
+                    action { _ ->
+                        StatsCollector.reset()
+                        println(Localization.t("stats.reset.done"))
+                    }
+                }
+            }
+
+            group(name = "locale", description = "Manage interface locale") {
+                command(name = "show", description = "Print the active locale tag") {
+                    option("v", "verbose", "Also show the source of the active locale", "", false)
+                    action { ctx ->
+                        println(Localization.getLocale().toString())
+                        if (ctx.optionBool("verbose")) {
+                            println("Source: ${Localization.localeSource()}")
+                        }
+                    }
+                }
+                command(name = "set", description = "Set and persist locale for all future sessions") {
+                    argument("tag", "Locale tag (e.g. es, en_US, fr_FR)", required = true)
+                    action { ctx ->
+                        val tag = ctx.argument("tag")
+                        if (!Localization.isValidLocaleTag(tag)) {
+                            System.err.println(Localization.t("locale.invalid.tag", tag))
+                            return@action
+                        }
+                        Localization.saveLocale(tag)
+                        if (Localization.isLocaleOverriddenByEnv()) {
+                            System.err.println(
+                                Localization.t("locale.env.override.warning", System.getenv("LARET_LOCALE")),
+                            )
+                        }
+                        println(Localization.t("locale.set.done", tag))
+                    }
+                }
+                command(name = "reset", description = "Reset locale to system default") {
+                    action { _ ->
+                        val futureTag = Localization.resolveAfterClear().toString()
+                        val message = Localization.t("locale.reset.done", futureTag)
+                        Localization.clearLocale()
+                        println(message)
+                    }
+                }
+            }
+
+            group(name = "i18n", description = "Localization test commands") {
+                command(name = "hello", description = "Print a localized greeting") {
                     action { _ ->
                         println(Localization.t("app.greeting"))
                     }
                 }
-                command(name = "locale", description = "Print the currently active locale") {
+                command(name = "locale", description = "Print the active locale tag") {
                     action { _ ->
-                        println(Localization.getLocale().toLanguageTag())
+                        println(Localization.getLocale().toString())
                     }
                 }
             }
@@ -316,6 +516,134 @@ fun main(args: Array<String>) {
                 }
             }
 
+            group(name = "history", description = "Command history and replay") {
+                command(name = "show", description = "List recent commands") {
+                    option("n", "limit", "Max entries to show", "20", true)
+                    action { ctx ->
+                        val limit = ctx.optionInt("limit").coerceAtLeast(1)
+                        val all = CommandHistory.list()
+                        if (all.isEmpty()) {
+                            println("No command history.")
+                            return@action
+                        }
+                        val start = (all.size - limit).coerceAtLeast(0)
+                        val shown = all.subList(start, all.size)
+                        shown.forEachIndexed { i, e ->
+                            println("  ${start + i + 1}. ${e.args.joinToString(" ")}")
+                        }
+                    }
+                }
+                command(
+                    name = "replay",
+                    description = "Replay a command (default: last). Use index from 'history show'.",
+                ) {
+                    argument(
+                        "index",
+                        "Entry index to replay (0 = last)",
+                        required = false,
+                        optional = true,
+                        default = "0",
+                    )
+                    action { ctx ->
+                        val index = ctx.argument("index").toIntOrNull() ?: 0
+                        val entry = if (index <= 0) CommandHistory.last() else CommandHistory.get(index)
+                        if (entry == null) {
+                            println("No command history.")
+                            return@action
+                        }
+                        val app = ctx.app ?: return@action
+                        println("Replaying: ${entry.args.joinToString(" ")}")
+                        val replayArgs = entry.args.toTypedArray()
+                        if (replayArgs.size >= 2 && replayArgs[0] == "pipe" && replayArgs[1] == "run") {
+                            pipeCommandArgs.set(replayArgs.copyOfRange(2, replayArgs.size))
+                        }
+                        if (replayArgs.size >= 2 && replayArgs[0] == "parallel" && replayArgs[1] == "run") {
+                            parallelCommandArgs.set(replayArgs.copyOfRange(2, replayArgs.size))
+                        }
+                        if (replayArgs.size >= 2 && replayArgs[0] == "watch" && replayArgs[1] == "run") {
+                            watchCommandArgs.set(replayArgs.copyOfRange(2, replayArgs.size))
+                        }
+                        val exitCode = CommandHistory.withSuppressedRecording {
+                            app.runForTest(replayArgs)
+                        }
+                        if (exitCode != 0) {
+                            System.err.println("Replay failed (exit $exitCode)")
+                            throw RuntimeException("Replay failed (exit $exitCode)")
+                        }
+                    }
+                }
+                command(name = "clear", description = "Clear command history") {
+                    action { _ ->
+                        CommandHistory.clear()
+                        println("Command history cleared.")
+                    }
+                }
+            }
+
+            group(name = "undo", description = "Undo last recorded action") {
+                command(name = "run", description = "Undo the most recent undoable command") {
+                    action { ctx ->
+                        val entry = UndoManager.peekUndo()
+                        if (entry == null) {
+                            println("Nothing to undo.")
+                            return@action
+                        }
+                        println("Undoing: ${entry.description}")
+                        val app = ctx.app ?: return@action
+                        val exitCode = UndoManager.withSuppressedRecording {
+                            app.runForTest(entry.undoArgs.toTypedArray())
+                        }
+                        if (exitCode == 0) {
+                            UndoManager.popUndo()
+                            println("Undo complete.")
+                        } else {
+                            System.err.println("Undo failed (exit $exitCode) — action was not undone.")
+                        }
+                    }
+                }
+                command(name = "history", description = "Show undo/redo history") {
+                    action { _ ->
+                        val undos = UndoManager.undoHistory()
+                        val redos = UndoManager.redoHistory()
+                        if (undos.isEmpty() && redos.isEmpty()) {
+                            println("No history recorded.")
+                            return@action
+                        }
+                        if (undos.isNotEmpty()) {
+                            println("Undo stack (oldest → newest):")
+                            undos.forEachIndexed { i, e -> println("  ${i + 1}. ${e.description}") }
+                        }
+                        if (redos.isNotEmpty()) {
+                            println("Redo stack:")
+                            redos.asReversed().forEachIndexed { i, e -> println("  ${i + 1}. ${e.description}") }
+                        }
+                    }
+                }
+            }
+
+            group(name = "redo", description = "Redo last undone action") {
+                command(name = "run", description = "Redo the most recently undone command") {
+                    action { ctx ->
+                        val entry = UndoManager.peekRedo()
+                        if (entry == null) {
+                            println("Nothing to redo.")
+                            return@action
+                        }
+                        println("Redoing: ${entry.description}")
+                        val app = ctx.app ?: return@action
+                        val exitCode = UndoManager.withSuppressedRecording {
+                            app.runForTest(entry.redoArgs.toTypedArray())
+                        }
+                        if (exitCode == 0) {
+                            UndoManager.popRedo()
+                            println("Redo complete.")
+                        } else {
+                            System.err.println("Redo failed (exit $exitCode) — action was not redone.")
+                        }
+                    }
+                }
+            }
+
             group(name = "file", description = "File operations") {
                 aliases("f")
                 command(name = "create", description = "Create a new file") {
@@ -355,6 +683,11 @@ fun main(args: Array<String>) {
                             spinner.tick()
                             file.writeText(content)
                             spinner.finish("File created: $path")
+                            ctx.registerUndo(
+                                "file create $path",
+                                undoArgs = arrayOf("file", "delete", path),
+                                redoArgs = arrayOf("file", "create", path, "-c", content, "-f", "true"),
+                            )
                         } catch (e: Exception) {
                             spinner.fail("Failed to create file: ${e.message}")
                             throw e
@@ -374,10 +707,16 @@ fun main(args: Array<String>) {
                             return@action
                         }
 
+                        val originalContent = file.readText()
                         val spinner = ctx.spinner("Deleting $path")
                         spinner.tick()
                         if (file.delete()) {
                             spinner.finish("File deleted: $path")
+                            ctx.registerUndo(
+                                "file delete $path",
+                                undoArgs = arrayOf("file", "create", path, "-c", originalContent),
+                                redoArgs = arrayOf("file", "delete", path),
+                            )
                         } else {
                             spinner.fail("Failed to delete file: $path")
                         }
@@ -733,18 +1072,59 @@ fun main(args: Array<String>) {
             }
         }
 
-    app.init()
+    var configPath: String? = null
+    val stripped = mutableListOf<String>()
+    var idx = 0
+    while (idx < args.size) {
+        when {
+            args[idx] == "--locale" && idx + 1 < args.size -> {
+                Localization.setLocale(args[idx + 1])
+                idx += 2
+            }
 
-    val filteredArgs = stripLocaleArg(args)
+            args[idx] == "--config" && idx + 1 < args.size -> {
+                configPath = args[idx + 1]
+                idx += 2
+            }
 
-    if (filteredArgs.size >= 2 && filteredArgs[0] == "pipe" && filteredArgs[1] == "run") {
-        pipeCommandArgs.set(filteredArgs.copyOfRange(2, filteredArgs.size))
+            else -> {
+                stripped.add(args[idx])
+                idx++
+            }
+        }
     }
-    if (filteredArgs.size >= 2 && filteredArgs[0] == "parallel" && filteredArgs[1] == "run") {
-        parallelCommandArgs.set(filteredArgs.copyOfRange(2, filteredArgs.size))
+    val strippedArgs = stripped.toTypedArray()
+
+    app.init(configPath)
+    UndoManager.load()
+    CommandHistory.load()
+
+    val resolvedArgs = if (strippedArgs.size == 1 && strippedArgs[0] == "!!") {
+        arrayOf(
+            "history",
+            "replay",
+        )
+    } else {
+        strippedArgs
     }
 
-    val exitCode = app.run(filteredArgs)
+    if (resolvedArgs.size >= 2 && resolvedArgs[0] == "pipe" && resolvedArgs[1] == "run") {
+        pipeCommandArgs.set(resolvedArgs.copyOfRange(2, resolvedArgs.size))
+    }
+    if (resolvedArgs.size >= 2 && resolvedArgs[0] == "parallel" && resolvedArgs[1] == "run") {
+        parallelCommandArgs.set(resolvedArgs.copyOfRange(2, resolvedArgs.size))
+    }
+    if (resolvedArgs.size >= 2 && resolvedArgs[0] == "watch" && resolvedArgs[1] == "run") {
+        watchCommandArgs.set(resolvedArgs.copyOfRange(2, resolvedArgs.size))
+    }
+
+    val exitCode = app.run(resolvedArgs)
+
+    val group = resolvedArgs.firstOrNull()
+    if (exitCode == 0 && group != null && group != "history" && group != "undo" && group != "redo") {
+        CommandHistory.record(resolvedArgs)
+    }
+
     exitProcess(exitCode)
 }
 
@@ -770,6 +1150,62 @@ fun getCompletionPath(shellType: ShellType, appName: String): String {
 internal val pipeCommandArgs: ThreadLocal<Array<String>?> = ThreadLocal.withInitial { null }
 
 internal val parallelCommandArgs: ThreadLocal<Array<String>?> = ThreadLocal.withInitial { null }
+
+internal val watchCommandArgs: ThreadLocal<Array<String>?> = ThreadLocal.withInitial { null }
+
+internal data class WatchRunArgs(
+    val path: String?,
+    val duration: Long?,
+    val recursive: Boolean,
+    val maxEvents: Int?,
+    val events: String?,
+)
+
+internal fun parseWatchRunArgs(args: Array<String>): WatchRunArgs {
+    var path: String? = null
+    var duration: Long? = null
+    var recursive = false
+    var maxEvents: Int? = null
+    var events: String? = null
+    var index = 0
+
+    while (index < args.size) {
+        when (val token = args[index]) {
+            "--duration", "-d" -> {
+                duration = args.getOrNull(index + 1)?.toLongOrNull()?.coerceAtLeast(0)
+                index += 2
+            }
+            "--max-events", "-n" -> {
+                maxEvents = args.getOrNull(index + 1)?.toIntOrNull()?.coerceAtLeast(0)
+                index += 2
+            }
+            "--events", "-e" -> {
+                events = args.getOrNull(index + 1)
+                index += 2
+            }
+            "--recursive", "-r" -> {
+                recursive = true
+                index++
+            }
+            else -> {
+                if (path == null && !token.startsWith("-")) path = token
+                index++
+            }
+        }
+    }
+
+    return WatchRunArgs(path, duration, recursive, maxEvents, events)
+}
+
+internal fun parseEventFilter(raw: String): Set<WatchEventType> {
+    if (raw.isBlank()) return WatchEventType.entries.toSet()
+    return raw.split(",")
+        .map { it.trim().uppercase() }
+        .filter { it.isNotEmpty() }
+        .mapNotNull { name -> runCatching { WatchEventType.valueOf(name) }.getOrNull() }
+        .toSet()
+        .ifEmpty { WatchEventType.entries.toSet() }
+}
 
 internal fun parseParallelRunArgs(args: Array<String>): Triple<List<String>, Int?, Boolean> {
     val tokens = mutableListOf<String>()
@@ -814,11 +1250,4 @@ internal fun parseParallelTasks(tokens: List<String>, separator: String = "---")
     return stages.map { stage ->
         ParallelTask(command = stage.first(), args = stage.drop(1))
     }
-}
-
-internal fun stripLocaleArg(args: Array<String>): Array<String> {
-    val idx = args.indexOf("--locale")
-    if (idx < 0) return args
-    val dropTo = if (idx + 1 < args.size) idx + 2 else idx + 1
-    return (args.take(idx) + args.drop(dropTo)).toTypedArray()
 }
