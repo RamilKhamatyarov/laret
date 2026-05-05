@@ -8,11 +8,7 @@ import java.util.UUID
 
 object CommandHistory {
 
-    data class CommandEntry(
-        val id: String,
-        val args: List<String>,
-        val timestamp: Long,
-    )
+    data class CommandEntry(val id: String, val args: List<String>, val timestamp: Long)
 
     const val MAX_SIZE = 100
 
@@ -49,7 +45,6 @@ object CommandHistory {
 
     fun last(): CommandEntry? = entries.lastOrNull()
 
-    // 1-based absolute index into the full history list (oldest = 1)
     fun get(index: Int): CommandEntry? {
         if (index < 1 || index > entries.size) return null
         return entries.toList()[index - 1]
@@ -90,9 +85,6 @@ object CommandHistory {
             System.err.println("Warning: failed to persist command history to $historyFile: ${e.message}")
         }
     }
-
-    // Layout per line: id\ttimestamp\targCount\targ0\targ1\t...
-    // Each string field is individually Base64-encoded to survive any content.
 
     private fun b64(s: String): String = Base64.getEncoder().encodeToString(s.toByteArray(Charsets.UTF_8))
 

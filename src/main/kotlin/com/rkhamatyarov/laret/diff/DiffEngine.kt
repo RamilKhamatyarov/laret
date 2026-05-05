@@ -6,12 +6,7 @@ import java.nio.file.Path
 
 enum class DiffLineType { CONTEXT, ADD, REMOVE }
 
-data class DiffLine(
-    val type: DiffLineType,
-    val content: String,
-    val oldLineNo: Int,
-    val newLineNo: Int,
-)
+data class DiffLine(val type: DiffLineType, val content: String, val oldLineNo: Int, val newLineNo: Int)
 
 data class DiffHunk(
     val oldStart: Int,
@@ -129,10 +124,12 @@ internal fun lcsEdits(
                 i--
                 j--
             }
+
             j > 0 && (i == 0 || dp[i][j - 1] >= dp[i - 1][j]) -> {
                 result.addFirst(Edit(EditType.INSERT, newLines[j - 1]))
                 j--
             }
+
             else -> {
                 result.addFirst(Edit(EditType.DELETE, oldLines[i - 1]))
                 i--

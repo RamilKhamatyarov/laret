@@ -92,11 +92,6 @@ object UndoManager {
         } catch (_: Exception) {}
     }
 
-    // Serialization: one line per entry, prefix U (undo) or R (redo).
-    // Fields are tab-separated; each string value is individually Base64-encoded so that
-    // newlines and tabs within arg content do not corrupt the record structure.
-    // Layout: id\tdesc\ttimestamp\tundoCount\tundoArg0\t...\tredoCount\tredoArg0\t...
-
     private fun b64(s: String): String = Base64.getEncoder().encodeToString(s.toByteArray(Charsets.UTF_8))
 
     private fun unb64(s: String): String = String(Base64.getDecoder().decode(s), Charsets.UTF_8)

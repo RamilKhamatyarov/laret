@@ -186,10 +186,7 @@ internal class CollectorState(
     }
 }
 
-internal data class PersistedStats(
-    val startedAtEpochMs: Long = 0,
-    val entries: List<PersistedEntry> = emptyList(),
-)
+internal data class PersistedStats(val startedAtEpochMs: Long = 0, val entries: List<PersistedEntry> = emptyList())
 
 internal data class PersistedEntry(
     val group: String = "",

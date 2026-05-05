@@ -135,13 +135,11 @@ class UndoManagerTest {
     fun `peek then conditional pop leaves undo stack intact when execution fails`() {
         UndoManager.push(entry("action"))
 
-        // Simulate failed undo: peek but do NOT call popUndo (exit code != 0)
         val peeked = UndoManager.peekUndo()
         assertNotNull(peeked)
-        val fakeExitCode = 1 // failure
+        val fakeExitCode = 1
         if (fakeExitCode == 0) UndoManager.popUndo()
 
-        // Entry must still be in undo stack — user can retry
         assertEquals(1, UndoManager.undoHistory().size)
         assertEquals(0, UndoManager.redoHistory().size)
         assertEquals("action", UndoManager.undoHistory()[0].description)
@@ -150,15 +148,13 @@ class UndoManagerTest {
     @Test
     fun `peek then conditional pop leaves redo stack intact when execution fails`() {
         UndoManager.push(entry("action"))
-        UndoManager.popUndo() // move to redo stack
+        UndoManager.popUndo()
 
-        // Simulate failed redo: peek but do NOT call popRedo (exit code != 0)
         val peeked = UndoManager.peekRedo()
         assertNotNull(peeked)
-        val fakeExitCode = 1 // failure
+        val fakeExitCode = 1
         if (fakeExitCode == 0) UndoManager.popRedo()
 
-        // Entry must still be in redo stack — user can retry
         assertEquals(0, UndoManager.undoHistory().size)
         assertEquals(1, UndoManager.redoHistory().size)
         assertEquals("action", UndoManager.redoHistory()[0].description)
@@ -182,12 +178,11 @@ class UndoManagerTest {
     }
 
     @Test
-    fun `withSuppressedRecording is re-entrant — inner finally does not re-enable push`() {
+    fun `withSuppressedRecording is re-entrant - inner finally does not re-enable push`() {
         UndoManager.withSuppressedRecording {
             UndoManager.withSuppressedRecording {
                 UndoManager.push(entry("inner suppressed"))
             }
-            // outer block still active — push must still be suppressed
             UndoManager.push(entry("outer still suppressed"))
         }
         assertEquals(0, UndoManager.undoHistory().size)

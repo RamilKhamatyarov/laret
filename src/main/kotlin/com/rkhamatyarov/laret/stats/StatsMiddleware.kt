@@ -12,9 +12,7 @@ import kotlinx.coroutines.CancellationException
  * wrapper in the chain — its measured duration includes work done by all other
  * middlewares, which is what users want for end-to-end command timing.
  */
-class StatsMiddleware(
-    private val clock: () -> Long = System::currentTimeMillis,
-) : Middleware {
+class StatsMiddleware(private val clock: () -> Long = System::currentTimeMillis) : Middleware {
     override val scope: MiddlewareScope = MiddlewareScope.GLOBAL
     override val priority: Int = -1000
 

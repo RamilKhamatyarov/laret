@@ -22,7 +22,7 @@ data class WatchOptions(
     val recursive: Boolean = false,
     val durationSeconds: Long = 0,
     val maxEvents: Int = 0,
-    val acceptedTypes: Set<WatchEventType> = WatchEventType.values().toSet(),
+    val acceptedTypes: Set<WatchEventType> = WatchEventType.entries.toSet(),
 )
 
 class DirectoryWatcher(
@@ -155,7 +155,4 @@ enum class StopReason {
     WATCH_ROOT_GONE,
 }
 
-data class WatchSummary(
-    val emittedEvents: Int,
-    val stopReason: StopReason,
-)
+data class WatchSummary(val emittedEvents: Int, val stopReason: StopReason)

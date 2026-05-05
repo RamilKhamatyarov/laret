@@ -1081,10 +1081,12 @@ fun main(args: Array<String>) {
                 Localization.setLocale(args[idx + 1])
                 idx += 2
             }
+
             args[idx] == "--config" && idx + 1 < args.size -> {
                 configPath = args[idx + 1]
                 idx += 2
             }
+
             else -> {
                 stripped.add(args[idx])
                 idx++
