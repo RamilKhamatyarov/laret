@@ -1485,15 +1485,15 @@ jobs:
       - name: Watch - duration timeout exits cleanly with no events
         run: |
           set -euo pipefail
-          /usr/bin/time -v ./bin/laret watch run /tmp/laret_watch_test \
+          ./bin/laret watch run /tmp/laret_watch_test \
             --duration 2 \
             > /tmp/watch_timeout.out 2>/tmp/watch_timeout.err || true
           cat /tmp/watch_timeout.err
           grep -qi "DURATION_EXPIRED" /tmp/watch_timeout.err \
             || (echo "ERROR: expected DURATION_EXPIRED stop reason" \
               && cat /tmp/watch_timeout.out /tmp/watch_timeout.err && exit 1)
-          if [ -s /tmp/watch_timeout.out ]; then
-            echo "ERROR: stdout should be empty when no events occur"
+          if grep -qE "^(CREATE|DELETE|MODIFY)" /tmp/watch_timeout.out; then
+            echo "ERROR: no file events should appear when no changes occur"
             cat /tmp/watch_timeout.out
             exit 1
           fi

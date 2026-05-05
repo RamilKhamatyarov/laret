@@ -47,8 +47,8 @@ fun main(args: Array<String>) {
             use(LoggingMiddleware())
             use(StatsMiddleware())
 
-            onAppInit = { println(Localization.t("app.initializing")) }
-            onAppShutdown = { println(Localization.t("app.shutting.down")) }
+            onAppInit = { System.err.println(Localization.t("app.initializing")) }
+            onAppShutdown = { System.err.println(Localization.t("app.shutting.down")) }
 
             group(name = "completion", description = "Shell completion") {
                 command(name = "bash", description = "Generate bash completion script") {
@@ -133,7 +133,7 @@ fun main(args: Array<String>) {
                         }
 
                         if (outputPath.isNotBlank()) {
-                            val file = java.io.File(outputPath)
+                            val file = File(outputPath)
                             file.parentFile?.mkdirs()
                             file.writeText(content)
                             println("Man page written to $outputPath")
@@ -426,6 +426,19 @@ fun main(args: Array<String>) {
                         val message = Localization.t("locale.reset.done", futureTag)
                         Localization.clearLocale()
                         println(message)
+                    }
+                }
+            }
+
+            group(name = "i18n", description = "Localization test commands") {
+                command(name = "hello", description = "Print a localized greeting") {
+                    action { _ ->
+                        println(Localization.t("app.greeting"))
+                    }
+                }
+                command(name = "locale", description = "Print the active locale tag") {
+                    action { _ ->
+                        println(Localization.getLocale().toString())
                     }
                 }
             }
