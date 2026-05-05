@@ -26,7 +26,7 @@ repositories {
 dependencies {
     implementation(kotlin("stdlib"))
 
-    implementation("org.jline:jline:4.0.13")
+    implementation("org.jline:jline:4.0.15")
     implementation("org.fusesource.jansi:jansi:2.4.3")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.21.3")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.21.3")
