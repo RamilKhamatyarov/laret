@@ -36,8 +36,9 @@ class CommandBuilder(val name: String, val description: String = "") {
         default: String = "",
         takesValue: Boolean = true,
         persistent: Boolean = false,
+        configKey: String? = null,
     ) {
-        options.add(Option(short, long, description, default, takesValue, persistent))
+        options.add(Option(short, long, description, default, takesValue, persistent, configKey))
     }
 
     fun action(block: (CommandContext) -> Unit) {

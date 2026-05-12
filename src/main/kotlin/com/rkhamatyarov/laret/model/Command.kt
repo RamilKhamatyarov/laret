@@ -1,5 +1,6 @@
 package com.rkhamatyarov.laret.model
 
+import com.rkhamatyarov.laret.config.registry.ConfigRegistry
 import com.rkhamatyarov.laret.core.CommandContext
 import com.rkhamatyarov.laret.core.FlagPersistence
 
@@ -48,17 +49,17 @@ data class Command(
             }
         }
 
+        ctx.config = ctx.app?.createConfigRegistry(this, groupName, providedOptions) ?: ctx.config
         val config = ctx.app?.getAppConfig()
         options.forEach { option ->
-            val cliValue = providedOptions[option.long]
-            if (cliValue != null) {
-                ctx.options[option.long] = cliValue
-            } else if (option.persistent) {
-                val configValue = FlagPersistence.resolveFlag(option, groupName, this.name, config)
-                ctx.options[option.long] = configValue ?: option.default
+            val configKey = option.configKey ?: ConfigRegistry.defaultBindingKey(groupName, option.long)
+            val registryValue = ctx.config.getString(configKey)
+            val legacyValue = if (option.persistent) {
+                FlagPersistence.resolveFlag(option, groupName, this.name, config)
             } else {
-                ctx.options[option.long] = option.default
+                null
             }
+            ctx.options[option.long] = registryValue ?: legacyValue ?: option.default
         }
     }
 }

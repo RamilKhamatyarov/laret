@@ -15,6 +15,7 @@
 - **Shell Completion**
 - **Zero Dependencies**
 - **Type-Safe**
+- **12Factor Configuration**
 
 ## Quick Start
 
@@ -624,8 +625,21 @@ command(name = "convert", description = "Uppercase input") {
     }
 }
 ```
+## 12Factor Configuration
 
-### Programmatic API
+Laret resolves command configuration with predictable Cobra/Viper-style precedence:
+defaults < config files < environment variables < CLI flags. Profile-specific files such as
+`.laret.dev.yml` or `.laret.prod.toml` are selected with `--profile`, falling back to base
+`.laret.yml`, `.laret.toml`, or `.laret.json` files when a profile file is missing.
+
+```bash
+LARET_DIR_FORMAT=json laret --profile dev dir list /tmp --format plain
+```
+
+Command actions can read resolved values from `ctx.config`, for example
+`ctx.config.getString("dir.format")`.
+
+#### Programmatic API
 
 ```kt
 val pipeline = CommandPipeline(app)

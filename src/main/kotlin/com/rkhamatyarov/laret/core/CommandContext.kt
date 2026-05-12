@@ -1,5 +1,6 @@
 package com.rkhamatyarov.laret.core
 
+import com.rkhamatyarov.laret.config.registry.ConfigRegistry
 import com.rkhamatyarov.laret.model.Command
 import com.rkhamatyarov.laret.output.OutputStrategy
 import com.rkhamatyarov.laret.output.PlainOutput
@@ -12,6 +13,7 @@ class CommandContext(
     val app: CliApp? = null,
     val outputStrategy: OutputStrategy = PlainOutput,
     val groupName: String,
+    var config: ConfigRegistry = ConfigRegistry.empty(),
 ) {
     val arguments = mutableMapOf<String, String>()
 

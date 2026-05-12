@@ -1,20 +1,24 @@
 package com.rkhamatyarov.laret.config
 
+import com.fasterxml.jackson.core.type.TypeReference
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.toml.TomlMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.rkhamatyarov.laret.config.model.AppConfig
-import com.rkhamatyarov.laret.ui.redBold
 import java.io.File
 
 class ConfigLoader {
     private val jsonMapper: ObjectMapper = jacksonObjectMapper()
+        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
     private val yamlMapper: ObjectMapper = YAMLMapper()
+        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
     private val tomlMapper: ObjectMapper = TomlMapper()
+        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
 
-    fun load(configPath: String? = null): AppConfig {
-        val file = resolveConfigFile(configPath)
+    fun load(configPath: String? = null, profile: String? = null): AppConfig {
+        val file = resolveConfigFile(configPath, profile)
 
         return if (file?.exists() == true) {
             loadFromFile(file)
@@ -34,11 +38,24 @@ class ConfigLoader {
             val content = file.readText()
             val mapper = getMapper(format)
             val config = mapper.readValue(content, AppConfig::class.java)
-
-            println("Loaded config from ${file.absolutePath} (format: $format)")
             applyEnvironmentOverrides(config)
         } catch (e: Exception) {
-            println(redBold("Failed to load config from ${file.absolutePath} ${e.printStackTrace()}"))
+            throw RuntimeException("Config loading failed: ${e.message}", e)
+        }
+    }
+
+    fun loadMapFromFile(file: File): Map<String, Any?> {
+        require(file.exists()) { "Config file not found: ${file.absolutePath}" }
+
+        val format =
+            ConfigFormat.fromFile(file)
+                ?: throw IllegalArgumentException("Unsupported config format for file: ${file.name}")
+
+        return try {
+            val content = file.readText()
+            val mapper = getMapper(format)
+            mapper.readValue(content, object : TypeReference<Map<String, Any?>>() {})
+        } catch (e: Exception) {
             throw RuntimeException("Config loading failed: ${e.message}", e)
         }
     }
@@ -51,25 +68,41 @@ class ConfigLoader {
             val mapper = getMapper(format)
             val content = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(config)
             file.writeText(content)
-            println("Saved config to ${file.absolutePath}")
         } catch (e: Exception) {
-            println(redBold("Failed to save config to ${file.absolutePath} ${e.printStackTrace()}"))
             throw RuntimeException("Config save failed: ${e.message}", e)
         }
     }
 
-    private fun resolveConfigFile(configPath: String?): File? {
+    private fun resolveConfigFile(configPath: String?, profile: String? = null): File? {
+        val profileCandidates =
+            profile
+                ?.takeIf { it.isNotBlank() }
+                ?.let { activeProfile ->
+                    listOf(
+                        File(".laret.$activeProfile.yml"),
+                        File(".laret.$activeProfile.yaml"),
+                        File(".laret.$activeProfile.toml"),
+                        File(".laret.$activeProfile.json"),
+                        File(System.getProperty("user.home"), ".laret.$activeProfile.yml"),
+                        File(System.getProperty("user.home"), ".laret.$activeProfile.toml"),
+                        File(System.getProperty("user.home"), ".laret.$activeProfile.json"),
+                    )
+                }
+                .orEmpty()
+
         val candidates =
             listOfNotNull(
                 configPath?.let { File(it) },
-                File(".laret.yml"),
-                File(".laret.yaml"),
-                File(".laret.toml"),
-                File(".laret.json"),
-                File(System.getProperty("user.home"), ".laret.yml"),
-                File(System.getProperty("user.home"), ".laret.toml"),
-                File(System.getProperty("user.home"), ".laret.json"),
-            )
+            ) + profileCandidates +
+                listOf(
+                    File(".laret.yml"),
+                    File(".laret.yaml"),
+                    File(".laret.toml"),
+                    File(".laret.json"),
+                    File(System.getProperty("user.home"), ".laret.yml"),
+                    File(System.getProperty("user.home"), ".laret.toml"),
+                    File(System.getProperty("user.home"), ".laret.json"),
+                )
 
         return candidates.firstOrNull { it.exists() }
     }
