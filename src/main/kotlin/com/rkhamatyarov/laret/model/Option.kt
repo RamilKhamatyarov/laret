@@ -13,6 +13,8 @@ package com.rkhamatyarov.laret.model
  *                    [com.rkhamatyarov.laret.config.model.AppConfig.flags]
  *                    before falling back to [default].  Precedence order:
  *                    CLI > config file > compile-time default.
+ * @param configKey   Optional dot-key used by ConfigRegistry.  When omitted,
+ *                    the runtime key is derived as `<group>.<long>`.
  */
 data class Option(
     val short: String,
@@ -21,4 +23,5 @@ data class Option(
     val default: String = "",
     val takesValue: Boolean = true,
     val persistent: Boolean = false,
+    val configKey: String? = null,
 )

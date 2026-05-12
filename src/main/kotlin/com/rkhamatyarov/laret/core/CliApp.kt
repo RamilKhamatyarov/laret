@@ -2,7 +2,9 @@ package com.rkhamatyarov.laret.core
 
 import com.rkhamatyarov.laret.config.ConfigLoader
 import com.rkhamatyarov.laret.config.model.AppConfig
+import com.rkhamatyarov.laret.config.registry.ConfigRegistry
 import com.rkhamatyarov.laret.config.validator.ConfigValidator
+import com.rkhamatyarov.laret.model.Command
 import com.rkhamatyarov.laret.model.CommandGroup
 import kotlinx.coroutines.runBlocking
 import org.fusesource.jansi.AnsiConsole
@@ -32,26 +34,24 @@ data class CliApp(
 
     private var appConfig: AppConfig = AppConfig()
     private var configPath: String? = null
+    private var configProfile: String? = null
 
     internal var onInitHook: suspend (CliApp) -> Unit = {}
     internal var onShutdownHook: suspend (CliApp) -> Unit = {}
 
     /** Initialize the application, optionally loading a config file. */
-    fun init(configPath: String? = null): CliApp {
+    fun init(configPath: String? = null, profile: String? = null): CliApp {
         this.configPath = configPath
-        try {
-            appConfig = configLoader.load(configPath)
-            val result = configValidator.validate(appConfig)
-            if (!result.isValid) {
-                result.errors.forEach { System.err.println("ERROR: $it") }
-                throw RuntimeException("Configuration validation failed")
-            }
-            result.warnings.forEach { System.err.println(" WARNING: $it") }
-            applyConfiguration(appConfig)
-            initializePlugins()
-        } catch (e: Exception) {
-            throw e
+        this.configProfile = profile
+        appConfig = configLoader.load(configPath, profile)
+        val result = configValidator.validate(appConfig)
+        if (!result.isValid) {
+            result.errors.forEach { System.err.println("ERROR: $it") }
+            throw RuntimeException("Configuration validation failed")
         }
+        result.warnings.forEach { System.err.println(" WARNING: $it") }
+        applyConfiguration(appConfig)
+        initializePlugins()
         runBlocking { onInitHook(this@CliApp) }
         return this
     }
@@ -121,6 +121,12 @@ data class CliApp(
     }
 
     private fun dispatch(args: Array<String>): Int {
+        val global = extractGlobalOptions(args)
+        if (global.configPath != null || global.profile != null) {
+            init(global.configPath ?: configPath, global.profile ?: configProfile)
+            return dispatch(global.remaining)
+        }
+
         when {
             args.isEmpty() -> {
                 HelpFormatter.showApplicationHelp(this)
@@ -154,18 +160,30 @@ data class CliApp(
         }
     }
 
-    private fun applyConfiguration(config: AppConfig) {
-        if (config.output.verbose) println("Verbose mode enabled")
-        if (config.logging.file.isNotEmpty()) println("Log file configured: ${config.logging.file}")
-        if (config.plugins.enabled.isNotEmpty()) {
-            println("Enabled plugins: ${config.plugins.enabled.joinToString(", ")}")
-        }
-        if (config.plugins.paths.isNotEmpty()) {
-            println("Plugin search paths: ${config.plugins.paths.joinToString(", ")}")
-        }
-    }
+    private fun applyConfiguration(@Suppress("UNUSED_PARAMETER") config: AppConfig) = Unit
 
     fun getAppConfig(): AppConfig = appConfig
+
+    internal fun createConfigRegistry(
+        command: Command,
+        groupName: String,
+        providedOptions: Map<String, String>,
+    ): ConfigRegistry {
+        val bindings = command.options.associate { option ->
+            option.long to (option.configKey ?: ConfigRegistry.defaultBindingKey(groupName, option.long))
+        }
+        val defaults = command.options
+            .filterNot { it.persistent }
+            .associate { option ->
+                (option.configKey ?: ConfigRegistry.defaultBindingKey(groupName, option.long)) to option.default
+            }
+
+        return ConfigRegistry()
+            .defaults(defaults)
+            .files(configPath = configPath, profile = configProfile)
+            .env(prefix = "LARET", bindings = bindings)
+            .flags(values = providedOptions, bindings = bindings)
+    }
 
     fun getAppMetadata() = appConfig.app
 
@@ -177,13 +195,11 @@ data class CliApp(
 
     fun saveConfig(outputPath: String) {
         configLoader.save(appConfig, outputPath)
-        println("Configuration saved to: $outputPath")
     }
 
     fun reloadConfig(): CliApp {
-        appConfig = configLoader.load(configPath)
+        appConfig = configLoader.load(configPath, configProfile)
         applyConfiguration(appConfig)
-        println("Configuration reloaded")
         return this
     }
 
@@ -217,4 +233,38 @@ data class CliApp(
     fun getPlugins(): List<LaretPlugin> = pluginManager.getPlugins()
 
     fun findPlugin(name: String): LaretPlugin? = pluginManager.getPlugins().find { it.name == name }
+
+    private data class GlobalOptions(
+        val configPath: String?,
+        val profile: String?,
+        val remaining: Array<String>,
+    )
+
+    private fun extractGlobalOptions(args: Array<String>): GlobalOptions {
+        var nextConfigPath: String? = null
+        var nextProfile: String? = null
+        val remaining = mutableListOf<String>()
+        var index = 0
+
+        while (index < args.size) {
+            when {
+                args[index] == "--config" && index + 1 < args.size -> {
+                    nextConfigPath = args[index + 1]
+                    index += 2
+                }
+
+                args[index] == "--profile" && index + 1 < args.size -> {
+                    nextProfile = args[index + 1]
+                    index += 2
+                }
+
+                else -> {
+                    remaining.add(args[index])
+                    index++
+                }
+            }
+        }
+
+        return GlobalOptions(nextConfigPath, nextProfile, remaining.toTypedArray())
+    }
 }

@@ -2253,6 +2253,59 @@ jobs:
             /tmp/hist_*.err
           retention-days: 7
 
+  test-config-precedence:
+    name: Test Config Precedence (zsh)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shell: [bash, zsh]
+        profile: [dev, prod]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install zsh
+        if: matrix.shell == 'zsh'
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Build fat jar
+        run: ./gradlew shadowJar
+
+      - name: Test precedence file < env < cli
+        shell: ${{ matrix.shell }} {0}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/laret_config_precedence
+          echo "fixture" > /tmp/laret_config_precedence/item.txt
+          cat > ".laret.${{ matrix.profile }}.yml" <<'EOF'
+          dir:
+            format: yaml
+          EOF
+          cat > ".laret.yml" <<'EOF'
+          dir:
+            format: plain
+          EOF
+
+          java -jar build/libs/laret-fat.jar --profile "${{ matrix.profile }}" \
+            dir list /tmp/laret_config_precedence > /tmp/laret_profile.out
+          grep -q "name:" /tmp/laret_profile.out
+
+          LARET_DIR_FORMAT=json java -jar build/libs/laret-fat.jar --profile "${{ matrix.profile }}" \
+            dir list /tmp/laret_config_precedence > /tmp/laret_env.out
+          grep -q '"name"' /tmp/laret_env.out
+
+          LARET_DIR_FORMAT=json java -jar build/libs/laret-fat.jar --profile "${{ matrix.profile }}" \
+            dir list /tmp/laret_config_precedence --format plain > /tmp/laret_flag.out
+          grep -q "Directory:" /tmp/laret_flag.out
+
   summary:
     name: Build Summary (zsh)
     runs-on: ubuntu-latest
@@ -2277,6 +2330,7 @@ jobs:
       - integration-diff
       - integration-undo
       - integration-history
+      - test-config-precedence
     if: always()
 
     steps:

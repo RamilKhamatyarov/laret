@@ -177,6 +177,29 @@ fun main(args: Array<String>) {
                 }
             }
 
+            group(name = "echo", description = "Echo text to stdout (pipe demo)") {
+                command(name = "print", description = "Print text") {
+                    argument("text", "Text to print", required = false, optional = true, default = "")
+                    action { ctx -> print(ctx.argument("text")) }
+                }
+            }
+
+            group(name = "upper", description = "Text transformation (pipe demo)") {
+                command(name = "convert", description = "Convert text to uppercase") {
+                    argument(
+                        "text",
+                        "Text to convert (use - to read from previous stage)",
+                        required = false,
+                        optional = true,
+                        default = "",
+                    )
+                    action { ctx ->
+                        val input = ctx.argument("text").ifEmpty { CommandPipeline.captureStdin() }
+                        print(input.uppercase())
+                    }
+                }
+            }
+
             group(name = "pipe", description = "Command piping") {
                 command(name = "run", description = "Run a pipeline of laret commands separated by --- or |") {
                     action { ctx ->
@@ -1073,6 +1096,7 @@ fun main(args: Array<String>) {
         }
 
     var configPath: String? = null
+    var profile: String? = null
     val stripped = mutableListOf<String>()
     var idx = 0
     while (idx < args.size) {
@@ -1087,6 +1111,11 @@ fun main(args: Array<String>) {
                 idx += 2
             }
 
+            args[idx] == "--profile" && idx + 1 < args.size -> {
+                profile = args[idx + 1]
+                idx += 2
+            }
+
             else -> {
                 stripped.add(args[idx])
                 idx++
@@ -1095,7 +1124,7 @@ fun main(args: Array<String>) {
     }
     val strippedArgs = stripped.toTypedArray()
 
-    app.init(configPath)
+    app.init(configPath, profile)
     UndoManager.load()
     CommandHistory.load()
 
