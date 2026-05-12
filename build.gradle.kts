@@ -36,7 +36,7 @@ dependencies {
     implementation("com.github.ajalt.mordant:mordant-markdown:3.0.2")
 
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation("org.assertj:assertj-core:3.27.7")
     testImplementation("io.mockk:mockk:1.14.6")
     testImplementation("junit:junit:4.13.2")
