@@ -16,6 +16,11 @@ import com.rkhamatyarov.laret.diff.UnifiedFormatter
 import com.rkhamatyarov.laret.diff.diffFiles
 import com.rkhamatyarov.laret.dsl.cli
 import com.rkhamatyarov.laret.output.OutputStrategy
+import com.rkhamatyarov.laret.scaffold.generator.ProjectGenerator
+import com.rkhamatyarov.laret.scaffold.model.Module
+import com.rkhamatyarov.laret.scaffold.model.ScaffoldConfig
+import com.rkhamatyarov.laret.scaffold.model.ShellTarget
+import com.rkhamatyarov.laret.scaffold.wizard.InteractiveWizard
 import com.rkhamatyarov.laret.stats.JsonStatsFormatter
 import com.rkhamatyarov.laret.stats.PlainStatsFormatter
 import com.rkhamatyarov.laret.stats.PrometheusFormatter
@@ -173,6 +178,43 @@ fun main(args: Array<String>) {
                                 println("Error: ${e.message}")
                             }
                         }
+                    }
+                }
+            }
+
+            group(name = "new", description = "Scaffold a new Laret CLI project") {
+                command(name = "project", description = "Run interactive wizard and write project files") {
+                    option("d", "dir", "Target directory (default: ./<project-name>)", "", true)
+                    option("y", "yes", "Skip wizard and use defaults", "", false)
+                    option("n", "name", "Project name (used with --yes)", "my-cli", true)
+                    option("p", "package", "Package name (used with --yes)", "com.example.mycli", true)
+
+                    action { ctx ->
+                        val config = if (ctx.optionBool("yes")) {
+                            ScaffoldConfig(
+                                projectName = ctx.option("name"),
+                                packageName = ctx.option("package"),
+                                appName = ctx.option("name"),
+                                laretVersion = InteractiveWizard.DEFAULT_LARET_VERSION,
+                                modules = Module.entries.toSet(),
+                                shellTests = ShellTarget.entries.toSet(),
+                                graalvm = false,
+                            )
+                        } else {
+                            InteractiveWizard().runWizard()
+                        }
+
+                        val targetDir = ctx.option("dir").ifBlank { config.projectName }
+                        val root = File(targetDir).toPath()
+
+                        System.err.println("Generating ${config.projectName} in $root")
+                        val result = runBlocking { ProjectGenerator().generate(config, root) }
+                        result.written.forEach { println("created: $it") }
+                        if (result.failures.isNotEmpty()) {
+                            result.failures.forEach { System.err.println("error: ${it.message}") }
+                            throw RuntimeException("Scaffold completed with ${result.failures.size} failure(s)")
+                        }
+                        println("Done. Next: cd $targetDir && ./gradlew run")
                     }
                 }
             }
