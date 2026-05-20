@@ -2,6 +2,8 @@ package com.rkhamatyarov.laret.example
 
 import com.rkhamatyarov.laret.completion.CompletionCommand
 import com.rkhamatyarov.laret.completion.ManPageGenerator
+import com.rkhamatyarov.laret.completion.SchemaExportCommand
+import com.rkhamatyarov.laret.completion.SchemaFormat
 import com.rkhamatyarov.laret.completion.ShellType
 import com.rkhamatyarov.laret.core.CommandHistory
 import com.rkhamatyarov.laret.core.CommandPipeline
@@ -178,6 +180,25 @@ fun main(args: Array<String>) {
                                 println("Error: ${e.message}")
                             }
                         }
+                    }
+                }
+            }
+
+            group(name = "schema", description = "LLM schema export") {
+                command(name = "export", description = "Export commands as an LLM function-calling schema") {
+                    option("f", "format", "Schema dialect: openai or anthropic", "openai", true)
+                    option("o", "output", "Write schema to file instead of stdout", "", true)
+
+                    action { ctx ->
+                        val formatId = ctx.option("format").ifBlank { "openai" }
+                        val format = SchemaFormat.fromId(formatId)
+                            ?: run {
+                                System.err.println("Unsupported schema format: $formatId")
+                                return@action
+                            }
+                        val output = ctx.option("output").takeIf { it.isNotBlank() }?.let { File(it) }
+                        val schema = SchemaExportCommand(ctx.app!!).export(format, output)
+                        if (output == null) print(schema)
                     }
                 }
             }

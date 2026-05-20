@@ -564,6 +564,15 @@ group(
 
 ```
 
+## LLM Function Calling
+
+Export your Laret CLI as OpenAI functions or Anthropic tools:
+
+```bash
+laret schema export --format openai > functions.json
+laret schema export --format anthropic --output tools.json
+```
+
 ## Command Piping
 
 Laret lets you chain multiple commands together so the output of one becomes the input of the next — similar to Unix pipes.
