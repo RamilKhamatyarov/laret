@@ -2,6 +2,7 @@ package com.rkhamatyarov.laret.example
 
 import com.rkhamatyarov.laret.completion.CompletionCommand
 import com.rkhamatyarov.laret.completion.ManPageGenerator
+import com.rkhamatyarov.laret.completion.McpServeCommand
 import com.rkhamatyarov.laret.completion.SchemaExportCommand
 import com.rkhamatyarov.laret.completion.SchemaFormat
 import com.rkhamatyarov.laret.completion.ShellType
@@ -201,6 +202,10 @@ fun main(args: Array<String>) {
                         if (output == null) print(schema)
                     }
                 }
+            }
+
+            group(name = "mcp", description = "Model Context Protocol server") {
+                McpServeCommand.register(this)
             }
 
             group(name = "new", description = "Scaffold a new Laret CLI project") {

@@ -563,6 +563,74 @@ group(
 }
 
 ```
+
+## MCP Server
+
+Laret can expose its command tree as Model Context Protocol tools.
+Any MCP-compatible local client can list commands and call them with structured arguments over stdio.
+
+```bash
+laret mcp:serve --transport stdio
+```
+
+When the server starts, it waits for JSON-RPC messages on stdin. It does not print an interactive prompt.
+
+Generic MCP client configuration:
+
+```json
+{
+  "mcpServers": {
+    "laret": {
+      "command": "laret",
+      "args": ["mcp:serve", "--transport", "stdio"],
+      "env": {
+        "LARET_PROFILE": "prod"
+      }
+    }
+  }
+}
+```
+
+Jar-based configuration:
+
+```json
+{
+  "mcpServers": {
+    "laret": {
+      "command": "java",
+      "args": [
+        "--enable-native-access=ALL-UNNAMED",
+        "-jar",
+        "<path-to-laret-fat.jar>",
+        "mcp:serve"
+      ]
+    }
+  }
+}
+```
+
+Tools are named with the app, group, and command path, for example `laret.file.create`.
+
+Manual protocol check:
+
+```bash
+echo '{"jsonrpc":"2.0","method":"initialize","id":1}' | laret mcp:serve
+echo '{"jsonrpc":"2.0","method":"tools/list","id":2}' | laret mcp:serve
+echo '{"jsonrpc":"2.0","method":"tools/call","id":3,"params":{"name":"laret.file.create","arguments":{"path":"sample.txt","content":"hello"}}}' | laret mcp:serve
+```
+
+This implementation is stdio-only, so `curl` is not used until an HTTP/SSE transport is added.
+
+Security note: the MCP server runs with your user permissions; do not expose it to untrusted networks. Stdio is local by default, but any command available in the CLI can be invoked by a connected agent.
+
+Troubleshooting:
+
+| Issue | Check |
+|-------|-------|
+| Client does not see tools | Run `laret mcp:serve 2>mcp.log` and check stderr for adapter startup or command errors. |
+| Tool call returns `-32602` | Required arguments are missing or `arguments` is not a JSON object. |
+| Tool call returns `-32000` | The underlying Laret command failed; inspect the returned error text. |
+
 ## Command Piping
 
 Laret lets you chain multiple commands together so the output of one becomes the input of the next — similar to Unix pipes.
