@@ -189,10 +189,7 @@ class EnvLayer(
     }
 }
 
-class FlagLayer(
-    values: Map<String, String>,
-    private val bindings: Map<String, String> = emptyMap(),
-) : ConfigLayer {
+class FlagLayer(values: Map<String, String>, private val bindings: Map<String, String> = emptyMap()) : ConfigLayer {
     override val priority = 30
 
     private val normalizedValues = values.entries.associate { (k, v) ->

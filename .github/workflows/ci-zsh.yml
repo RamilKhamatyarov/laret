@@ -2253,7 +2253,6 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        shell: [bash, zsh]
         profile: [dev, prod]
 
     steps:
@@ -2261,7 +2260,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install zsh
-        if: matrix.shell == 'zsh'
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Set up Java 25
@@ -2275,12 +2273,15 @@ jobs:
         run: ./gradlew shadowJar
 
       - name: Test precedence file < env < cli
-        shell: ${{ matrix.shell }} {0}
+        shell: bash
         run: |
-          set -euo pipefail
+          cat > /tmp/laret_config_precedence_test.sh <<'SCRIPT'
+          set -e
+          set -u
+          set -o pipefail
           mkdir -p /tmp/laret_config_precedence
           echo "fixture" > /tmp/laret_config_precedence/item.txt
-          cat > ".laret.${{ matrix.profile }}.yml" <<'EOF'
+          cat > ".laret.PROFILE.yml" <<'EOF'
           dir:
             format: yaml
           EOF
@@ -2289,17 +2290,21 @@ jobs:
             format: plain
           EOF
 
-          java -jar build/libs/laret-fat.jar --profile "${{ matrix.profile }}" \
+          java -jar build/libs/laret-fat.jar --profile "PROFILE" \
             dir list /tmp/laret_config_precedence > /tmp/laret_profile.out
           grep -q "name:" /tmp/laret_profile.out
 
-          LARET_DIR_FORMAT=json java -jar build/libs/laret-fat.jar --profile "${{ matrix.profile }}" \
+          LARET_DIR_FORMAT=json java -jar build/libs/laret-fat.jar --profile "PROFILE" \
             dir list /tmp/laret_config_precedence > /tmp/laret_env.out
           grep -q '"name"' /tmp/laret_env.out
 
-          LARET_DIR_FORMAT=json java -jar build/libs/laret-fat.jar --profile "${{ matrix.profile }}" \
+          LARET_DIR_FORMAT=json java -jar build/libs/laret-fat.jar --profile "PROFILE" \
             dir list /tmp/laret_config_precedence --format plain > /tmp/laret_flag.out
           grep -q "Directory:" /tmp/laret_flag.out
+          SCRIPT
+
+          sed -i 's/PROFILE/${{ matrix.profile }}/g' /tmp/laret_config_precedence_test.sh
+          zsh /tmp/laret_config_precedence_test.sh
 
   summary:
     name: Build Summary (zsh)

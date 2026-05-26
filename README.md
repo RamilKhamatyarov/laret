@@ -563,7 +563,6 @@ group(
 }
 
 ```
-
 ## Command Piping
 
 Laret lets you chain multiple commands together so the output of one becomes the input of the next — similar to Unix pipes.

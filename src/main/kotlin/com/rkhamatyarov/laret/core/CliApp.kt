@@ -234,11 +234,7 @@ data class CliApp(
 
     fun findPlugin(name: String): LaretPlugin? = pluginManager.getPlugins().find { it.name == name }
 
-    private data class GlobalOptions(
-        val configPath: String?,
-        val profile: String?,
-        val remaining: Array<String>,
-    )
+    private data class GlobalOptions(val configPath: String?, val profile: String?, val remaining: Array<String>)
 
     private fun extractGlobalOptions(args: Array<String>): GlobalOptions {
         var nextConfigPath: String? = null
