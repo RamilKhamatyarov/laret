@@ -2237,8 +2237,68 @@ jobs:
             /tmp/hist_*.err
           retention-days: 7
 
-  test-config-precedence:
-    name: Test Config Precedence
+  integration-mcp-server:
+    name: Integration - MCP Server
+    runs-on: ubuntu-latest
+    needs: [ build ]
+
+    steps:
+      - name: Download native binary
+        uses: actions/download-artifact@v4
+        with:
+          name: laret-native
+          path: ./bin
+
+      - name: Make binary executable
+        run: chmod +x ./bin/laret
+
+      - name: MCP - initialize returns server info
+        run: |
+          set -euo pipefail
+          printf '%s\n' '{"jsonrpc":"2.0","method":"initialize","id":1}' \
+            | ./bin/laret mcp:serve > /tmp/mcp_initialize.out 2>/tmp/mcp_initialize.err
+          cat /tmp/mcp_initialize.out
+          grep -q '"jsonrpc":"2.0"' /tmp/mcp_initialize.out
+          grep -q '"id":1' /tmp/mcp_initialize.out
+          grep -q '"serverInfo"' /tmp/mcp_initialize.out
+          echo "MCP initialize succeeded"
+
+      - name: MCP - tools/list exposes command tools
+        run: |
+          set -euo pipefail
+          printf '%s\n' '{"jsonrpc":"2.0","method":"tools/list","id":2}' \
+            | ./bin/laret mcp:serve > /tmp/mcp_tools.out 2>/tmp/mcp_tools.err
+          cat /tmp/mcp_tools.out
+          grep -q '"tools"' /tmp/mcp_tools.out
+          grep -q '"name":"laret.file.create"' /tmp/mcp_tools.out
+          grep -q '"inputSchema"' /tmp/mcp_tools.out
+          echo "MCP tools/list succeeded"
+
+      - name: MCP - tools/call executes command
+        run: |
+          set -euo pipefail
+          rm -f /tmp/mcp_created.txt
+          printf '%s\n' '{"jsonrpc":"2.0","method":"tools/call","id":3,"params":{"name":"laret.file.create","arguments":{"path":"/tmp/mcp_created.txt","content":"mcp content"}}}' \
+            | ./bin/laret mcp:serve > /tmp/mcp_call.out 2>/tmp/mcp_call.err
+          cat /tmp/mcp_call.out
+          grep -q '"content"' /tmp/mcp_call.out
+          test -f /tmp/mcp_created.txt
+          grep -q "mcp content" /tmp/mcp_created.txt
+          echo "MCP tools/call succeeded"
+
+      - name: Upload MCP artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-server-outputs
+          path: |
+            /tmp/mcp_*.out
+            /tmp/mcp_*.err
+            /tmp/mcp_created.txt
+          retention-days: 7
+
+  integration-config-precedence:
+    name: Integration - Config Precedence
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -2317,7 +2377,8 @@ jobs:
       - integration-diff
       - integration-undo
       - integration-history
-      - test-config-precedence
+      - integration-mcp-server
+      - integration-config-precedence
     if: always()
 
     steps:
@@ -2346,6 +2407,8 @@ jobs:
           echo " integration-diff:           ${{ needs.integration-diff.result }}"
           echo " integration-undo:           ${{ needs.integration-undo.result }}"
           echo " integration-history:        ${{ needs.integration-history.result }}"
+          echo " integration-mcp-server:     ${{ needs.integration-mcp-server.result }}"
+          echo " integration-config-precedence: ${{ needs.integration-config-precedence.result }}"
           echo "=========================================="
 
       - name: Comment PR on failure

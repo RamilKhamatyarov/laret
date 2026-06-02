@@ -144,6 +144,11 @@ data class CliApp(
                 return 0
             }
 
+            args[0].contains(":") -> {
+                val parts = args[0].split(":", limit = 2)
+                return executeCommand((parts + args.drop(1)).toTypedArray())
+            }
+
             args[0] == "--config" && args.size > 1 -> {
                 init(args[1])
                 val remaining = args.drop(2).toTypedArray()

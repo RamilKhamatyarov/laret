@@ -16,7 +16,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-@DisplayName("SchemaExporter")
 class SchemaExporterTest {
     private val mapper = jacksonObjectMapper()
 
