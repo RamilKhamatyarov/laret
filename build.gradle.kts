@@ -50,8 +50,9 @@ kotlin {
 }
 
 pmd {
-    toolVersion = "7.7.0"
+    toolVersion = "7.16.0"
     isConsoleOutput = true
+    isIgnoreFailures = false
     ruleSets = listOf()
     ruleSetFiles = files("config/pmd/ruleset.xml")
 }
@@ -175,7 +176,7 @@ tasks {
     }
 
     named("check") {
-        dependsOn("spotlessCheck", "ktlintCheck")
+        dependsOn("spotlessCheck", "ktlintCheck", "pmdMain", "pmdTest")
     }
 }
 

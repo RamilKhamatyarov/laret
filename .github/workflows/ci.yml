@@ -123,33 +123,8 @@ jobs:
         run: ./gradlew tasks --all | grep -q spotlessCheck && ./gradlew spotlessCheck || echo "Spotless not configured - skipping"
         continue-on-error: true
 
-      - name: Install PMD
-        run: |
-          PMD_VERSION="7.7.0"
-          curl -sSL "https://github.com/pmd/pmd/releases/download/pmd_releases%2F${PMD_VERSION}/pmd-dist-${PMD_VERSION}-bin.zip" \
-            -o /tmp/pmd.zip
-          unzip -q /tmp/pmd.zip -d /tmp/pmd-dist
-          echo "/tmp/pmd-dist/pmd-bin-${PMD_VERSION}/bin" >> $GITHUB_PATH
-
-      - name: Run PMD on Kotlin sources
-        run: |
-          pmd check \
-            --dir src/main/kotlin \
-            --rulesets config/pmd/ruleset.xml \
-            --format text \
-            --fail-on-violation false \
-            --no-progress \
-            2>&1 | tee /tmp/pmd-report.txt || true
-          echo "PMD analysis complete"
-          wc -l /tmp/pmd-report.txt
-
-      - name: Upload PMD report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pmd-report
-          path: /tmp/pmd-report.txt
-          retention-days: 7
+      - name: PMD check
+        run: ./gradlew pmdMain pmdTest
 
       - name: Super-Linter
         uses: super-linter/super-linter@v8.0.0
