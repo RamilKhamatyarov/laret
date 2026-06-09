@@ -8,6 +8,9 @@
                 "pattern": "templates/.*\\.tpl"
             },
             {
+                "pattern": "docs/.*\\.md$"
+            },
+            {
                 "pattern": "templates/bash\\.tpl$"
             },
             {
