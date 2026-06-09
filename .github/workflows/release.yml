@@ -1,0 +1,169 @@
+# Single responsibility: this workflow only builds and publishes releases.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      publish:
+        default: false
+        description: 'Publish a GitHub Release instead of only validating artifacts'
+        required: true
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  build-native:
+    name: Build Native - ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - artifact-name: laret-linux-x86_64
+            binary-name: laret-linux-x86_64
+            os: ubuntu-latest
+            target: linux-x86_64
+          - artifact-name: laret-macos-x86_64
+            binary-name: laret-macos-x86_64
+            os: macos-13
+            target: macos-x86_64
+          - artifact-name: laret-macos-aarch64
+            binary-name: laret-macos-aarch64
+            os: macos-14
+            target: macos-aarch64
+          - artifact-name: laret-windows-x86_64
+            binary-name: laret-windows-x86_64.exe
+            os: windows-latest
+            target: windows-x86_64
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup GraalVM
+        uses: graalvm/setup-graalvm@v1
+        with:
+          distribution: graalvm-community
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          java-version: '25'
+          native-image-job-reports: 'true'
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Build native image
+        if: runner.os != 'Windows'
+        run: |
+          chmod +x ./gradlew
+          ./gradlew nativeCompile --no-daemon --console=plain
+
+      - name: Build native image on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\gradlew.bat nativeCompile --no-daemon --console=plain
+
+      - name: Prepare release artifact
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p release
+          cp build/native/nativeCompile/laret "release/${{ matrix.binary-name }}"
+          chmod +x "release/${{ matrix.binary-name }}"
+
+      - name: Prepare Windows release artifact
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item build\native\nativeCompile\laret.exe "release\${{ matrix.binary-name }}"
+
+      - name: Upload platform binary
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: ${{ matrix.artifact-name }}
+          path: release/${{ matrix.binary-name }}
+          retention-days: 1
+
+      - name: Upload native build report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: ignore
+          name: native-report-${{ matrix.target }}
+          path: build/native/nativeCompile/reports/**
+          retention-days: 7
+
+  generate-checksums:
+    name: Generate SHA256 Checksums
+    needs: build-native
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download platform binaries
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: release
+          pattern: laret-*
+
+      - name: Create release metadata
+        run: |
+          tag_name="${GITHUB_REF_NAME:-manual-release}"
+          printf '{\n  "x-laret-version": "%s",\n  "commit": "%s"\n}\n' \
+            "$tag_name" "$GITHUB_SHA" > release/laret-release-metadata.json
+
+      - name: Compute SHA256 checksums
+        run: |
+          cd release
+          sha256sum laret-* | sort -k2 > SHA256SUMS.txt
+          grep -Eq '^[a-f0-9]{64}  laret-' SHA256SUMS.txt
+          sha256sum --check SHA256SUMS.txt
+
+      - name: Upload release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: release-bundle
+          path: release/*
+          retention-days: 1
+
+  publish-release:
+    name: Publish GitHub Release
+    if: github.event_name == 'push' || github.event.inputs.publish == 'true'
+    needs:
+      - build-native
+      - generate-checksums
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download release bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: release-bundle
+          path: release
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          body: |
+            Release metadata is available in `laret-release-metadata.json`.
+          draft: false
+          fail_on_unmatched_files: true
+          files: release/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

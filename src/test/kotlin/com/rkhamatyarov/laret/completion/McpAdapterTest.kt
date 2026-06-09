@@ -74,7 +74,7 @@ class McpAdapterTest {
                     "arguments": {}
                   }
                 }
-            """.trimIndent()
+        """.trimIndent()
 
         val response = adapter.handleRequest(request)
         val parsed = json.readTree(response)
@@ -107,7 +107,7 @@ class McpAdapterTest {
                     }
                   }
                 }
-            """.trimIndent()
+        """.trimIndent()
 
         val response = adapter.handleRequest(request)
         val parsed = json.readTree(response)
@@ -134,7 +134,7 @@ class McpAdapterTest {
                     }
                   }
                 }
-            """.trimIndent()
+        """.trimIndent()
 
         val response = adapter.handleRequest(request)
         val parsed = json.readTree(response)

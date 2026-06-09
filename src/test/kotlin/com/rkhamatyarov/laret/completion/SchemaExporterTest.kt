@@ -10,7 +10,6 @@ import com.rkhamatyarov.laret.model.Argument
 import com.rkhamatyarov.laret.model.Command
 import com.rkhamatyarov.laret.model.CommandGroup
 import com.rkhamatyarov.laret.model.Option
-import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

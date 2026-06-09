@@ -17,6 +17,8 @@ import com.rkhamatyarov.laret.diff.JsonDiffFormatter
 import com.rkhamatyarov.laret.diff.PlainFormatter
 import com.rkhamatyarov.laret.diff.UnifiedFormatter
 import com.rkhamatyarov.laret.diff.diffFiles
+import com.rkhamatyarov.laret.doc.DocFormat
+import com.rkhamatyarov.laret.doc.DocGenerateCommand
 import com.rkhamatyarov.laret.dsl.cli
 import com.rkhamatyarov.laret.output.OutputStrategy
 import com.rkhamatyarov.laret.scaffold.generator.ProjectGenerator
@@ -206,6 +208,30 @@ fun main(args: Array<String>) {
 
             group(name = "mcp", description = "Model Context Protocol server") {
                 McpServeCommand.register(this)
+            }
+
+            group(name = "doc", description = "Documentation generation") {
+                command(name = "generate", description = "Generate command docs (Markdown or man pages)") {
+                    option("f", "format", "Output format: md or man", "md", true)
+                    option("l", "lang", "Language: en, es, or all", "en", true)
+                    option("o", "output-dir", "Output directory", "docs", true)
+
+                    action { ctx ->
+                        val app = ctx.app ?: return@action
+                        val formatId = ctx.option("format").ifBlank { "md" }
+                        val format = DocFormat.fromId(formatId)
+                            ?: run {
+                                System.err.println("Unsupported format: $formatId (use md or man)")
+                                return@action
+                            }
+                        val lang = ctx.option("lang").ifBlank { "en" }
+                        val outputDir = File(ctx.option("output-dir").ifBlank { "docs" }).toPath()
+
+                        val written = DocGenerateCommand(app).run(format, lang, outputDir)
+                        written.forEach { println("created: $it") }
+                        println("Generated ${written.size} doc file(s) in $outputDir")
+                    }
+                }
             }
 
             group(name = "new", description = "Scaffold a new Laret CLI project") {
