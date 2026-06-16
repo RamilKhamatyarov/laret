@@ -1,4 +1,3 @@
-# Single responsibility: this workflow only builds and publishes releases.
 name: Release
 
 on:
@@ -17,8 +16,53 @@ permissions:
   contents: write
 
 jobs:
+  validate-release:
+    name: Validate Release Versions
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Check version consistency
+        run: |
+          GRADLE_VERSION=$(grep '^version = ' build.gradle.kts | grep -o '"[^"]*"' | tr -d '"')
+          WIZARD_VERSION=$(grep 'DEFAULT_LARET_VERSION' \
+            src/main/kotlin/com/rkhamatyarov/laret/scaffold/wizard/InteractiveWizard.kt \
+            | grep -o '"[^"]*"' | tr -d '"')
+          MAIN_VERSION=$(grep -m1 'version = "' \
+            src/main/kotlin/com/rkhamatyarov/laret/example/Main.kt \
+            | grep -o '"[^"]*"' | tr -d '"')
+
+          echo "Gradle version : $GRADLE_VERSION"
+          echo "Wizard version : $WIZARD_VERSION"
+          echo "Main version   : $MAIN_VERSION"
+
+          if [[ "$GRADLE_VERSION" != "$WIZARD_VERSION" ]]; then
+            echo "Version mismatch between build.gradle.kts ($GRADLE_VERSION) and InteractiveWizard ($WIZARD_VERSION)"
+            exit 1
+          fi
+
+          if [[ "$GRADLE_VERSION" != "$MAIN_VERSION" ]]; then
+            echo "Version mismatch between build.gradle.kts ($GRADLE_VERSION) and example/Main.kt ($MAIN_VERSION)"
+            exit 1
+          fi
+
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+            echo "Tag version    : $TAG_VERSION"
+            if [[ "$GRADLE_VERSION" != "$TAG_VERSION" ]]; then
+              echo "Tag v$TAG_VERSION does not match build.gradle.kts version $GRADLE_VERSION"
+              echo "Run: ./scripts/bump-version.sh $TAG_VERSION"
+              exit 1
+            fi
+          fi
+
+          echo "All versions consistent: $GRADLE_VERSION"
+
   build-native:
     name: Build Native - ${{ matrix.target }}
+    needs: validate-release
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -159,11 +203,72 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          body: |
-            Release metadata is available in `laret-release-metadata.json`.
           draft: false
           fail_on_unmatched_files: true
           files: release/*
           generate_release_notes: true
+          body: |
+            ## Laret ${{ github.ref_name }}
+
+            ### New Features
+            - `laret new project` — interactive wizard to scaffold a new Laret CLI project
+            - `laret doc generate --format <md|man> --lang <en|es|all>` — documentation generation with i18n prose support
+            - `laret doc` group: Clean Architecture doc subsystem (`DocGenerator`, `ProseProvider`, `ResourceProseProvider`)
+
+            ### Improvements
+            - GraalVM native-image resource config updated for scaffold templates and doc prose files
+            - `GroffDocGenerator` adapter wraps existing `ManPageGenerator` without breaking `completion man`
+
+            ### Migration
+            - Man pages: `laret completion man` continues to work unchanged. The new `laret doc generate --format man` path is the recommended future default.
+            - Prose files: drop `src/main/resources/docs/{lang}/{group}/{command}.md` files alongside your commands to add localized long descriptions, examples, and see-also references.
+
+            See full changelog below.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  post-release-test:
+    name: Smoke Test - ${{ matrix.target }}
+    if: github.event_name == 'push'
+    needs: publish-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            asset: laret-linux-x86_64
+            binary: laret
+            target: linux-x86_64
+          - os: macos-14
+            asset: laret-macos-aarch64
+            binary: laret
+            target: macos-aarch64
+          - os: windows-latest
+            asset: laret-windows-x86_64.exe
+            binary: laret.exe
+            target: windows-x86_64
+
+    steps:
+      - name: Download release binary
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          curl -fsSL -o "${{ matrix.binary }}" \
+            "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/${{ matrix.asset }}"
+
+      - name: Make executable
+        if: runner.os != 'Windows'
+        run: chmod +x ./${{ matrix.binary }}
+
+      - name: Smoke test — version
+        shell: bash
+        run: ./${{ matrix.binary }} --version
+
+      - name: Smoke test — doc generate
+        shell: bash
+        run: ./${{ matrix.binary }} doc generate --format md --lang en --output-dir smoke-docs
+
+      - name: Smoke test — completion help
+        shell: bash
+        run: ./${{ matrix.binary }} completion --help || true

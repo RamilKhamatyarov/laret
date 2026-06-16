@@ -33,6 +33,7 @@ import com.rkhamatyarov.laret.stats.StatsCollector
 import com.rkhamatyarov.laret.stats.StatsFormat
 import com.rkhamatyarov.laret.stats.StatsMiddleware
 import com.rkhamatyarov.laret.ui.UnicodeSupport
+import com.rkhamatyarov.laret.update.UpdateCommand
 import com.rkhamatyarov.laret.watch.DirectoryWatcher
 import com.rkhamatyarov.laret.watch.WatchEventType
 import com.rkhamatyarov.laret.watch.WatchOptions
@@ -51,7 +52,7 @@ fun main(args: Array<String>) {
     val app =
         cli(
             name = "laret",
-            version = "1.0.0",
+            version = "0.2.0-SNAPSHOT",
             description = "Laret - A Cobra-like CLI framework for Kotlin",
         ) {
             use(LoggingMiddleware())
@@ -230,6 +231,46 @@ fun main(args: Array<String>) {
                         val written = DocGenerateCommand(app).run(format, lang, outputDir)
                         written.forEach { println("created: $it") }
                         println("Generated ${written.size} doc file(s) in $outputDir")
+                    }
+                }
+            }
+
+            group(name = "update", description = "Self-update the laret binary") {
+                command(name = "check", description = "Check whether a newer release is available") {
+                    action { ctx ->
+                        val result = UpdateCommand(ctx.app!!).check()
+                        result.fold(
+                            onSuccess = { info ->
+                                println("Current version: ${info.currentVersion}")
+                                println("Latest release : ${info.latestVersion}")
+                                if (info.updateAvailable) {
+                                    println("Update available. Run: laret update run")
+                                } else {
+                                    println("Already up to date.")
+                                }
+                            },
+                            onFailure = { e ->
+                                System.err.println("Update check failed: ${e.message}")
+                                throw RuntimeException("Update check failed", e)
+                            },
+                        )
+                    }
+                }
+
+                command(name = "run", description = "Download and install the latest release") {
+                    option("f", "force", "Install even when not newer than current", "", false)
+                    action { ctx ->
+                        val result = UpdateCommand(ctx.app!!).execute(force = ctx.optionBool("force"))
+                        result.fold(
+                            onSuccess = { path ->
+                                println("Updated binary installed at $path")
+                                println("The new version takes effect on next launch.")
+                            },
+                            onFailure = { e ->
+                                System.err.println("Update failed: ${e.message}")
+                                throw RuntimeException("Update failed", e)
+                            },
+                        )
                     }
                 }
             }
