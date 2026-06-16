@@ -6,6 +6,7 @@ import com.rkhamatyarov.laret.config.registry.ConfigRegistry
 import com.rkhamatyarov.laret.config.validator.ConfigValidator
 import com.rkhamatyarov.laret.model.Command
 import com.rkhamatyarov.laret.model.CommandGroup
+import com.rkhamatyarov.laret.update.OldBinaryCleaner
 import kotlinx.coroutines.runBlocking
 import org.fusesource.jansi.AnsiConsole
 
@@ -97,6 +98,7 @@ data class CliApp(
      */
     fun run(args: Array<String>): Int {
         logManager.disableLogging()
+        OldBinaryCleaner.cleanupSilently()
         AnsiConsole.systemInstall()
         try {
             return dispatch(args)

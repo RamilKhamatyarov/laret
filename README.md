@@ -16,6 +16,7 @@
 - **Zero Dependencies**
 - **Type-Safe**
 - **12Factor Configuration**
+- **Self-Update**
 
 ## Quick Start
 
@@ -944,6 +945,49 @@ cp build/native/nativeCompile/laret /usr/local/bin/
 tar -czf laret-linux-x64.tar.gz -C build/native/nativeCompile laret
 
 ```
+
+## Self-Update
+
+The native binary can update itself from [GitHub Releases](https://github.com/RamilKhamatyarov/laret/releases) — no package manager needed.
+
+### Check for Updates
+
+```bash
+
+laret update check
+
+# Current version: 0.2.0
+# Latest release : 0.3.0
+# Update available. Run: laret update run
+
+```
+
+### Install the Latest Release
+
+```bash
+
+# Download, verify, and install the newest version
+laret update run
+
+# Reinstall even when already up to date
+laret update run --force
+
+```
+
+### How It Works
+
+1. Queries the GitHub Releases API for the latest tag and picks the binary matching your OS and architecture (`linux-x86_64`, `macos-x86_64`, `macos-aarch64`, `windows-x86_64`).
+2. Downloads the binary next to the current executable and verifies its **SHA-256 checksum** against the release's `SHA256SUMS.txt` — a corrupted download never replaces a working binary.
+3. Renames the running executable to `laret.old` (allowed even on Windows, where a running `.exe` cannot be deleted) and atomically moves the new binary into place. If anything fails mid-swap, the previous binary is restored.
+4. The leftover `laret.old` is cleaned up automatically on the next launch.
+
+The new version takes effect on the next run.
+
+### Notes
+
+- Self-update only works for the **native binary**. Running via `gradle run` or a JAR fails with a clear message instead of touching the JVM.
+- An update is only offered when the release is strictly newer (`0.2.0-SNAPSHOT < 0.2.0 < 0.2.1`); use `--force` to override.
+- Set the `GITHUB_TOKEN` environment variable to avoid GitHub API rate limits in CI or behind shared IPs.
 
 ## Docker
 
