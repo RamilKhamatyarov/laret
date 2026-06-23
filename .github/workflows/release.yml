@@ -72,10 +72,6 @@ jobs:
             binary-name: laret-linux-x86_64
             os: ubuntu-latest
             target: linux-x86_64
-          - artifact-name: laret-macos-x86_64
-            binary-name: laret-macos-x86_64
-            os: macos-13
-            target: macos-x86_64
           - artifact-name: laret-macos-aarch64
             binary-name: laret-macos-aarch64
             os: macos-14

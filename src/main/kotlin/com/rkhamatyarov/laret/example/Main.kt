@@ -66,7 +66,7 @@ fun main(args: Array<String>) {
     val app =
         cli(
             name = "laret",
-            version = "0.2.0-SNAPSHOT",
+            version = "0.2.0",
             description = "Laret - A Cobra-like CLI framework for Kotlin",
         ) {
             use(LoggingMiddleware())

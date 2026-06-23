@@ -123,7 +123,7 @@ class InteractiveWizard(
     }
 
     companion object {
-        const val DEFAULT_LARET_VERSION = "0.2.0-SNAPSHOT"
+        const val DEFAULT_LARET_VERSION = "0.2.0"
         private const val MAX_RETRIES = 3
     }
 }

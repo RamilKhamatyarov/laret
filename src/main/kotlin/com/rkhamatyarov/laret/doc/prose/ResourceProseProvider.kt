@@ -1,7 +1,7 @@
 package com.rkhamatyarov.laret.doc.prose
 
-import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.rkhamatyarov.laret.core.CliApp
@@ -119,9 +119,30 @@ class ResourceProseProvider(private val classLoader: ClassLoader = ResourceProse
         val block = normalized.substring(FENCE.length + 1, closing)
         val afterFence = normalized.indexOf('\n', closing + 1)
         val body = if (afterFence < 0) "" else normalized.substring(afterFence + 1).trim()
-        val frontmatter = yaml.readValue(block, Frontmatter::class.java)
-        return frontmatter to body
+        return parseFrontmatter(block) to body
     }
+
+    /**
+     * Reads the frontmatter via Jackson's tree model rather than data-class
+     * binding.  `jackson-module-kotlin` would invoke Kotlin reflection on this
+     * nested private class, which fails at runtime inside the shaded fat JAR
+     * (`KotlinReflectionInternalError: Unresolved class … $Frontmatter`).  The
+     * tree model is pure `jackson-databind` and needs no reflection.
+     */
+    private fun parseFrontmatter(block: String): Frontmatter {
+        val node: JsonNode = yaml.readTree(block) ?: return Frontmatter()
+        if (!node.isObject) return Frontmatter()
+        return Frontmatter(
+            title = node.path("title").takeIf { it.isTextual }?.asText(),
+            summary = node.path("summary").takeIf { it.isTextual }?.asText(),
+            synopsis = node.path("synopsis").takeIf { it.isTextual }?.asText(),
+            examples = stringList(node.path("examples")),
+            seeAlso = stringList(node.path("see_also")),
+        )
+    }
+
+    private fun stringList(node: JsonNode): List<String> =
+        if (node.isArray) node.mapNotNull { if (it.isNull) null else it.asText() } else emptyList()
 
     private fun toProse(frontmatter: Frontmatter, body: String, command: Command): Prose = Prose(
         title = frontmatter.title ?: command.name,
@@ -147,7 +168,7 @@ class ResourceProseProvider(private val classLoader: ClassLoader = ResourceProse
         val summary: String? = null,
         val synopsis: String? = null,
         val examples: List<String> = emptyList(),
-        @param:JsonProperty("see_also") val seeAlso: List<String> = emptyList(),
+        val seeAlso: List<String> = emptyList(),
     )
 
     companion object {

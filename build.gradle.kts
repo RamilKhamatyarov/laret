@@ -3,14 +3,14 @@ plugins {
     id("org.graalvm.buildtools.native") version "1.1.2"
     id("com.gradleup.shadow") version "9.4.2"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
-    id("com.diffplug.spotless") version "8.6.0"
+    id("com.diffplug.spotless") version "8.7.0"
     id("pmd")
     `maven-publish`
     application
 }
 
 group = "com.rkhamatyarov"
-version = "0.2.0-SNAPSHOT"
+version = "0.2.0"
 
 application {
     mainClass.set("com.rkhamatyarov.laret.example.MainKt")
