@@ -19,6 +19,8 @@ import com.rkhamatyarov.laret.diff.UnifiedFormatter
 import com.rkhamatyarov.laret.diff.diffFiles
 import com.rkhamatyarov.laret.doc.DocFormat
 import com.rkhamatyarov.laret.doc.DocGenerateCommand
+import com.rkhamatyarov.laret.doc.DocScaffoldCommand
+import com.rkhamatyarov.laret.doc.DocValidationException
 import com.rkhamatyarov.laret.dsl.cli
 import com.rkhamatyarov.laret.output.OutputStrategy
 import com.rkhamatyarov.laret.scaffold.generator.ProjectGenerator
@@ -47,6 +49,18 @@ import java.net.InetAddress
 import java.net.Socket
 import kotlin.streams.asSequence
 import kotlin.system.exitProcess
+
+/**
+ * Resolves the entries a `dir list` invocation should report, applying the same
+ * hidden-file and max-size filters used to render the listing. Centralizing the
+ * filter keeps the rendered output and the post-execute summary count derived
+ * from one identical set (see integration-table-rendering entry-count check).
+ */
+internal fun listDirEntries(dir: File, includeHidden: Boolean, maxSize: Int): List<File> =
+    (dir.listFiles() ?: emptyArray())
+        .filter { includeHidden || !it.isHidden }
+        .filter { maxSize <= 0 || it.length() <= maxSize }
+        .sortedBy { it.name }
 
 fun main(args: Array<String>) {
     val app =
@@ -216,6 +230,8 @@ fun main(args: Array<String>) {
                     option("f", "format", "Output format: md or man", "md", true)
                     option("l", "lang", "Language: en, es, or all", "en", true)
                     option("o", "output-dir", "Output directory", "docs", true)
+                    option("s", "strict", "Fail on missing files, broken see_also links, or orphans", "", false)
+                    option("H", "include-hidden", "Document hidden commands with an [INTERNAL] badge", "", false)
 
                     action { ctx ->
                         val app = ctx.app ?: return@action
@@ -228,9 +244,40 @@ fun main(args: Array<String>) {
                         val lang = ctx.option("lang").ifBlank { "en" }
                         val outputDir = File(ctx.option("output-dir").ifBlank { "docs" }).toPath()
 
-                        val written = DocGenerateCommand(app).run(format, lang, outputDir)
-                        written.forEach { println("created: $it") }
-                        println("Generated ${written.size} doc file(s) in $outputDir")
+                        try {
+                            val written = DocGenerateCommand(app).run(
+                                format = format,
+                                lang = lang,
+                                outputDir = outputDir,
+                                strict = ctx.optionBool("strict"),
+                                includeHidden = ctx.optionBool("include-hidden"),
+                            )
+                            written.forEach { println("created: $it") }
+                            println("Generated ${written.size} doc file(s) in $outputDir")
+                        } catch (e: DocValidationException) {
+                            System.err.println(e.message)
+                            exitProcess(1)
+                        }
+                    }
+                }
+
+                command(name = "scaffold", description = "Create missing prose skeletons for every command") {
+                    option("l", "lang", "Language directory to scaffold", "en", true)
+                    option("o", "output-dir", "Output directory", "src/main/resources/docs", true)
+                    option("H", "include-hidden", "Scaffold hidden commands too", "", false)
+
+                    action { ctx ->
+                        val app = ctx.app ?: return@action
+                        val lang = ctx.option("lang").ifBlank { "en" }
+                        val outputDir = File(ctx.option("output-dir").ifBlank { "src/main/resources/docs" }).toPath()
+
+                        val created = DocScaffoldCommand(app).run(
+                            lang = lang,
+                            outputDir = outputDir,
+                            includeHidden = ctx.optionBool("include-hidden"),
+                        )
+                        created.forEach { println("scaffolded: $it") }
+                        println("Created ${created.size} skeleton(s) in $outputDir")
                     }
                 }
             }
@@ -911,8 +958,13 @@ fun main(args: Array<String>) {
                     postExecute = { ctx ->
                         val path = ctx.argument("path")
                         val dir = File(path)
-                        val count = dir.listFiles()?.size ?: 0
-                        println("listed $count entries in $path")
+                        val count =
+                            if (dir.isDirectory) {
+                                listDirEntries(dir, ctx.optionBool("all"), ctx.optionInt("max-size")).size
+                            } else {
+                                0
+                            }
+                        System.err.println("listed $count entries in $path")
                     }
 
                     action { ctx ->
@@ -928,11 +980,7 @@ fun main(args: Array<String>) {
                             return@action
                         }
 
-                        val files =
-                            (dir.listFiles() ?: emptyArray())
-                                .filter { all || !it.isHidden }
-                                .filter { maxSize <= 0 || it.length() <= maxSize }
-                                .sortedBy { it.name }
+                        val files = listDirEntries(dir, all, maxSize)
 
                         val bar = ctx.progressBar(total = files.size, label = "Scanning")
                         val entries =

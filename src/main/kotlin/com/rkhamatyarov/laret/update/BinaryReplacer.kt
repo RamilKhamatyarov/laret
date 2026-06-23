@@ -32,7 +32,6 @@ class BinaryReplacer(private val installMove: (staged: Path, live: Path) -> Unit
         require(Files.isRegularFile(staged)) { "Staged binary not found: $staged" }
         val old = live.resolveSibling("${live.fileName}.old")
 
-        // A stale .old from a previous update would block the rename on Windows.
         runCatching { Files.deleteIfExists(old) }
 
         Files.move(live, old)
@@ -58,7 +57,6 @@ class BinaryReplacer(private val installMove: (staged: Path, live: Path) -> Unit
             perms.add(PosixFilePermission.OTHERS_EXECUTE)
             Files.setPosixFilePermissions(target, perms)
         }
-        // POSIX permissions not supported on Windows — silently ignore.
     }
 
     companion object {

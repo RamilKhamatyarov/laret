@@ -33,17 +33,11 @@ class GitHubReleaseFetcher(private val repo: String = DEFAULT_REPO, private val 
         val assetName = assetNameFor(osName, osArch)
             ?: throw IllegalStateException("Unsupported platform: $osName/$osArch")
 
-        val request = baseRequest("https://api.github.com/repos/$repo/releases/latest").GET().build()
-        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-        if (response.statusCode() != 200) {
-            throw IllegalStateException("GitHub API returned HTTP ${response.statusCode()} for $repo")
-        }
-
-        val root: JsonNode = mapper.readTree(response.body())
-        val tagName = root.path("tag_name").asText("")
+        val release = latestRelease()
+        val tagName = release.path("tag_name").asText("")
         if (tagName.isBlank()) throw IllegalStateException("Release response has no tag_name")
 
-        val assets = root.path("assets")
+        val assets = release.path("assets")
         val assetUrl = downloadUrlOf(assets, assetName)
             ?: throw IllegalStateException("Release $tagName has no asset named '$assetName'")
 
@@ -56,10 +50,31 @@ class GitHubReleaseFetcher(private val repo: String = DEFAULT_REPO, private val 
         )
     }
 
+    private fun latestRelease(): JsonNode {
+        val latestUrl = "https://api.github.com/repos/$repo/releases/latest"
+        val latestResponse = sendString(latestUrl)
+        return when (latestResponse.statusCode()) {
+            200 -> mapper.readTree(latestResponse.body())
+            404 -> firstPublishedRelease()
+            else -> throw IllegalStateException("GitHub API returned HTTP ${latestResponse.statusCode()} for $repo")
+        }
+    }
+
+    private fun firstPublishedRelease(): JsonNode {
+        val releasesUrl = "https://api.github.com/repos/$repo/releases?per_page=10"
+        val releasesResponse = sendString(releasesUrl)
+        if (releasesResponse.statusCode() != 200) {
+            throw IllegalStateException("GitHub API returned HTTP ${releasesResponse.statusCode()} for $repo")
+        }
+
+        val releases = mapper.readTree(releasesResponse.body())
+        return releases.firstOrNull()
+            ?: throw IllegalStateException("No published GitHub releases found for $repo")
+    }
+
     /** Download [url] to [target], following GitHub's redirect to the CDN. */
     fun downloadTo(url: String, target: Path): Result<Path> = runCatching {
-        val request = baseRequest(url).GET().build()
-        val response = client.send(request, HttpResponse.BodyHandlers.ofFile(target))
+        val response = client.send(baseRequest(url).GET().build(), HttpResponse.BodyHandlers.ofFile(target))
         if (response.statusCode() != 200) {
             throw IllegalStateException("Download failed with HTTP ${response.statusCode()}: $url")
         }
@@ -68,13 +83,15 @@ class GitHubReleaseFetcher(private val repo: String = DEFAULT_REPO, private val 
 
     /** Download [url] as text (used for `SHA256SUMS.txt`). */
     fun downloadText(url: String): Result<String> = runCatching {
-        val request = baseRequest(url).GET().build()
-        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+        val response = sendString(url)
         if (response.statusCode() != 200) {
             throw IllegalStateException("Download failed with HTTP ${response.statusCode()}: $url")
         }
         response.body()
     }
+
+    private fun sendString(url: String): HttpResponse<String> =
+        client.send(baseRequest(url).GET().build(), HttpResponse.BodyHandlers.ofString())
 
     private fun baseRequest(url: String): HttpRequest.Builder {
         val builder = HttpRequest.newBuilder(URI.create(url))

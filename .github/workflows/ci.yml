@@ -139,6 +139,40 @@ jobs:
           HTTP_TIMEOUT: 30
         continue-on-error: false
 
+  doc-validation:
+    name: Documentation Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Java 25 to match the project's jvmToolchain(25): the fat JAR is compiled
+      # to Java 25 bytecode and must run on a 25 runtime.
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # Use the fat JAR rather than nativeCompile: it builds in seconds and keeps
+      # the PR feedback loop fast (native image is reserved for release.yml).
+      - name: Build fat JAR
+        run: ./gradlew shadowJar
+
+      # Advisory for now: most commands still lack prose .md files, so strict mode
+      # reports many "missing prose" findings. Kept non-blocking until prose
+      # coverage is complete — to enforce, delete the `continue-on-error` line.
+      - name: Validate documentation (strict, advisory)
+        continue-on-error: true
+        run: |
+          java -jar build/libs/laret-fat.jar \
+            doc generate --format md --lang all --output-dir site/docs --strict
+
   integration-completions:
     name: Integration - Shell Completions
     runs-on: ubuntu-latest

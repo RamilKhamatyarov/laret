@@ -33,7 +33,16 @@ object VersionComparator {
         val l = parse(local) ?: return false
         val byNumbers = compareValuesBy(r, l, Parsed::major, Parsed::minor, Parsed::patch)
         if (byNumbers != 0) return byNumbers > 0
-        // Same numbers: release is newer than its own snapshot.
         return l.snapshot && !r.snapshot
+    }
+
+    /**
+     * True when [remote] increments the major version over [local] (a breaking
+     * change, e.g. `1.4.0 → 2.0.0`).  Unparseable input returns `false`.
+     */
+    fun isMajorBump(remote: String, local: String): Boolean {
+        val r = parse(remote) ?: return false
+        val l = parse(local) ?: return false
+        return r.major > l.major
     }
 }
