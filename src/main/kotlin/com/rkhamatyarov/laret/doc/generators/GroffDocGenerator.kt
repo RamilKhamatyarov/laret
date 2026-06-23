@@ -27,20 +27,21 @@ class GroffDocGenerator(
 
     override val format: DocFormat = DocFormat.MAN
 
-    override fun generate(app: CliApp, lang: String): List<DocFile> = app.groups.flatMap { group ->
-        group.commands.map { command ->
-            val resolved = prose.resolve(group.name, command, lang)
-            val content = manPageGenerator.generate(
-                command = command,
-                appName = app.name,
-                version = app.version,
-                groupName = group.name,
-                seeAlso = resolved.seeAlso,
-            )
-            DocFile(
-                relativePath = "man1/${app.name}-${group.name}-${command.name}.1",
-                content = content,
-            )
+    override fun generate(app: CliApp, lang: String, includeHidden: Boolean): List<DocFile> =
+        app.groups.flatMap { group ->
+            group.commands.filter { includeHidden || !it.hidden }.map { command ->
+                val resolved = prose.resolve(group.name, command, lang)
+                val content = manPageGenerator.generate(
+                    command = command,
+                    appName = app.name,
+                    version = app.version,
+                    groupName = group.name,
+                    seeAlso = resolved.seeAlso,
+                )
+                DocFile(
+                    relativePath = "man1/${app.name}-${group.name}-${command.name}.1",
+                    content = content,
+                )
+            }
         }
-    }
 }

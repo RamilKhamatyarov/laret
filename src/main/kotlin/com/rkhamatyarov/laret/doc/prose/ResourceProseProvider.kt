@@ -4,8 +4,12 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.model.Command
+import java.nio.file.Files
+import java.nio.file.Paths
 import java.util.logging.Logger
+import kotlin.streams.asSequence
 
 /**
  * [ProseProvider] backed by classpath resources at
@@ -50,6 +54,42 @@ class ResourceProseProvider(private val classLoader: ClassLoader = ResourceProse
             tryLoad(FALLBACK_LANG, groupName, command)?.let { return it }
         }
         return dslProse(command)
+    }
+
+    override fun exists(groupName: String, command: String, lang: String): Boolean =
+        classLoader.getResource("docs/$lang/$groupName/$command.md") != null
+
+    /**
+     * Finds authored `.md` files under `docs/{lang}` that no longer correspond
+     * to a command in [app] (orphans), used by strict mode.
+     *
+     * Best-effort and Native-Image-safe: classpath directory enumeration only
+     * works when resources live on the file system (dev/CI from source); when
+     * the resource root is a JAR or not a `file:` directory, this returns empty.
+     * `index.md` files (generated navigation, not authored prose) are ignored.
+     */
+    fun findOrphans(app: CliApp, languages: List<String>): List<String> {
+        val known = buildSet {
+            app.groups.forEach { group -> group.commands.forEach { add("${group.name}/${it.name}") } }
+        }
+        return languages.flatMap { lang -> orphansForLang(lang, known) }
+    }
+
+    private fun orphansForLang(lang: String, known: Set<String>): List<String> {
+        val url = classLoader.getResource("docs/$lang") ?: return emptyList()
+        if (url.protocol != "file") return emptyList()
+        val root = Paths.get(url.toURI())
+        if (!Files.isDirectory(root)) return emptyList()
+        return Files.walk(root).use { stream ->
+            stream.asSequence()
+                .filter { Files.isRegularFile(it) && it.toString().endsWith(".md") }
+                .map { root.relativize(it).toString().replace('\\', '/') }
+                .filter { !it.substringAfterLast('/').equals("index.md", ignoreCase = true) }
+                .map { it.removeSuffix(".md") }
+                .filter { it !in known }
+                .map { "docs/$lang/$it.md" }
+                .toList()
+        }
     }
 
     private fun tryLoad(lang: String, groupName: String, command: Command): Prose? {

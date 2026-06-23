@@ -22,12 +22,23 @@ class GitHubReleaseFetcherTest {
         }
     """.trimIndent()
 
-    private fun clientReturning(status: Int, body: String): HttpClient {
+    private fun responseReturning(status: Int, body: String): HttpResponse<String> {
         val response = mockk<HttpResponse<String>>()
         every { response.statusCode() } returns status
         every { response.body() } returns body
+        return response
+    }
+
+    private fun clientReturning(status: Int, body: String): HttpClient {
+        val response = responseReturning(status, body)
         val client = mockk<HttpClient>()
         every { client.send(any(), any<HttpResponse.BodyHandler<String>>()) } returns response
+        return client
+    }
+
+    private fun clientReturning(vararg responses: HttpResponse<String>): HttpClient {
+        val client = mockk<HttpClient>()
+        every { client.send(any(), any<HttpResponse.BodyHandler<String>>()) } returnsMany responses.toList()
         return client
     }
 
@@ -50,6 +61,34 @@ class GitHubReleaseFetcherTest {
 
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull()!!.message!!.contains("403"))
+    }
+
+    @Test
+    fun test_fetch_latest_falls_back_to_release_list_when_latest_endpoint_returns_404() {
+        val client = clientReturning(
+            responseReturning(404, """{"message":"Not Found"}"""),
+            responseReturning(200, "[$releaseJson]"),
+        )
+        val fetcher = GitHubReleaseFetcher(client = client)
+
+        val release = fetcher.fetchLatest(osName = "Linux", osArch = "amd64").getOrThrow()
+
+        assertEquals("0.3.0", release.version)
+        assertEquals("laret-linux-x86_64", release.assetName)
+    }
+
+    @Test
+    fun test_fetch_latest_reports_missing_published_releases_when_fallback_is_empty() {
+        val client = clientReturning(
+            responseReturning(404, """{"message":"Not Found"}"""),
+            responseReturning(200, "[]"),
+        )
+        val fetcher = GitHubReleaseFetcher(client = client)
+
+        val result = fetcher.fetchLatest(osName = "Linux", osArch = "amd64")
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()!!.message!!.contains("No published GitHub releases"))
     }
 
     @Test

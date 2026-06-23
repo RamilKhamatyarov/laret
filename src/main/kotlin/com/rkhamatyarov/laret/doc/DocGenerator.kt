@@ -21,9 +21,11 @@ interface DocGenerator {
     /**
      * Render documentation for every command in [app] for the given [lang].
      *
-     * @param app  The CLI application whose groups/commands are documented.
-     * @param lang Language tag (e.g. `"en"`, `"es"`) used to resolve prose.
+     * @param app           The CLI application whose groups/commands are documented.
+     * @param lang          Language tag (e.g. `"en"`, `"es"`) used to resolve prose.
+     * @param includeHidden When `true`, hidden commands are documented too (with an
+     *                      `[INTERNAL]` marker); when `false` they are skipped entirely.
      * @return One or more [DocFile]s; the caller performs the actual I/O.
      */
-    fun generate(app: CliApp, lang: String): List<DocFile>
+    fun generate(app: CliApp, lang: String, includeHidden: Boolean = false): List<DocFile>
 }

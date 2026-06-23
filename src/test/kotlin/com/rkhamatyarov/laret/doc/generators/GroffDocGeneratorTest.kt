@@ -59,4 +59,22 @@ class GroffDocGeneratorTest {
 
         assertTrue(content.contains("laret-file-delete"))
     }
+
+    @Test
+    fun test_groff_generator_skips_hidden_commands_unless_included() {
+        val hiddenApp = CliApp(
+            name = "laret",
+            version = "1.0.0",
+            groups = listOf(
+                CommandGroup(
+                    name = "file",
+                    commands = listOf(Command(name = "secret", description = "Internal", hidden = true)),
+                ),
+            ),
+        )
+        val generator = GroffDocGenerator(providerReturning(prose))
+
+        assertTrue(generator.generate(hiddenApp, "en", includeHidden = false).isEmpty())
+        assertEquals(1, generator.generate(hiddenApp, "en", includeHidden = true).size)
+    }
 }

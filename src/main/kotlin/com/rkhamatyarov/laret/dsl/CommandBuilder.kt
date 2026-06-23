@@ -9,6 +9,7 @@ class CommandBuilder(val name: String, val description: String = "") {
     private val arguments = mutableListOf<Argument>()
     private val options = mutableListOf<Option>()
     private val aliases = mutableListOf<String>()
+    private var hidden = false
     private var actionBlock: (CommandContext) -> Unit = {}
 
     var preExecute: suspend (CommandContext) -> Unit = {}
@@ -17,6 +18,11 @@ class CommandBuilder(val name: String, val description: String = "") {
 
     fun aliases(vararg names: String) {
         aliases.addAll(names)
+    }
+
+    /** Marks this command as hidden: excluded from help/completion and from doc navigation. */
+    fun hidden() {
+        hidden = true
     }
 
     fun argument(
@@ -47,6 +53,6 @@ class CommandBuilder(val name: String, val description: String = "") {
 
     fun build(): Command = Command(
         name, description, arguments, options, aliases.toList(),
-        actionBlock, preExecute, postExecute, onError,
+        actionBlock, preExecute, postExecute, onError, hidden,
     )
 }

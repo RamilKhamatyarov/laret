@@ -10,6 +10,9 @@ import com.rkhamatyarov.laret.core.FlagPersistence
  * @param name        Primary name used to invoke the command (e.g. `"create"`).
  * @param aliases     Alternative names accepted at the CLI (e.g. `listOf("c", "new")`).
  * @param description Short description shown in help output.
+ * @param hidden      When `true`, the command is omitted from help/completion and
+ *                    from generated documentation navigation; doc generation still
+ *                    emits its page (with an `[INTERNAL]` badge) under `--include-hidden`.
  */
 data class Command(
     val name: String,
@@ -21,6 +24,7 @@ data class Command(
     val preExecute: suspend (CommandContext) -> Unit = {},
     val postExecute: suspend (CommandContext) -> Unit = {},
     val onError: suspend (CommandContext, Exception) -> Unit = { _, _ -> },
+    val hidden: Boolean = false,
 ) {
     /** True when [input] equals the primary name or any alias. */
     fun matches(input: String): Boolean = input == name || input in aliases

@@ -1,0 +1,34 @@
+site_name: Laret
+site_description: A Cobra-like CLI framework for Kotlin with GraalVM Native Image support
+
+# `laret doc generate --output-dir site/docs` writes the per-language tree here:
+#   site/docs/en/...   site/docs/es/...
+docs_dir: site/docs
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+
+plugins:
+  - search
+  # Folder structure: the plugin builds each locale from its top-level folder
+  # (en/, es/) under docs_dir — matching MarkdownDocGenerator's output layout.
+  - i18n:
+      docs_structure: folder
+      fallback_to_default: true
+      languages:
+        - locale: en
+          name: English
+          default: true
+          build: true
+        - locale: es
+          name: Español
+          build: true
+
+# The generator also drops a nav-only mkdocs.yml inside the docs tree; this
+# committed file is authoritative, so keep the generated one out of the site.
+exclude_docs: |
+  mkdocs.yml

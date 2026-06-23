@@ -48,4 +48,17 @@ class VersionComparatorTest {
         assertFalse(VersionComparator.isValid("1.0"))
         assertFalse(VersionComparator.isValid("abc"))
     }
+
+    @Test
+    fun test_is_major_bump_detects_breaking_upgrades() {
+        assertTrue(VersionComparator.isMajorBump("2.0.0", "1.4.3"))
+        assertTrue(VersionComparator.isMajorBump("v2.0.0", "1.9.9"))
+    }
+
+    @Test
+    fun test_minor_and_patch_changes_are_not_major_bumps() {
+        assertFalse(VersionComparator.isMajorBump("1.5.0", "1.4.0"))
+        assertFalse(VersionComparator.isMajorBump("1.4.4", "1.4.3"))
+        assertFalse(VersionComparator.isMajorBump("not-a-version", "1.0.0"))
+    }
 }

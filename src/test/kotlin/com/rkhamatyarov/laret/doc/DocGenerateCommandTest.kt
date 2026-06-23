@@ -47,9 +47,11 @@ class DocGenerateCommandTest {
     fun test_markdown_generation_writes_files_to_disk() {
         val written = DocGenerateCommand(app).run(DocFormat.MARKDOWN, "en", outputDir, provider)
 
-        val expected = outputDir.resolve("en/file/create.md")
-        assertEquals(listOf(expected), written)
-        assertTrue(Files.exists(expected))
+        val commandPage = outputDir.resolve("en/file/create.md")
+        assertTrue(written.contains(commandPage))
+        assertTrue(Files.exists(commandPage))
+        assertTrue(Files.exists(outputDir.resolve("mkdocs.yml")), "mkdocs.yml must be generated for Markdown")
+        assertTrue(Files.exists(outputDir.resolve("en/index.md")))
     }
 
     @Test
@@ -61,10 +63,51 @@ class DocGenerateCommandTest {
 
     @Test
     fun test_lang_all_fans_out_markdown_over_supported_languages() {
-        val written = DocGenerateCommand(app).run(DocFormat.MARKDOWN, DocGenerateCommand.ALL, outputDir, provider)
+        DocGenerateCommand(app).run(DocFormat.MARKDOWN, DocGenerateCommand.ALL, outputDir, provider)
 
-        assertEquals(DocGenerateCommand.SUPPORTED_LANGUAGES.size, written.size)
+        assertTrue(Files.exists(outputDir.resolve("en/file/create.md")))
         assertTrue(Files.exists(outputDir.resolve("es/file/create.md")))
+    }
+
+    @Test
+    fun test_strict_mode_fails_on_missing_prose_file() {
+        every { provider.exists(any(), any(), any()) } returns false
+
+        val error = runCatching {
+            DocGenerateCommand(app).run(DocFormat.MARKDOWN, "en", outputDir, provider, strict = true)
+        }.exceptionOrNull()
+
+        assertTrue(error is DocValidationException)
+        assertTrue(error.problems.any { it.contains("missing prose") })
+    }
+
+    @Test
+    fun test_strict_mode_fails_on_broken_see_also_link() {
+        every { provider.exists(any(), any(), any()) } returns true
+        every { provider.resolve(any(), any(), any()) } returns Prose(
+            title = "Create",
+            summary = "Create a file.",
+            synopsis = null,
+            examples = emptyList(),
+            seeAlso = listOf("laret-file-nonexistent"),
+            body = "Body.",
+        )
+
+        val error = runCatching {
+            DocGenerateCommand(app).run(DocFormat.MARKDOWN, "en", outputDir, provider, strict = true)
+        }.exceptionOrNull()
+
+        assertTrue(error is DocValidationException)
+        assertTrue(error.problems.any { it.contains("broken see_also") })
+    }
+
+    @Test
+    fun test_strict_mode_passes_when_files_present_and_links_valid() {
+        every { provider.exists(any(), any(), any()) } returns true
+
+        val written = DocGenerateCommand(app).run(DocFormat.MARKDOWN, "en", outputDir, provider, strict = true)
+
+        assertTrue(written.isNotEmpty())
     }
 
     @Test

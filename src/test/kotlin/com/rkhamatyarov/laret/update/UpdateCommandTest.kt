@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -127,5 +128,53 @@ class UpdateCommandTest {
 
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull()!!.message!!.contains("native laret binary"))
+    }
+
+    @Test
+    fun test_execute_refuses_in_protected_install_location() {
+        val protected = Result.success(Paths.get("/usr/local/bin/laret"))
+
+        val result = command(fetcherFor(), locator = protected).execute()
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()!!.message!!.contains("protected location"))
+        assertEquals("current binary", Files.readString(live))
+    }
+
+    @Test
+    fun test_execute_aborts_on_major_bump_when_not_confirmed() {
+        val majorApp = CliApp(name = "laret", version = "1.0.0")
+        val majorRelease = release.copy(tagName = "v2.0.0", version = "2.0.0")
+        val command = UpdateCommand(
+            app = majorApp,
+            fetcher = fetcherFor(latest = majorRelease),
+            replacer = BinaryReplacer(),
+            locateExecutable = { Result.success(live) },
+            confirmMajor = { false },
+        )
+
+        val result = command.execute()
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()!!.message!!.contains("major version", ignoreCase = true))
+        assertEquals("current binary", Files.readString(live))
+    }
+
+    @Test
+    fun test_execute_proceeds_on_major_bump_when_confirmed() {
+        val majorApp = CliApp(name = "laret", version = "1.0.0")
+        val majorRelease = release.copy(tagName = "v2.0.0", version = "2.0.0")
+        val command = UpdateCommand(
+            app = majorApp,
+            fetcher = fetcherFor(latest = majorRelease),
+            replacer = BinaryReplacer(),
+            locateExecutable = { Result.success(live) },
+            confirmMajor = { true },
+        )
+
+        val result = command.execute()
+
+        assertTrue(result.isSuccess)
+        assertEquals("new binary", Files.readString(live))
     }
 }

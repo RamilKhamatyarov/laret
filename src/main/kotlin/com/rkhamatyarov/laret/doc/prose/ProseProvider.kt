@@ -43,4 +43,12 @@ interface ProseProvider {
      * DSL description) and never throw for missing or malformed content.
      */
     fun resolve(groupName: String, command: Command, lang: String): Prose
+
+    /**
+     * Reports whether a backing prose file exists for [command] in [groupName]
+     * for the exact [lang] (no fallback).  Used by strict mode to flag missing
+     * documentation; the default is `true` so providers without a notion of
+     * "backing files" (and test doubles) never trip strict validation.
+     */
+    fun exists(groupName: String, command: String, lang: String): Boolean = true
 }
