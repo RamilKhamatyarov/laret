@@ -8,6 +8,7 @@ import com.rkhamatyarov.laret.completion.SchemaFormat
 import com.rkhamatyarov.laret.completion.ShellType
 import com.rkhamatyarov.laret.core.CommandHistory
 import com.rkhamatyarov.laret.core.CommandPipeline
+import com.rkhamatyarov.laret.core.CommandRunner
 import com.rkhamatyarov.laret.core.Localization
 import com.rkhamatyarov.laret.core.ParallelDispatcher
 import com.rkhamatyarov.laret.core.ParallelTask
@@ -66,7 +67,7 @@ fun main(args: Array<String>) {
     val app =
         cli(
             name = "laret",
-            version = "0.2.0",
+            version = "0.2.0-SNAPSHOT",
             description = "Laret - A Cobra-like CLI framework for Kotlin",
         ) {
             use(LoggingMiddleware())
@@ -158,9 +159,10 @@ fun main(args: Array<String>) {
                         }
 
                         if (outputPath.isNotBlank()) {
-                            val file = File(outputPath)
-                            file.parentFile?.mkdirs()
-                            file.writeText(content)
+                            File(outputPath).parentFile?.let { parent ->
+                                if (!ctx.fs.exists(parent.path)) ctx.fs.createDirectories(parent.path)
+                            }
+                            ctx.fs.writeText(outputPath, content)
                             println("Man page written to $outputPath")
                         } else {
                             print(content)
@@ -399,7 +401,7 @@ fun main(args: Array<String>) {
                             return@action
                         }
                         System.err.println(Localization.t("pipe.started", stages.size))
-                        pipeline.execute(stages)
+                        pipeline.execute(stages, dryRun = ctx.isDryRun)
                     }
                 }
             }
@@ -758,7 +760,7 @@ fun main(args: Array<String>) {
                         }
                         val app = ctx.app ?: return@action
                         println("Replaying: ${entry.args.joinToString(" ")}")
-                        val replayArgs = entry.args.toTypedArray()
+                        val replayArgs = CommandHistory.replayArgs(entry).toTypedArray()
                         if (replayArgs.size >= 2 && replayArgs[0] == "pipe" && replayArgs[1] == "run") {
                             pipeCommandArgs.set(replayArgs.copyOfRange(2, replayArgs.size))
                         }
@@ -869,25 +871,27 @@ fun main(args: Array<String>) {
                     action { ctx ->
                         val path = ctx.argument("path")
                         val force = ctx.optionBool("force")
-                        val file = File(path)
 
-                        if (file.exists() && !force) {
+                        if (ctx.fs.exists(path) && !force) {
                             System.err.println("Error: File already exists: $path (use --force to overwrite)")
                             throw RuntimeException("File already exists")
-                        }
-
-                        var content = ctx.option("content")
-                        if (content.isBlank()) {
-                            content = System.`in`.bufferedReader().readText()
                         }
 
                         val spinner = ctx.spinner("Creating $path")
                         try {
                             spinner.tick()
-                            file.parentFile?.mkdirs()
+
+                            var content = ctx.option("content")
+                            if (content.isBlank()) {
+                                content = System.`in`.bufferedReader().readText()
+                            }
+
+                            File(path).parentFile?.let { parent ->
+                                if (!ctx.fs.exists(parent.path)) ctx.fs.createDirectories(parent.path)
+                            }
                             spinner.tick()
-                            file.writeText(content)
-                            spinner.finish("File created: $path")
+                            ctx.fs.writeText(path, content)
+                            spinner.finish()
                             ctx.registerUndo(
                                 "file create $path",
                                 undoArgs = arrayOf("file", "delete", path),
@@ -905,18 +909,17 @@ fun main(args: Array<String>) {
                     argument("path", "File path", required = true)
                     action { ctx ->
                         val path = ctx.argument("path")
-                        val file = File(path)
 
-                        if (!file.exists()) {
+                        if (!ctx.fs.exists(path)) {
                             println("Error: File not found: $path")
                             return@action
                         }
 
-                        val originalContent = file.readText()
+                        val originalContent = ctx.fs.readText(path)
                         val spinner = ctx.spinner("Deleting $path")
                         spinner.tick()
-                        if (file.delete()) {
-                            spinner.finish("File deleted: $path")
+                        if (ctx.fs.delete(path)) {
+                            spinner.finish()
                             ctx.registerUndo(
                                 "file delete $path",
                                 undoArgs = arrayOf("file", "create", path, "-c", originalContent),
@@ -1018,22 +1021,19 @@ fun main(args: Array<String>) {
                     option("p", "parents", "Create parent directories", "", false)
                     action { ctx ->
                         val path = ctx.argument("path")
-                        val parents = ctx.optionBool("parents")
-                        val dir = File(path)
 
-                        if (dir.exists()) {
+                        if (ctx.fs.exists(path)) {
                             println("Error: Directory already exists: $path")
                             return@action
                         }
 
                         val spinner = ctx.spinner("Creating directory $path")
-                        spinner.tick()
-                        val success = if (parents) dir.mkdirs() else dir.mkdir()
-
-                        if (success) {
-                            spinner.finish("Directory created: $path")
-                        } else {
-                            spinner.fail("Failed to create directory: $path")
+                        try {
+                            spinner.tick()
+                            ctx.fs.createDirectories(path)
+                            spinner.finish()
+                        } catch (e: Exception) {
+                            spinner.fail("Failed to create directory: ${e.message}")
                         }
                     }
                 }
@@ -1060,7 +1060,7 @@ fun main(args: Array<String>) {
                                 val commandLine = info.commandLine().orElse(info.command().orElse(""))
                                 mapOf(
                                     "pid" to it.pid(),
-                                    "name" to shortName(info.command().orElse("")),
+                                    "name" to shortName(info.command().orElse("") ?: ""),
                                     "commandLine" to commandLine,
                                     "cpuMs" to info.totalCpuDuration().map { d -> d.toMillis() }.orElse(0L),
                                 )
@@ -1097,7 +1097,7 @@ fun main(args: Array<String>) {
                             ProcessHandle.of(target.toLong()).orElse(null)
                         } else {
                             ProcessHandle.allProcesses().asSequence().firstOrNull {
-                                it.info().commandLine().orElse("").contains(target, ignoreCase = true)
+                                (it.info().commandLine().orElse("") ?: "").contains(target, ignoreCase = true)
                             }
                         }
 
@@ -1333,7 +1333,9 @@ fun main(args: Array<String>) {
     val exitCode = app.run(resolvedArgs)
 
     val group = resolvedArgs.firstOrNull()
-    if (exitCode == 0 && group != null && group != "history" && group != "undo" && group != "redo") {
+    val skipHistory = group == null || group in setOf("history", "undo", "redo") ||
+        CommandRunner.isDryRunInvocation(app, resolvedArgs)
+    if (exitCode == 0 && !skipHistory) {
         CommandHistory.record(resolvedArgs)
     }
 

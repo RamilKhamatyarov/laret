@@ -30,8 +30,14 @@ class CommandPipeline(private val app: CliApp) {
     fun splitStages(tokens: Array<String>, separator: String): List<Array<String>> =
         splitStages(tokens, setOf(separator))
 
-    fun execute(stages: List<Array<String>>): String {
+    fun execute(stages: List<Array<String>>, dryRun: Boolean = false): String {
         require(stages.isNotEmpty()) { "Pipeline must contain at least one stage" }
+
+        if (dryRun) {
+            System.err.println(
+                "[WARNING] Pipelines in --dry-run mode may behave unexpectedly due to stdout interception.",
+            )
+        }
 
         val originalOut = System.out
         val originalIn = System.`in`

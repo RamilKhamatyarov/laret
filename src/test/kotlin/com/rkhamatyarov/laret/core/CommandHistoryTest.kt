@@ -34,6 +34,14 @@ class CommandHistoryTest {
     }
 
     @Test
+    fun test_replayArgs_returns_recorded_args_verbatim() {
+        CommandHistory.record(arrayOf("file", "create", "/tmp/x"))
+        val entry = CommandHistory.last()!!
+
+        assertEquals(listOf("file", "create", "/tmp/x"), CommandHistory.replayArgs(entry))
+    }
+
+    @Test
     fun `record does nothing for empty args`() {
         CommandHistory.record(emptyArray())
         assertEquals(0, CommandHistory.size())

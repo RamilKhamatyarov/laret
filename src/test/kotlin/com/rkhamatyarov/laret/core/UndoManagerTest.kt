@@ -48,6 +48,14 @@ class UndoManagerTest {
     }
 
     @Test
+    fun test_push_skips_entry_when_command_is_dry_run() {
+        UndoManager.push(entry("create file"), isDryRun = true)
+
+        assertEquals(0, UndoManager.undoHistory().size)
+        assertFalse(UndoManager.canUndo())
+    }
+
+    @Test
     fun `popUndo returns the most recently pushed entry`() {
         UndoManager.push(entry("first"))
         UndoManager.push(entry("second"))
@@ -137,8 +145,7 @@ class UndoManagerTest {
 
         val peeked = UndoManager.peekUndo()
         assertNotNull(peeked)
-        val fakeExitCode = 1
-        if (fakeExitCode == 0) UndoManager.popUndo()
+        // Execution failed (non-zero exit), so the success-only pop is deliberately not invoked.
 
         assertEquals(1, UndoManager.undoHistory().size)
         assertEquals(0, UndoManager.redoHistory().size)
@@ -152,8 +159,7 @@ class UndoManagerTest {
 
         val peeked = UndoManager.peekRedo()
         assertNotNull(peeked)
-        val fakeExitCode = 1
-        if (fakeExitCode == 0) UndoManager.popRedo()
+        // Execution failed (non-zero exit), so the success-only pop is deliberately not invoked.
 
         assertEquals(0, UndoManager.undoHistory().size)
         assertEquals(1, UndoManager.redoHistory().size)

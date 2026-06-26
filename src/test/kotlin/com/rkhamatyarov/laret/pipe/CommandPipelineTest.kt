@@ -19,10 +19,10 @@ import kotlin.test.assertTrue
  * JUnit 5 tests for [CommandPipeline].
  *
  * Categories:
- *  * [SplitStagesTests]   — pure input splitting, no side effects.
- *  * [SubstituteDashTests]— `-` token replacement.
- *  * [ExecuteTests]       — end-to-end execution with capture apps.
- *  * [EdgeCaseTests]      — empty/invalid input.
+ *  * splitStages    — pure input splitting, no side effects.
+ *  * substituteDash — `-` token replacement.
+ *  * execute        — end-to-end execution with capture apps.
+ *  * edge cases     — empty/invalid input.
  */
 class CommandPipelineTest {
 
@@ -111,6 +111,24 @@ class CommandPipelineTest {
         pipeline = CommandPipeline(cli("t") { group("g") { command("c") { action {} } } })
         val result = pipeline.substituteDash(arrayOf("cmd", "-", "-"), "X")
         assertTrue(result.contentEquals(arrayOf("cmd", "X", "X")))
+    }
+
+    @Test
+    fun `dry-run pipeline emits a stderr warning before executing`() {
+        pipeline = CommandPipeline(cli("t") { group("g") { command("c") { action {} } } })
+
+        pipeline.execute(listOf(arrayOf("g", "c")), dryRun = true)
+
+        assertTrue(captured().contains("--dry-run mode may behave unexpectedly"))
+    }
+
+    @Test
+    fun `non dry-run pipeline emits no warning`() {
+        pipeline = CommandPipeline(cli("t") { group("g") { command("c") { action {} } } })
+
+        pipeline.execute(listOf(arrayOf("g", "c")), dryRun = false)
+
+        assertTrue(!captured().contains("--dry-run mode may behave unexpectedly"))
     }
 
     @Test

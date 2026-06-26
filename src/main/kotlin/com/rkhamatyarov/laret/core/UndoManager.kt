@@ -36,8 +36,9 @@ object UndoManager {
         redoStack.clear()
     }
 
-    fun push(entry: HistoryEntry) {
+    fun push(entry: HistoryEntry, isDryRun: Boolean = false) {
         if (suppressDepth > 0) return
+        if (isDryRun) return
         undoStack.addLast(entry)
         redoStack.clear()
         persist()
