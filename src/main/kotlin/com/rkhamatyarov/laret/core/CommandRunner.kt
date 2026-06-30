@@ -144,7 +144,5 @@ object CommandRunner {
         return DryRunArgs(filtered.toTypedArray(), isDryRun)
     }
 
-    // Not a data class: holds an Array and is only accessed by property, never
-    // compared or destructured — so generated equals()/hashCode() add no value.
     private class DryRunArgs(val args: Array<String>, val isDryRun: Boolean)
 }

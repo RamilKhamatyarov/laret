@@ -33,12 +33,12 @@ class CommandContext(
 
     fun optionLong(name: String): Long = options[name]?.toLongOrNull() ?: 0L
 
-    @Suppress("unused") // public DSL accessor, completes the option* family
+    @Suppress("unused")
     fun optionDouble(name: String): Double = options[name]?.toDoubleOrNull() ?: 0.0
 
     fun argumentInt(name: String): Int = argument(name).toIntOrNull() ?: 0
 
-    @Suppress("unused") // public DSL accessor, completes the argument* family
+    @Suppress("unused")
     fun argumentLong(name: String): Long = argument(name).toLongOrNull() ?: 0L
 
     fun render(data: Any): String = outputStrategy.render(data)

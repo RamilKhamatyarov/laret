@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "com.rkhamatyarov"
-version = "0.2.0"
+version = "0.2.1-SNAPSHOT"
 
 application {
     mainClass.set("com.rkhamatyarov.laret.example.MainKt")

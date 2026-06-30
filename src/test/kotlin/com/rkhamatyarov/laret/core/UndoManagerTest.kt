@@ -145,7 +145,6 @@ class UndoManagerTest {
 
         val peeked = UndoManager.peekUndo()
         assertNotNull(peeked)
-        // Execution failed (non-zero exit), so the success-only pop is deliberately not invoked.
 
         assertEquals(1, UndoManager.undoHistory().size)
         assertEquals(0, UndoManager.redoHistory().size)
@@ -159,7 +158,6 @@ class UndoManagerTest {
 
         val peeked = UndoManager.peekRedo()
         assertNotNull(peeked)
-        // Execution failed (non-zero exit), so the success-only pop is deliberately not invoked.
 
         assertEquals(0, UndoManager.undoHistory().size)
         assertEquals(1, UndoManager.redoHistory().size)

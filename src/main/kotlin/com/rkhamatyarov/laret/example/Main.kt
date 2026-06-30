@@ -67,7 +67,7 @@ fun main(args: Array<String>) {
     val app =
         cli(
             name = "laret",
-            version = "0.2.0-SNAPSHOT",
+            version = "0.2.1-SNAPSHOT",
             description = "Laret - A Cobra-like CLI framework for Kotlin",
         ) {
             use(LoggingMiddleware())
@@ -1333,8 +1333,10 @@ fun main(args: Array<String>) {
     val exitCode = app.run(resolvedArgs)
 
     val group = resolvedArgs.firstOrNull()
-    val skipHistory = group == null || group in setOf("history", "undo", "redo") ||
-        CommandRunner.isDryRunInvocation(app, resolvedArgs)
+    val skipHistory =
+        group == null ||
+            group in setOf("history", "undo", "redo") ||
+            CommandRunner.isDryRunInvocation(app, resolvedArgs)
     if (exitCode == 0 && !skipHistory) {
         CommandHistory.record(resolvedArgs)
     }

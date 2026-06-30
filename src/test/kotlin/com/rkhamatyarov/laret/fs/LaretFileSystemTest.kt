@@ -30,8 +30,6 @@ class LaretFileSystemTest {
         return buffer.toString(Charsets.UTF_8)
     }
 
-    // ----- RealFileSystem: actually performs the operation -----
-
     @Test
     fun test_real_write_then_read_round_trips() {
         val fs = RealFileSystem()
