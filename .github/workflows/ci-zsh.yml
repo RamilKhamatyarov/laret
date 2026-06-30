@@ -2248,6 +2248,131 @@ jobs:
             /tmp/hist_*.err
           retention-days: 7
 
+  integration-dry-run:
+    name: Integration - Dry Run (zsh)
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
+
+    steps:
+      - name: Install zsh
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
+      - name: Download native binary
+        uses: actions/download-artifact@v4
+        with:
+          name: laret-native-zsh
+          path: ./bin
+
+      - name: Make binary executable
+        run: chmod +x ./bin/laret
+
+      - name: Dry-run - file create writes nothing and narrates to stderr
+        run: |
+          set -euo pipefail
+          rm -f /tmp/dry_create.txt
+          ./bin/laret file create /tmp/dry_create.txt -c "should not be written" --dry-run \
+            > /tmp/dry_create.out 2>/tmp/dry_create.err
+          [ ! -e /tmp/dry_create.txt ] \
+            || (echo "ERROR: --dry-run must not create the file" && exit 1)
+          grep -q "\[DRY-RUN\]" /tmp/dry_create.err \
+            || (echo "ERROR: expected [DRY-RUN] narration on stderr" && cat /tmp/dry_create.err && exit 1)
+          echo "Dry-run file create touched no disk"
+
+      - name: Dry-run - file delete leaves the file intact
+        run: |
+          set -euo pipefail
+          echo "keep me" > /tmp/dry_delete.txt
+          ./bin/laret file delete /tmp/dry_delete.txt --dry-run \
+            > /tmp/dry_delete.out 2>/tmp/dry_delete.err
+          [ -f /tmp/dry_delete.txt ] \
+            || (echo "ERROR: --dry-run must not delete the file" && exit 1)
+          grep -q "\[DRY-RUN\]" /tmp/dry_delete.err \
+            || (echo "ERROR: expected [DRY-RUN] narration on stderr" && cat /tmp/dry_delete.err && exit 1)
+          echo "Dry-run file delete left the file intact"
+
+      - name: Dry-run - dir create makes no directory
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/dry_newdir
+          ./bin/laret dir create /tmp/dry_newdir --dry-run \
+            > /tmp/dry_dir.out 2>/tmp/dry_dir.err
+          [ ! -d /tmp/dry_newdir ] \
+            || (echo "ERROR: --dry-run must not create the directory" && exit 1)
+          echo "Dry-run dir create made no directory"
+
+      - name: Dry-run - man --output writes no file
+        run: |
+          set -euo pipefail
+          rm -f /tmp/dry_man.1
+          ./bin/laret completion man --group file --command create --output /tmp/dry_man.1 --dry-run \
+            > /tmp/dry_man.out 2>/tmp/dry_man.err || true
+          [ ! -e /tmp/dry_man.1 ] \
+            || (echo "ERROR: --dry-run must not write the man page" && exit 1)
+          echo "Dry-run man --output wrote no file"
+
+      - name: Dry-run - not recorded in command history
+        run: |
+          set -euo pipefail
+          ./bin/laret history clear > /dev/null 2>&1
+          ./bin/laret file create /tmp/dry_hist.txt -c "x" --dry-run > /dev/null 2>&1
+          ./bin/laret history show > /tmp/dry_hist.out 2>/tmp/dry_hist.err
+          grep -q "No command history" /tmp/dry_hist.out \
+            || (echo "ERROR: dry-run must not be recorded in history" && cat /tmp/dry_hist.out && exit 1)
+          echo "Dry-run left command history untouched"
+
+      - name: Dry-run - registers no undo entry
+        run: |
+          set -euo pipefail
+          ./bin/laret file create /tmp/dry_undo.txt -c "x" --dry-run > /dev/null 2>&1
+          ./bin/laret undo run > /tmp/dry_undo.out 2>/tmp/dry_undo.err
+          grep -q "Nothing to undo" /tmp/dry_undo.out \
+            || (echo "ERROR: dry-run must not push an undo entry" && cat /tmp/dry_undo.out && exit 1)
+          echo "Dry-run pushed no undo entry"
+
+      - name: Dry-run - pipeline emits stdout-interception warning
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/dry_pipe && echo hi > /tmp/dry_pipe/a.txt
+          ./bin/laret pipe run dir list /tmp/dry_pipe --dry-run \
+            > /tmp/dry_pipe.out 2>/tmp/dry_pipe.err || true
+          grep -q "dry-run mode may behave unexpectedly" /tmp/dry_pipe.err \
+            || (echo "ERROR: expected pipeline dry-run warning on stderr" && cat /tmp/dry_pipe.err && exit 1)
+          echo "Pipeline dry-run warning emitted"
+
+      - name: Control - real run still performs the operation
+        run: |
+          set -euo pipefail
+          rm -f /tmp/dry_real.txt
+          ./bin/laret file create /tmp/dry_real.txt -c "real content" > /dev/null 2>&1
+          [ -f /tmp/dry_real.txt ] \
+            || (echo "ERROR: a normal run must create the file" && exit 1)
+          grep -q "real content" /tmp/dry_real.txt \
+            || (echo "ERROR: real run wrote wrong content" && cat /tmp/dry_real.txt && exit 1)
+          echo "Real run (no --dry-run) still writes to disk"
+
+      - name: Regression - removed -n shorthand is not a global dry-run flag
+        run: |
+          set -euo pipefail
+          rm -f /tmp/dry_dashn.txt
+          ./bin/laret file create /tmp/dry_dashn.txt -c "written" -n > /dev/null 2>&1 || true
+          [ -f /tmp/dry_dashn.txt ] \
+            || (echo "ERROR: -n must NOT trigger dry-run; the file should be created" && exit 1)
+          echo "-n is command-scoped only, not a global dry-run flag"
+
+      - name: Upload dry-run artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dry-run-outputs-zsh
+          path: |
+            /tmp/dry_*.out
+            /tmp/dry_*.err
+          retention-days: 7
+
   integration-mcp-server:
     name: Integration - MCP Server (zsh)
     runs-on: ubuntu-latest
@@ -2397,6 +2522,7 @@ jobs:
       - integration-diff
       - integration-undo
       - integration-history
+      - integration-dry-run
       - integration-mcp-server
       - integration-config-precedence
     if: always()
@@ -2427,6 +2553,7 @@ jobs:
           echo " integration-diff:             ${{ needs.integration-diff.result }}"
           echo " integration-undo:             ${{ needs.integration-undo.result }}"
           echo " integration-history:          ${{ needs.integration-history.result }}"
+          echo " integration-dry-run:          ${{ needs.integration-dry-run.result }}"
           echo " integration-mcp-server:       ${{ needs.integration-mcp-server.result }}"
           echo " integration-config-precedence: ${{ needs.integration-config-precedence.result }}"
           echo "=========================================="

@@ -102,6 +102,26 @@ class DocGenerateCommandTest {
     }
 
     @Test
+    fun test_strict_mode_fails_on_broken_internal_link_in_prose_body() {
+        every { provider.exists(any(), any(), any()) } returns true
+        every { provider.resolve(any(), any(), any()) } returns Prose(
+            title = "Create",
+            summary = "Create a file.",
+            synopsis = null,
+            examples = emptyList(),
+            seeAlso = emptyList(),
+            body = "See [the missing page](nope.md) for details.",
+        )
+
+        val error = runCatching {
+            DocGenerateCommand(app).run(DocFormat.MARKDOWN, "en", outputDir, provider, strict = true)
+        }.exceptionOrNull()
+
+        assertTrue(error is DocValidationException)
+        assertTrue(error.problems.any { it.contains("broken link") })
+    }
+
+    @Test
     fun test_strict_mode_passes_when_files_present_and_links_valid() {
         every { provider.exists(any(), any(), any()) } returns true
 

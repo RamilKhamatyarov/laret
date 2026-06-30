@@ -29,6 +29,11 @@ object CommandHistory {
         entries.clear()
     }
 
+    /**
+     * Records a successfully executed command.  Dry runs are **never** recorded:
+     * the caller guards this with `!isDryRunInvocation(...)`, so history reflects
+     * only commands that actually ran.
+     */
     fun record(args: Array<String>) {
         if (suppressDepth > 0) return
         if (args.isEmpty()) return
@@ -58,6 +63,8 @@ object CommandHistory {
     }
 
     fun size(): Int = entries.size
+
+    fun replayArgs(entry: CommandEntry): List<String> = entry.args
 
     fun <T> withSuppressedRecording(block: () -> T): T {
         suppressDepth++

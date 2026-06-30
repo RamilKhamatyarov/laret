@@ -5,6 +5,9 @@ import com.rkhamatyarov.laret.doc.generators.GroffDocGenerator
 import com.rkhamatyarov.laret.doc.generators.MarkdownDocGenerator
 import com.rkhamatyarov.laret.doc.prose.ProseProvider
 import com.rkhamatyarov.laret.doc.prose.ResourceProseProvider
+import com.rkhamatyarov.laret.doc.validation.DocValidator
+import com.rkhamatyarov.laret.doc.validation.ValidationReport
+import com.rkhamatyarov.laret.ui.yellowBold
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -35,7 +38,7 @@ class DocGenerateCommand(private val app: CliApp) {
      * @param provider      Prose source (overridable for tests).
      * @param strict        Fail-fast on missing prose files, broken `see_also`
      *                      links, or orphaned `.md` files (for CI/CD).
-     * @param includeHidden Document hidden commands too (with an `[INTERNAL]` badge).
+     * @param includeHidden Document hidden commands too (marked INTERNAL in the output).
      * @return The list of files actually written, in generation order.
      * @throws DocValidationException in [strict] mode when validation fails.
      */
@@ -48,11 +51,6 @@ class DocGenerateCommand(private val app: CliApp) {
         includeHidden: Boolean = false,
     ): List<Path> {
         val languages = resolveLanguages(format, lang)
-
-        if (strict) {
-            val problems = collectProblems(languages, provider, includeHidden)
-            if (problems.isNotEmpty()) throw DocValidationException(problems)
-        }
 
         val generator: DocGenerator = when (format) {
             DocFormat.MARKDOWN -> MarkdownDocGenerator(provider)
@@ -67,6 +65,16 @@ class DocGenerateCommand(private val app: CliApp) {
         if (generator is MarkdownDocGenerator) {
             files += generator.mkdocsYaml(app, languages)
         }
+
+        var report = DocValidator.validate(files)
+        if (strict) {
+            report += ValidationReport(errors = collectProblems(languages, provider, includeHidden))
+        }
+
+        report.warnings.forEach { System.err.println(yellowBold("[doc] warning: $it")) }
+        if (strict && report.hasErrors) throw DocValidationException(report.errors)
+
+        report.errors.forEach { System.err.println(yellowBold("[doc] warning: $it")) }
 
         return files.map { write(outputDir, it) }
     }

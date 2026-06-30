@@ -1,6 +1,9 @@
 package com.rkhamatyarov.laret.core
 
 import com.rkhamatyarov.laret.model.Command
+import com.rkhamatyarov.laret.model.fs.DryRunFileSystem
+import com.rkhamatyarov.laret.model.fs.LaretFileSystem
+import com.rkhamatyarov.laret.model.fs.RealFileSystem
 import com.rkhamatyarov.laret.ui.redBold
 import kotlinx.coroutines.runBlocking
 
@@ -43,9 +46,17 @@ object CommandRunner {
     }
 
     internal suspend fun executeCommand(command: Command, args: Array<String>, app: CliApp, groupName: String): Int {
+        val executionArgs = dryRunArgs(args)
+        val fs = fileSystemFor(executionArgs.isDryRun)
         if (groupName == "completion" && command.name in setOf("bash", "zsh", "powershell", "install", "interactive")) {
-            val ctx = CommandContext(command, app, groupName = groupName)
-            command.parseArgumentsAndOptions(args, ctx, groupName)
+            val ctx = CommandContext(
+                command,
+                app,
+                groupName = groupName,
+                isDryRun = executionArgs.isDryRun,
+                fs = fs,
+            )
+            command.parseArgumentsAndOptions(executionArgs.args, ctx, groupName)
             return try {
                 command.action(ctx)
                 0
@@ -55,10 +66,16 @@ object CommandRunner {
             }
         }
 
-        val ctx = CommandContext(command, app, groupName = groupName)
-        command.parseArgumentsAndOptions(args, ctx, groupName)
+        val ctx = CommandContext(
+            command,
+            app,
+            groupName = groupName,
+            isDryRun = executionArgs.isDryRun,
+            fs = fs,
+        )
+        command.parseArgumentsAndOptions(executionArgs.args, ctx, groupName)
 
-        val positionalCount = args.count { !it.startsWith("-") }
+        val positionalCount = executionArgs.args.count { !it.startsWith("-") }
         val missingRequired = command.arguments.filterIndexed { idx, arg ->
             arg.required && !arg.optional && idx >= positionalCount
         }
@@ -90,4 +107,42 @@ object CommandRunner {
             1
         }
     }
+
+    internal fun isDryRunInvocation(app: CliApp, args: Array<String>): Boolean {
+        val normalizedArgs = normalizeColonCommand(args)
+        val groupInput = normalizedArgs.getOrNull(0) ?: return false
+        val commandInput = normalizedArgs.getOrNull(1) ?: return false
+        val group = app.groups.find { it.matches(groupInput) } ?: return false
+        group.commands.find { it.matches(commandInput) } ?: return false
+        return dryRunArgs(normalizedArgs.drop(2).toTypedArray()).isDryRun
+    }
+
+    private fun fileSystemFor(isDryRun: Boolean): LaretFileSystem =
+        if (isDryRun) DryRunFileSystem() else RealFileSystem()
+
+    private fun normalizeColonCommand(args: Array<String>): Array<String> {
+        val commandToken = args.firstOrNull() ?: return args
+        if (!commandToken.contains(":")) return args
+        val parts = commandToken.split(":", limit = 2)
+        return (parts + args.drop(1)).toTypedArray()
+    }
+
+    /**
+     * Strips the single global `--dry-run` flag from [args].  There is
+     * deliberately **no `-n` shorthand**: `-n` is already a command-specific
+     * option elsewhere (e.g. `events --max-events`), and a global short flag
+     * would shadow it.
+     */
+    private fun dryRunArgs(args: Array<String>): DryRunArgs {
+        var isDryRun = false
+        val filtered = mutableListOf<String>()
+
+        args.forEach { arg ->
+            if (arg == "--dry-run") isDryRun = true else filtered.add(arg)
+        }
+
+        return DryRunArgs(filtered.toTypedArray(), isDryRun)
+    }
+
+    private class DryRunArgs(val args: Array<String>, val isDryRun: Boolean)
 }

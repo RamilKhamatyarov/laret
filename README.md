@@ -17,6 +17,7 @@
 - **Type-Safe**
 - **12Factor Configuration**
 - **Self-Update**
+- **Dry Run**
 
 ## Quick Start
 
@@ -693,6 +694,37 @@ command(name = "convert", description = "Uppercase input") {
     }
 }
 ```
+
+## Dry Run
+
+Pass the global `--dry-run` flag to preview any command without touching the disk. Side-effecting
+operations (`file create`, `file delete`, `dir create`, `completion man --output`) route through a
+`LaretFileSystem` abstraction: in a dry run the real filesystem is swapped for one that **narrates**
+what *would* happen to stderr and performs no writes. Reads still work normally. Dry runs are never
+recorded in command history and never push an undo entry, so framework state stays untouched.
+
+```bash
+$ laret file create notes.txt --content "hello" --dry-run
+[DRY-RUN] Would write 5 bytes to notes.txt
+
+$ laret file delete notes.txt --dry-run
+[DRY-RUN] Would delete notes.txt
+```
+
+Because the interception lives in `ctx.fs`, command actions never branch on a dry-run flag — accidental
+side-effects are structurally impossible rather than something a reviewer must catch:
+
+```kt
+action { ctx ->
+    // Swapped for DryRunFileSystem automatically when --dry-run is present.
+    ctx.fs.writeText(ctx.argument("path"), content)
+}
+```
+
+> There is no `-n` shorthand — `--dry-run` is spelled out so it never collides with command-specific
+> short flags (e.g. `events --max-events`). Piped stages still execute for real, so `pipe run … --dry-run`
+> prints a warning that stdout interception makes dry-run piping unreliable.
+
 ## 12Factor Configuration
 
 Laret resolves command configuration with predictable Cobra/Viper-style precedence:
@@ -728,7 +760,7 @@ val result = pipeline.execute(stages)  // returns "HELLO"
 com.rkhamatyarov.laret/
 ├── core/                          # Framework engine
 │   ├── CliApp.kt                  # Main application class
-│   ├── CommandContext.kt          # Execution context + registerUndo()
+│   ├── CommandContext.kt          # Execution context + registerUndo() + fs injection
 │   ├── CommandRunner.kt           # Command dispatch and middleware chain
 │   ├── CommandPipeline.kt         # Stage-based command piping (--- and |)
 │   ├── FlagPersistence.kt         # Persistent flag loading from config
@@ -747,7 +779,11 @@ com.rkhamatyarov.laret/
 │   ├── CommandGroup.kt
 │   ├── Command.kt
 │   ├── Argument.kt
-│   └── Option.kt
+│   ├── Option.kt
+│   └── fs/                        # FileSystem abstraction (powers --dry-run)
+│       ├── LaretFileSystem.kt     # Side-effect interface (write/delete/read/list)
+│       ├── RealFileSystem.kt      # Performs real disk I/O
+│       └── DryRunFileSystem.kt    # Intercepts writes; narrates, never mutates
 ├── output/                        # Output strategies
 │   ├── OutputStrategy.kt          # Strategy interface
 │   ├── JsonOutput.kt
