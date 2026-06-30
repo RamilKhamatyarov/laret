@@ -1,7 +1,7 @@
 plugins {
     kotlin("jvm") version "2.4.0"
     id("org.graalvm.buildtools.native") version "1.1.3"
-    id("com.gradleup.shadow") version "9.4.2"
+    id("com.gradleup.shadow") version "9.4.3"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
     id("com.diffplug.spotless") version "8.7.0"
     id("pmd")
