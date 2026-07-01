@@ -1,8 +1,10 @@
 package com.rkhamatyarov.laret.doc
 
 import com.rkhamatyarov.laret.core.CliApp
+import com.rkhamatyarov.laret.model.Argument
 import com.rkhamatyarov.laret.model.Command
 import com.rkhamatyarov.laret.model.CommandGroup
+import com.rkhamatyarov.laret.model.fs.DryRunFileSystem
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -23,7 +25,11 @@ class DocScaffoldCommandTest {
             CommandGroup(
                 name = "file",
                 commands = listOf(
-                    Command(name = "create", description = "Create a new file"),
+                    Command(
+                        name = "create",
+                        description = "Create a new file",
+                        arguments = listOf(Argument(name = "path", description = "Target path", required = true)),
+                    ),
                     Command(name = "secret", description = "Internal", hidden = true),
                 ),
             ),
@@ -54,6 +60,23 @@ class DocScaffoldCommandTest {
         DocScaffoldCommand(app).run("en", outputDir, includeHidden = true)
 
         assertTrue(Files.exists(outputDir.resolve("en/file/secret.md")))
+    }
+
+    @Test
+    fun test_scaffold_fills_synopsis_usage_and_todo_body() {
+        DocScaffoldCommand(app).run("en", outputDir)
+
+        val content = Files.readString(outputDir.resolve("en/file/create.md"))
+        assertTrue(content.contains("synopsis: laret file create <path>"))
+        assertTrue(content.contains("TODO: Write detailed explanation and examples for `create`."))
+    }
+
+    @Test
+    fun test_scaffold_with_dry_run_filesystem_writes_nothing() {
+        val created = DocScaffoldCommand(app, DryRunFileSystem()).run("en", outputDir)
+
+        assertTrue(created.isNotEmpty(), "the dry run still reports which files it would create")
+        assertTrue(!Files.exists(outputDir.resolve("en/file/create.md")))
     }
 
     @Test

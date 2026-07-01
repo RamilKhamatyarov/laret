@@ -20,6 +20,8 @@ import com.rkhamatyarov.laret.diff.UnifiedFormatter
 import com.rkhamatyarov.laret.diff.diffFiles
 import com.rkhamatyarov.laret.doc.DocFormat
 import com.rkhamatyarov.laret.doc.DocGenerateCommand
+import com.rkhamatyarov.laret.doc.DocGuideCommand
+import com.rkhamatyarov.laret.doc.DocIndexCommand
 import com.rkhamatyarov.laret.doc.DocScaffoldCommand
 import com.rkhamatyarov.laret.doc.DocValidationException
 import com.rkhamatyarov.laret.dsl.cli
@@ -273,13 +275,58 @@ fun main(args: Array<String>) {
                         val lang = ctx.option("lang").ifBlank { "en" }
                         val outputDir = File(ctx.option("output-dir").ifBlank { "src/main/resources/docs" }).toPath()
 
-                        val created = DocScaffoldCommand(app).run(
+                        val created = DocScaffoldCommand(app, ctx.fs).run(
                             lang = lang,
                             outputDir = outputDir,
                             includeHidden = ctx.optionBool("include-hidden"),
                         )
                         created.forEach { println("scaffolded: $it") }
                         println("Created ${created.size} skeleton(s) in $outputDir")
+                    }
+                }
+
+                command(name = "guide", description = "Scaffold a standalone guide page (e.g. installation)") {
+                    argument("name", "Guide name/slug (e.g. quick-start)", required = true)
+                    option("l", "lang", "Language directory (blank for language-neutral)", "en", true)
+                    option("o", "output-dir", "Docs directory", "docs", true)
+
+                    action { ctx ->
+                        val name = ctx.argument("name")
+                        if (name.isBlank()) {
+                            System.err.println("Usage: laret doc guide <name>")
+                            return@action
+                        }
+                        val lang = ctx.option("lang").takeIf { it.isNotBlank() }
+                        val outputDir = File(ctx.option("output-dir").ifBlank { "docs" }).toPath()
+                        val guide = DocGuideCommand(ctx.fs)
+
+                        if (guide.exists(name, outputDir, lang)) {
+                            println("Guide already exists; leaving it untouched.")
+                            return@action
+                        }
+                        val written = guide.create(name, outputDir, lang)
+                        println("created: $written")
+                    }
+                }
+
+                command(name = "index", description = "Generate docs/index.md landing page from README.md") {
+                    option("r", "readme", "Path to the source README", "README.md", true)
+                    option("l", "lang", "Language directory (blank for a language-neutral index)", "", true)
+                    option("o", "output-dir", "Docs directory", "docs", true)
+                    option("t", "title", "Landing-page title", "Laret", true)
+
+                    action { ctx ->
+                        val readme = File(ctx.option("readme").ifBlank { "README.md" }).toPath()
+                        if (!ctx.fs.exists(readme)) {
+                            System.err.println("README not found: $readme")
+                            return@action
+                        }
+                        val lang = ctx.option("lang").takeIf { it.isNotBlank() }
+                        val outputDir = File(ctx.option("output-dir").ifBlank { "docs" }).toPath()
+                        val title = ctx.option("title").ifBlank { "Laret" }
+
+                        val written = DocIndexCommand(ctx.fs).fromReadme(readme, outputDir, lang, title)
+                        println("created: $written")
                     }
                 }
             }
