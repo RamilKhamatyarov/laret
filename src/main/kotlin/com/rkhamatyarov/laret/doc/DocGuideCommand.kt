@@ -7,7 +7,7 @@ import java.nio.file.Path
 /**
  * Implements `laret doc guide <name>`: scaffolds a standalone guide page (e.g.
  * *Installation*, *Quick Start*) under `docs/{lang}/guides/<slug>.md` with a
- * minimal frontmatter and a `TODO` body, so authors have an obvious place to
+ * minimal frontmatter
  * write long-form documentation that is not tied to a single command.
  *
  * All I/O is routed through [fs], so `doc guide <name> --dry-run` narrates the

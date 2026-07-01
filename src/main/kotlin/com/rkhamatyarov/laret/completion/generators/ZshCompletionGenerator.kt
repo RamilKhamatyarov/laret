@@ -6,8 +6,8 @@ import com.rkhamatyarov.laret.completion.template.TemplateEngine
 import com.rkhamatyarov.laret.core.CliApp
 
 class ZshCompletionGenerator(val templateEngine: TemplateEngine = TemplateEngine()) : CompletionGenerator {
-    override fun generate(app: CliApp): String {
-        val template = loadTemplate()
+    override fun generate(app: CliApp, dynamic: Boolean): String {
+        val template = loadTemplate(if (dynamic) "zsh_dynamic" else "zsh")
         val baseContext = buildContext(app)
         val contextMap = baseContext.toMap().toMutableMap()
         val items = mutableListOf<Map<String, String>>()
@@ -45,7 +45,7 @@ class ZshCompletionGenerator(val templateEngine: TemplateEngine = TemplateEngine
         },
     )
 
-    private fun loadTemplate(): String = javaClass.classLoader.getResource("templates/zsh.tpl")
+    private fun loadTemplate(name: String): String = javaClass.classLoader.getResource("templates/$name.tpl")
         ?.readText()
-        ?: throw IllegalStateException("Zsh template not found")
+        ?: throw IllegalStateException("Zsh template '$name' not found")
 }

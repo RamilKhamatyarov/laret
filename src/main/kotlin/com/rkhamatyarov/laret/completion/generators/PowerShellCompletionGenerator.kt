@@ -6,8 +6,8 @@ import com.rkhamatyarov.laret.completion.template.TemplateEngine
 import com.rkhamatyarov.laret.core.CliApp
 
 class PowerShellCompletionGenerator(val templateEngine: TemplateEngine = TemplateEngine()) : CompletionGenerator {
-    override fun generate(app: CliApp): String {
-        val template = loadTemplate()
+    override fun generate(app: CliApp, dynamic: Boolean): String {
+        val template = loadTemplate(if (dynamic) "powershell_dynamic" else "powershell")
         val context = buildContext(app)
         return templateEngine.render(template, context)
     }
@@ -53,7 +53,7 @@ class PowerShellCompletionGenerator(val templateEngine: TemplateEngine = Templat
         )
     }
 
-    private fun loadTemplate(): String = javaClass.classLoader.getResource("templates/powershell.tpl")
+    private fun loadTemplate(name: String): String = javaClass.classLoader.getResource("templates/$name.tpl")
         ?.readText()
-        ?: throw IllegalStateException("PowerShell template not found")
+        ?: throw IllegalStateException("PowerShell template '$name' not found")
 }

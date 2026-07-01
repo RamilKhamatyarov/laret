@@ -6,6 +6,7 @@ import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.dsl.cli
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PowerShellCompletionGeneratorTest {
@@ -52,6 +53,19 @@ class PowerShellCompletionGeneratorTest {
         val script = completionCommand.generate(ShellType.POWERSHELL)
         assertTrue(script.contains("laret"))
         assertTrue(script.contains("laret.exe"))
+    }
+
+    @Test
+    fun `generate dynamic script queries hidden __complete command`() {
+        val script = completionCommand.generate(ShellType.POWERSHELL, dynamic = true)
+        assertTrue(script.contains("__complete"), "Dynamic script must query the binary at runtime")
+        assertTrue(script.contains("Register-ArgumentCompleter"), "Should register a native completer")
+    }
+
+    @Test
+    fun `generate defaults to static script without __complete`() {
+        val script = completionCommand.generate(ShellType.POWERSHELL)
+        assertFalse(script.contains("__complete"), "Static script must not depend on the binary at runtime")
     }
 
     @Test

@@ -146,6 +146,67 @@ jobs:
         run: |
           pwsh -NoProfile -Command ". '/tmp/laret_ps.ps1'; Write-Host 'PowerShell completion sourced successfully'"
 
+      - name: Advanced completion - dynamic script generation (--dynamic)
+        run: |
+          set -euo pipefail
+          ./bin/laret completion bash --dynamic > /tmp/laret_bash_dyn.sh
+          grep -q "__complete" /tmp/laret_bash_dyn.sh
+          bash -n /tmp/laret_bash_dyn.sh
+
+          ./bin/laret completion zsh --dynamic > /tmp/laret_zsh_dyn.sh
+          grep -q "__complete" /tmp/laret_zsh_dyn.sh
+          zsh -n /tmp/laret_zsh_dyn.sh
+
+          ./bin/laret completion powershell --dynamic > /tmp/laret_ps_dyn.ps1
+          grep -q "__complete" /tmp/laret_ps_dyn.ps1
+
+          # Static output must stay the default and must not depend on the binary
+          ./bin/laret completion zsh > /tmp/laret_zsh_static.sh
+          if grep -q "__complete" /tmp/laret_zsh_static.sh; then
+            echo "ERROR: static script unexpectedly references __complete"
+            exit 1
+          fi
+          echo "Dynamic completion scripts generated and syntax-checked"
+
+      - name: Advanced completion - dynamic script sourcing
+        run: |
+          set -euo pipefail
+          bash -c "source /tmp/laret_bash_dyn.sh && echo 'Dynamic bash completion sourced'"
+          zsh -c "source /tmp/laret_zsh_dyn.sh && echo 'Dynamic zsh completion sourced'"
+          zsh -c "autoload -Uz compinit && compinit -u && source /tmp/laret_zsh_dyn.sh && (( \${+functions[_laret_complete_dynamic]} )) && echo 'Dynamic zsh completion registered with compinit'"
+          pwsh -NoProfile -Command ". '/tmp/laret_ps_dyn.ps1'; Write-Host 'Dynamic PowerShell completion sourced'"
+
+      - name: Advanced completion - __complete protocol round trip
+        run: |
+          set -euo pipefail
+
+          ./bin/laret __complete "" > /tmp/complete_groups.out 2>/dev/null
+          grep -q "^file" /tmp/complete_groups.out
+          grep -qE "^:[0-9]+$" /tmp/complete_groups.out
+
+          ./bin/laret __complete file "" > /tmp/complete_cmds.out 2>/dev/null
+          grep -q "^create" /tmp/complete_cmds.out
+
+          ./bin/laret __complete file create -- > /tmp/complete_flags.out 2>/dev/null
+          grep -q -- "--dry-run" /tmp/complete_flags.out
+          grep -q -- "--force" /tmp/complete_flags.out
+
+          ./bin/laret __complete doc generate --format "" > /tmp/complete_format.out 2>/dev/null
+          grep -q "^md" /tmp/complete_format.out
+          grep -q "^man" /tmp/complete_format.out
+
+          ./bin/laret __complete doc generate --lang e > /tmp/complete_lang.out 2>/dev/null
+          grep -q "^en" /tmp/complete_lang.out
+          grep -q "^es" /tmp/complete_lang.out
+          if grep -q "^all" /tmp/complete_lang.out; then
+            echo "ERROR: prefix 'e' must not match 'all'"
+            exit 1
+          fi
+
+          ./bin/laret __complete nosuchgroup "" > /tmp/complete_unknown.out 2>/dev/null
+          grep -qE "^:[0-9]+$" /tmp/complete_unknown.out
+          echo "__complete protocol round trip valid"
+
   integration-progress:
     name: Integration - Progress Bars & Spinners (zsh)
     runs-on: ubuntu-latest

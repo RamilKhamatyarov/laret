@@ -1,11 +1,13 @@
 package com.rkhamatyarov.laret.example
 
 import com.rkhamatyarov.laret.completion.CompletionCommand
+import com.rkhamatyarov.laret.completion.CompletionEngine
 import com.rkhamatyarov.laret.completion.ManPageGenerator
 import com.rkhamatyarov.laret.completion.McpServeCommand
 import com.rkhamatyarov.laret.completion.SchemaExportCommand
 import com.rkhamatyarov.laret.completion.SchemaFormat
 import com.rkhamatyarov.laret.completion.ShellType
+import com.rkhamatyarov.laret.completion.completers.StaticCompleter
 import com.rkhamatyarov.laret.core.CommandHistory
 import com.rkhamatyarov.laret.core.CommandPipeline
 import com.rkhamatyarov.laret.core.CommandRunner
@@ -80,21 +82,24 @@ fun main(args: Array<String>) {
 
             group(name = "completion", description = "Shell completion") {
                 command(name = "bash", description = "Generate bash completion script") {
+                    option("d", "dynamic", "Emit a dynamic script backed by the hidden __complete command", "", false)
                     action { ctx ->
                         val command = CompletionCommand(ctx.app!!)
-                        print(command.generate(ShellType.BASH))
+                        print(command.generate(ShellType.BASH, dynamic = ctx.optionBool("dynamic")))
                     }
                 }
                 command(name = "zsh", description = "Generate zsh completion script") {
+                    option("d", "dynamic", "Emit a dynamic script backed by the hidden __complete command", "", false)
                     action { ctx ->
                         val command = CompletionCommand(ctx.app!!)
-                        print(command.generate(ShellType.ZSH))
+                        print(command.generate(ShellType.ZSH, dynamic = ctx.optionBool("dynamic")))
                     }
                 }
                 command(name = "powershell", description = "Generate PowerShell completion script") {
+                    option("d", "dynamic", "Emit a dynamic script backed by the hidden __complete command", "", false)
                     action { ctx ->
                         val command = CompletionCommand(ctx.app!!)
-                        print(command.generate(ShellType.POWERSHELL))
+                        print(command.generate(ShellType.POWERSHELL, dynamic = ctx.optionBool("dynamic")))
                     }
                 }
                 command(name = "install", description = "Install completion script") {
@@ -231,8 +236,22 @@ fun main(args: Array<String>) {
 
             group(name = "doc", description = "Documentation generation") {
                 command(name = "generate", description = "Generate command docs (Markdown or man pages)") {
-                    option("f", "format", "Output format: md or man", "md", true)
-                    option("l", "lang", "Language: en, es, or all", "en", true)
+                    option(
+                        "f",
+                        "format",
+                        "Output format: md or man",
+                        "md",
+                        true,
+                        completer = StaticCompleter("md", "man"),
+                    )
+                    option(
+                        "l",
+                        "lang",
+                        "Language: en, es, or all",
+                        "en",
+                        true,
+                        completer = StaticCompleter("en", "es", "all"),
+                    )
                     option("o", "output-dir", "Output directory", "docs", true)
                     option("s", "strict", "Fail on missing files, broken see_also links, or orphans", "", false)
                     option("H", "include-hidden", "Document hidden commands with an [INTERNAL] badge", "", false)
@@ -1382,7 +1401,7 @@ fun main(args: Array<String>) {
     val group = resolvedArgs.firstOrNull()
     val skipHistory =
         group == null ||
-            group in setOf("history", "undo", "redo") ||
+            group in setOf("history", "undo", "redo", CompletionEngine.COMPLETE_COMMAND) ||
             CommandRunner.isDryRunInvocation(app, resolvedArgs)
     if (exitCode == 0 && !skipHistory) {
         CommandHistory.record(resolvedArgs)

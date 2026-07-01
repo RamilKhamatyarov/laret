@@ -45,7 +45,7 @@ class DocScaffoldCommand(private val app: CliApp, private val fs: LaretFileSyste
 
     /**
      * Builds the Markdown skeleton for [command], pre-filling `synopsis` with the
-     * generated [usage] line and leaving a `TODO` marker in the body so authors
+     * generated [usage] line\
      * can see at a glance which pages still need real content.
      */
     fun skeletonFor(command: Command, usage: String = ""): String = buildString {

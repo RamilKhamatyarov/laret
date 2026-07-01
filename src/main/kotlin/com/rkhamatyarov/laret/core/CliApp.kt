@@ -1,5 +1,6 @@
 package com.rkhamatyarov.laret.core
 
+import com.rkhamatyarov.laret.completion.CompletionEngine
 import com.rkhamatyarov.laret.config.ConfigLoader
 import com.rkhamatyarov.laret.config.model.AppConfig
 import com.rkhamatyarov.laret.config.registry.ConfigRegistry
@@ -123,6 +124,11 @@ data class CliApp(
     }
 
     private fun dispatch(args: Array<String>): Int {
+        if (args.firstOrNull() == CompletionEngine.COMPLETE_COMMAND) {
+            print(CompletionEngine(this).complete(args.drop(1)))
+            return 0
+        }
+
         val global = extractGlobalOptions(args)
         if (global.configPath != null || global.profile != null) {
             init(global.configPath ?: configPath, global.profile ?: configProfile)

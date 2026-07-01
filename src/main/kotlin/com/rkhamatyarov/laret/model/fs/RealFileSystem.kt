@@ -21,6 +21,8 @@ class RealFileSystem : LaretFileSystem {
 
     override fun exists(path: Path): Boolean = Files.exists(path)
 
+    override fun isDirectory(path: Path): Boolean = Files.isDirectory(path)
+
     override fun readText(path: Path): String = Files.readString(path)
 
     override fun listFiles(path: Path): List<Path> = if (Files.isDirectory(path)) {

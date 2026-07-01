@@ -28,6 +28,8 @@ class DryRunFileSystem(private val real: LaretFileSystem = RealFileSystem()) : L
 
     override fun exists(path: Path): Boolean = real.exists(path)
 
+    override fun isDirectory(path: Path): Boolean = real.isDirectory(path)
+
     override fun readText(path: Path): String = real.readText(path)
 
     override fun listFiles(path: Path): List<Path> = real.listFiles(path)

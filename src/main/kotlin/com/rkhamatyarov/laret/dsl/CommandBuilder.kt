@@ -1,5 +1,6 @@
 package com.rkhamatyarov.laret.dsl
 
+import com.rkhamatyarov.laret.completion.Completer
 import com.rkhamatyarov.laret.core.CommandContext
 import com.rkhamatyarov.laret.model.Argument
 import com.rkhamatyarov.laret.model.Command
@@ -31,8 +32,9 @@ class CommandBuilder(val name: String, val description: String = "") {
         required: Boolean = true,
         optional: Boolean = false,
         default: String = "",
+        completer: Completer? = null,
     ) {
-        arguments.add(Argument(name, description, required, optional, default))
+        arguments.add(Argument(name, description, required, optional, default, completer))
     }
 
     fun option(
@@ -43,8 +45,9 @@ class CommandBuilder(val name: String, val description: String = "") {
         takesValue: Boolean = true,
         persistent: Boolean = false,
         configKey: String? = null,
+        completer: Completer? = null,
     ) {
-        options.add(Option(short, long, description, default, takesValue, persistent, configKey))
+        options.add(Option(short, long, description, default, takesValue, persistent, configKey, completer))
     }
 
     fun action(block: (CommandContext) -> Unit) {
