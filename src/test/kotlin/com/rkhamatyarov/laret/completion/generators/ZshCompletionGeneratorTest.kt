@@ -61,6 +61,20 @@ class ZshCompletionGeneratorTest {
     }
 
     @Test
+    fun `generate dynamic script queries hidden __complete command`() {
+        val script = completionCommand.generate(ShellType.ZSH, dynamic = true)
+        assertTrue(script.contains("__complete"), "Dynamic script must query the binary at runtime")
+        assertTrue(script.contains("_testcli_complete_dynamic"), "Should register the dynamic function")
+        assertTrue(script.contains("_files"), "Should fall back to file completion per directive")
+    }
+
+    @Test
+    fun `generate defaults to static script without __complete`() {
+        val script = completionCommand.generate(ShellType.ZSH)
+        assertFalse(script.contains("__complete"), "Static script must not depend on the binary at runtime")
+    }
+
+    @Test
     fun `generate creates valid zsh script`() {
         val script = completionCommand.generate(ShellType.ZSH)
         assertTrue(script.contains("#compdef testcli"))

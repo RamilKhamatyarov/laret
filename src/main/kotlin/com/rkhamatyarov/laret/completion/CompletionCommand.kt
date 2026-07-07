@@ -7,7 +7,7 @@ import com.rkhamatyarov.laret.core.CliApp
 import java.io.File
 
 class CompletionCommand(private val app: CliApp) {
-    fun generate(shellType: ShellType, outputFile: File? = null): String {
+    fun generate(shellType: ShellType, outputFile: File? = null, dynamic: Boolean = false): String {
         val generator =
             when (shellType) {
                 ShellType.POWERSHELL -> PowerShellCompletionGenerator()
@@ -15,7 +15,7 @@ class CompletionCommand(private val app: CliApp) {
                 ShellType.ZSH -> ZshCompletionGenerator()
             }
 
-        val script = generator.generate(app)
+        val script = generator.generate(app, dynamic)
         outputFile?.writeText(script)
         return script
     }

@@ -1,5 +1,7 @@
 package com.rkhamatyarov.laret.model
 
+import com.rkhamatyarov.laret.completion.Completer
+
 /**
  * A named command-line option (flag).
  *
@@ -15,6 +17,9 @@ package com.rkhamatyarov.laret.model
  *                    CLI > config file > compile-time default.
  * @param configKey   Optional dot-key used by ConfigRegistry.  When omitted,
  *                    the runtime key is derived as `<group>.<long>`.
+ * @param completer   Optional dynamic completion source for this option's value,
+ *                    queried by the hidden `__complete` command.  Only meaningful
+ *                    when [takesValue] is true.
  */
 data class Option(
     val short: String,
@@ -24,4 +29,5 @@ data class Option(
     val takesValue: Boolean = true,
     val persistent: Boolean = false,
     val configKey: String? = null,
+    val completer: Completer? = null,
 )

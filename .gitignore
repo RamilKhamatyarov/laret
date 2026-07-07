@@ -49,3 +49,6 @@ bin/
 .idea/
 .claude/
 .codex/
+
+### VHS demo GIFs (CI-rendered from demo/*.tape, never committed) ###
+demo/*.gif

@@ -48,6 +48,31 @@ jobs:
           java -jar build/libs/laret-fat.jar \
             doc generate --format md --lang all --output-dir site/docs
 
+      - name: Install VHS
+        uses: charmbracelet/vhs-action@v2
+        with:
+          install-only: true
+          version: v0.10.0
+
+      - name: Render demo GIFs
+        run: |
+          set -euo pipefail
+          # The tapes invoke `laret`; expose the fat JAR as an executable.
+          mkdir -p "$HOME/.local/bin"
+          printf '#!/usr/bin/env bash\nexec java -jar "%s/build/libs/laret-fat.jar" "$@"\n' \
+            "$GITHUB_WORKSPACE" > "$HOME/.local/bin/laret"
+          chmod +x "$HOME/.local/bin/laret"
+          export PATH="$HOME/.local/bin:$PATH"
+
+          for tape in demo/*.tape; do
+            echo "Rendering $tape"
+            vhs "$tape"
+          done
+
+          mkdir -p site/docs/assets
+          cp demo/*.gif site/docs/assets/
+          ls -la site/docs/assets/
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

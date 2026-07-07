@@ -67,7 +67,18 @@ class LaretFileSystemTest {
         assertTrue(fs.listFiles(tempDir.resolve("a.txt")).isEmpty())
     }
 
-    // ----- DryRunFileSystem: narrates, never mutates -----
+    @Test
+    fun test_real_isDirectory_distinguishes_files_and_directories() {
+        val fs = RealFileSystem()
+        val dir = tempDir.resolve("sub")
+        Files.createDirectories(dir)
+        val file = tempDir.resolve("plain.txt")
+        Files.writeString(file, "x")
+
+        assertTrue(fs.isDirectory(dir))
+        assertFalse(fs.isDirectory(file))
+        assertFalse(fs.isDirectory(tempDir.resolve("missing")))
+    }
 
     @Test
     fun test_dryRun_writeText_does_not_touch_disk_and_reports_bytes() {
@@ -113,5 +124,6 @@ class LaretFileSystemTest {
 
         assertTrue(fs.exists(file))
         assertEquals("payload", fs.readText(file))
+        assertTrue(fs.isDirectory(tempDir))
     }
 }

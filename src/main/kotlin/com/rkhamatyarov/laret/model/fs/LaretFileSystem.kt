@@ -28,6 +28,8 @@ interface LaretFileSystem {
 
     fun exists(path: Path): Boolean
 
+    fun isDirectory(path: Path): Boolean
+
     fun readText(path: Path): String
 
     fun listFiles(path: Path): List<Path>
@@ -39,6 +41,8 @@ interface LaretFileSystem {
     fun createDirectories(path: String): Unit = createDirectories(Paths.get(path))
 
     fun exists(path: String): Boolean = exists(Paths.get(path))
+
+    fun isDirectory(path: String): Boolean = isDirectory(Paths.get(path))
 
     fun readText(path: String): String = readText(Paths.get(path))
 

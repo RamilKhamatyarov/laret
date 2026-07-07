@@ -133,6 +133,20 @@ class BashCompletionGeneratorTest {
     }
 
     @Test
+    fun `generate dynamic script queries hidden __complete command`() {
+        val script = completionCommand.generate(ShellType.BASH, dynamic = true)
+        assertTrue(script.contains("__complete"), "Dynamic script must query the binary at runtime")
+        assertTrue(script.contains("_testcli_complete_dynamic"), "Should register the dynamic function")
+        assertTrue(script.contains("compgen -f"), "Should fall back to file completion per directive")
+    }
+
+    @Test
+    fun `generate defaults to static script without __complete`() {
+        val script = completionCommand.generate(ShellType.BASH)
+        assertFalse(script.contains("__complete"), "Static script must not depend on the binary at runtime")
+    }
+
+    @Test
     fun `generate has balanced braces`() {
         val script = completionCommand.generate(ShellType.BASH)
         val openBraces = script.count { it == '{' }
