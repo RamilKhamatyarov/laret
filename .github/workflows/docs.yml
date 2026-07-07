@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  # PRs run the build job only (no deploy) so tape/docs breakage is caught
+  # before it reaches main.
+  pull_request:
   workflow_dispatch:
 
 # GitHub Pages deployment requires write access to Pages and an OIDC token.
@@ -13,8 +16,10 @@ permissions:
   id-token: write
 
 # Allow only one concurrent Pages deployment; let an in-flight run finish.
+# Ref-scoped so PR builds don't queue behind main deploys (deploys all share
+# the refs/heads/main group).
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -93,12 +98,14 @@ jobs:
         run: mkdocs build --site-dir site-build
 
       - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
           path: site-build
 
   deploy:
     name: Deploy to GitHub Pages
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
 

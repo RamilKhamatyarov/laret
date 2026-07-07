@@ -12,7 +12,7 @@ Set Theme "Dracula"
 Set TypingSpeed 50ms
 Set Padding 20
 
-Hidden
+Hide
 Type "mkdir -p /tmp/demo && cd /tmp/demo && touch alpha.txt beta.txt gamma.txt && clear"
 Enter
 Sleep 1s

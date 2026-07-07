@@ -12,7 +12,7 @@ Set Theme "Dracula"
 Set TypingSpeed 50ms
 Set Padding 20
 
-Hidden
+Hide
 Type "mkdir -p /tmp/demo-dry && cd /tmp/demo-dry && rm -f notes.txt && echo 'quarterly numbers' > report.txt && clear"
 Enter
 Sleep 1s
