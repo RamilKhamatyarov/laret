@@ -637,6 +637,8 @@ Troubleshooting:
 
 Laret lets you chain multiple commands together so the output of one becomes the input of the next — similar to Unix pipes.
 
+![Laret Piping Demo](https://ramilkhamatyarov.github.io/laret/assets/piping.gif)
+
 ### Basic usage
 
 Use `pipe run` with the `---` separator:
@@ -702,6 +704,8 @@ operations (`file create`, `file delete`, `dir create`, `completion man --output
 `LaretFileSystem` abstraction: in a dry run the real filesystem is swapped for one that **narrates**
 what *would* happen to stderr and performs no writes. Reads still work normally. Dry runs are never
 recorded in command history and never push an undo entry, so framework state stays untouched.
+
+![Laret Dry Run Demo](https://ramilkhamatyarov.github.io/laret/assets/dry-run.gif)
 
 ```bash
 $ laret file create notes.txt --content "hello" --dry-run

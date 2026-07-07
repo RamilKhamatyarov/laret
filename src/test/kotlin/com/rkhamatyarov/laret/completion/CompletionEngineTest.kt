@@ -37,14 +37,20 @@ class CompletionEngineTest {
             group(name = "doc", description = "Documentation") {
                 command(name = "generate", description = "Generate docs") {
                     option(
-                        "f", "format", "Output format", "md", true,
+                        "f",
+                        "format",
+                        "Output format",
+                        "md",
+                        true,
                         completer = StaticCompleter("md", "man"),
                     )
                     action {}
                 }
                 command(name = "guide", description = "Scaffold a guide") {
                     argument(
-                        "name", "Guide name", required = true,
+                        "name",
+                        "Guide name",
+                        required = true,
                         completer = StaticCompleter("installation", "quick-start"),
                     )
                     action {}
