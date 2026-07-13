@@ -40,9 +40,9 @@ dependencies {
     testImplementation("org.assertj:assertj-core:3.27.7")
     testImplementation("io.mockk:mockk:1.14.11")
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.1")
-    testImplementation("org.junit.jupiter:junit-jupiter-engine:6.1.1")
-    testImplementation("org.junit.jupiter:junit-jupiter-params:6.1.1")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.2")
+    testImplementation("org.junit.jupiter:junit-jupiter-engine:6.1.2")
+    testImplementation("org.junit.jupiter:junit-jupiter-params:6.1.2")
 }
 
 kotlin {
