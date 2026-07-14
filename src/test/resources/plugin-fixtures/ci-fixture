@@ -1,0 +1,2 @@
+#!/bin/sh
+printf 'plugin=%s dry_run=%s profile=%s args=%s\n' "$LARET_PLUGIN_NAME" "$LARET_DRY_RUN" "$LARET_PROFILE" "$*"

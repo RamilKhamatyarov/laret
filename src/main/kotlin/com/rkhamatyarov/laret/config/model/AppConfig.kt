@@ -1,6 +1,7 @@
 package com.rkhamatyarov.laret.config.model
 
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.rkhamatyarov.laret.plugin.model.PluginConfig
 
 data class AppConfig(
     @field:JsonProperty("app")

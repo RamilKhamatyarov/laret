@@ -1050,3 +1050,22 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgments
 
 - Inspired by [Cobra](https://github.com/spf13/cobra) (Go)
+
+## Sidecar Plugins
+
+Laret can install verified external executables as top-level commands. Plugins are stored in `~/.laret/plugins` by default; use `--plugin-dir` or `LARET_PLUGIN_DIR` to select additional directories.
+
+```bash
+laret plugin install formatter \
+  --url https://example.org/formatter \
+  --sha256 <64-hex-character-sha256>
+laret plugin list
+laret formatter input.txt
+laret plugin remove formatter --force
+```
+
+Installation accepts HTTPS URLs only, follows HTTPS redirects, verifies the required SHA-256 digest, and writes executable and TOML metadata files transactionally. Existing names require `--force` for replacement. Built-in commands always take precedence over plugins.
+
+Each installed plugin has a `<name>.toml` metadata file containing its name, source URL, digest, and installation timestamp. Laret verifies the executable digest before every run. Invalid and shadowed entries are shown by `laret plugin list` and are not executed.
+
+Sidecars inherit the parent environment. Laret overrides `LARET_PLUGIN_NAME`, `LARET_DRY_RUN`, and `LARET_PROFILE`. The sidecar receives standard input, output, and error streams directly and its exit code is returned by Laret.
