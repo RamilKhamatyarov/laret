@@ -633,6 +633,9 @@ jobs:
     needs: [ build ]
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
@@ -642,6 +645,18 @@ jobs:
       - name: Make binary executable
         run: chmod +x ./bin/laret
 
+      - name: Plugin install and list smoke test
+        run: |
+          set -euo pipefail
+          export LARET_PLUGIN_DIR=/tmp/laret-plugin-ci
+          mkdir -p "$LARET_PLUGIN_DIR"
+          FIXTURE_SHA=$(sha256sum src/test/resources/plugin-fixtures/ci-fixture | awk '{print $1}')
+          FIXTURE_URL="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/src/test/resources/plugin-fixtures/ci-fixture"
+          ./bin/laret plugin install ci-fixture --url "$FIXTURE_URL" --sha256 "$FIXTURE_SHA" --plugin-dir "$LARET_PLUGIN_DIR"
+          ./bin/laret plugin list --plugin-dir "$LARET_PLUGIN_DIR" | grep -q "ci-fixture.*installed"
+          ./bin/laret ci-fixture hello > /tmp/plugin_fixture.out 2>/tmp/plugin_fixture.err
+          grep -q "plugin=ci-fixture" /tmp/plugin_fixture.out
+          grep -q "args=hello" /tmp/plugin_fixture.out
       - name: Prepare test fixtures in /tmp
         run: |
           for i in 1 2 3 4 5; do

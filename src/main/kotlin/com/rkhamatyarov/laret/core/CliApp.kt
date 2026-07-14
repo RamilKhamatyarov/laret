@@ -7,9 +7,16 @@ import com.rkhamatyarov.laret.config.registry.ConfigRegistry
 import com.rkhamatyarov.laret.config.validator.ConfigValidator
 import com.rkhamatyarov.laret.model.Command
 import com.rkhamatyarov.laret.model.CommandGroup
+import com.rkhamatyarov.laret.plugin.install.PluginInstaller
+import com.rkhamatyarov.laret.plugin.model.InstalledPlugin
+import com.rkhamatyarov.laret.plugin.model.LaretPlugin
+import com.rkhamatyarov.laret.plugin.runtime.PluginCatalog
+import com.rkhamatyarov.laret.plugin.runtime.PluginExecutor
+import com.rkhamatyarov.laret.plugin.runtime.PluginManager
 import com.rkhamatyarov.laret.update.OldBinaryCleaner
 import kotlinx.coroutines.runBlocking
 import org.fusesource.jansi.AnsiConsole
+import java.nio.file.Path
 
 /**
  * Represents a complete CLI application.
@@ -33,6 +40,7 @@ data class CliApp(
     private val logManager = LogManager()
     private val configLoader = ConfigLoader()
     private val configValidator = ConfigValidator()
+    private var sidecarCatalog = PluginCatalog(emptyList())
 
     private var appConfig: AppConfig = AppConfig()
     private var configPath: String? = null
@@ -53,6 +61,7 @@ data class CliApp(
         }
         result.warnings.forEach { System.err.println(" WARNING: $it") }
         applyConfiguration(appConfig)
+        refreshSidecarPlugins()
         initializePlugins()
         runBlocking { onInitHook(this@CliApp) }
         return this
@@ -69,15 +78,21 @@ data class CliApp(
             }
         }
 
-        val commandInput = args.getOrNull(1) ?: return 0
-        val cmdArgs = args.drop(2).toTypedArray()
-
         val group = groups.find { it.matches(groupInput) }
             ?: run {
+                val pluginArgs = args.drop(1)
+                if (sidecarCatalog.findActive(groupInput) != null) {
+                    val dryRun = pluginArgs.any { it == "--dry-run" }
+                    val forwarded = pluginArgs.filterNot { it == "--dry-run" }
+                    return PluginExecutor(sidecarCatalog).execute(groupInput, forwarded, dryRun, configProfile)
+                }
                 println("Group not found: $groupInput")
                 HelpFormatter.showApplicationHelp(this)
                 return 1
             }
+
+        val commandInput = args.getOrNull(1) ?: return 0
+        val cmdArgs = args.drop(2).toTypedArray()
 
         val command = group.commands.find { it.matches(commandInput) }
             ?: run {
@@ -203,6 +218,28 @@ data class CliApp(
     fun getOutputConfig() = appConfig.output
 
     fun getPluginConfig() = appConfig.plugins
+    fun getSidecarPlugins(): List<InstalledPlugin> = sidecarCatalog.list()
+
+    fun refreshSidecarPlugins() {
+        val reserved = groups.map { it.name }.toMutableSet()
+        reserved += setOf("plugin", "help", "version")
+        val directories = PluginCatalog.directories(appConfig.plugins.paths)
+        sidecarCatalog = PluginCatalog(directories, appConfig.plugins, reserved)
+        sidecarCatalog.refresh()
+    }
+
+    fun pluginDirectories(override: Path? = null): List<Path> =
+        PluginCatalog.directories(appConfig.plugins.paths, override)
+
+    fun installSidecarPlugin(
+        name: String,
+        url: String,
+        sha256: String,
+        directory: Path,
+        force: Boolean = false,
+    ): Result<Path> = PluginInstaller().install(name, url, sha256, directory, force)
+
+    fun removeSidecarPlugin(name: String, force: Boolean = false): Result<Unit> = sidecarCatalog.remove(name, force)
 
     fun getLoggingConfig() = appConfig.logging
 
@@ -213,6 +250,7 @@ data class CliApp(
     fun reloadConfig(): CliApp {
         appConfig = configLoader.load(configPath, configProfile)
         applyConfiguration(appConfig)
+        refreshSidecarPlugins()
         return this
     }
 

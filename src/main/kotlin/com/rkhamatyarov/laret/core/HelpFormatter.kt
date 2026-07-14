@@ -22,6 +22,7 @@ object HelpFormatter {
 
             ${Ansi.ansi().bold()}COMMANDS:${Ansi.ansi().reset()}
             ${formatCommandGroups(app.groups)}
+            ${formatPlugins(app)}
 
             ${Ansi.ansi().bold()}GLOBAL OPTIONS:${Ansi.ansi().reset()}
             -h, --help ${" ".repeat(15)} Show this help message
@@ -37,6 +38,12 @@ object HelpFormatter {
             """.trimIndent(),
         )
     }
+
+    private fun formatPlugins(app: CliApp): String = app.getSidecarPlugins()
+        .filter { it.status == com.rkhamatyarov.laret.plugin.model.PluginStatus.INSTALLED }
+        .joinToString("\n") { plugin ->
+            "${plugin.name} Execute installed sidecar plugin"
+        }
 
     /** Display help for a specific command group */
     fun showGroupHelp(group: CommandGroup) {

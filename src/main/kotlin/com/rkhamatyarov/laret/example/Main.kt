@@ -15,6 +15,7 @@ import com.rkhamatyarov.laret.core.Localization
 import com.rkhamatyarov.laret.core.ParallelDispatcher
 import com.rkhamatyarov.laret.core.ParallelTask
 import com.rkhamatyarov.laret.core.UndoManager
+import com.rkhamatyarov.laret.core.isInteractive
 import com.rkhamatyarov.laret.diff.DiffFormat
 import com.rkhamatyarov.laret.diff.JsonDiffFormatter
 import com.rkhamatyarov.laret.diff.PlainFormatter
@@ -52,6 +53,7 @@ import org.jline.terminal.TerminalBuilder
 import java.io.File
 import java.net.InetAddress
 import java.net.Socket
+import java.nio.file.Path
 import kotlin.streams.asSequence
 import kotlin.system.exitProcess
 
@@ -211,6 +213,93 @@ fun main(args: Array<String>) {
                 }
             }
 
+            group(name = "plugin", description = "Install and manage sidecar plugins") {
+                command(name = "install", description = "Install a verified HTTPS sidecar plugin") {
+                    argument("name", "Plugin name")
+                    option("u", "url", "HTTPS plugin URL")
+                    option("s", "sha256", "Expected SHA-256 digest")
+                    option("d", "plugin-dir", "Plugin directory override")
+                    option("f", "force", "Replace an existing plugin", takesValue = false)
+                    action { ctx ->
+                        val app = ctx.app ?: return@action
+                        val directory = Path.of(
+                            ctx.option("plugin-dir").ifBlank { app.pluginDirectories().first().toString() },
+                        )
+                        val result = app.installSidecarPlugin(
+                            ctx.argument("name"),
+                            ctx.option("url"),
+                            ctx.option("sha256"),
+                            directory,
+                            ctx.optionBool("force"),
+                        )
+                        result.fold(
+                            onSuccess = {
+                                app.refreshSidecarPlugins()
+                                println("Plugin installed: ${ctx.argument("name")}")
+                            },
+                            onFailure = { error ->
+                                throw IllegalStateException(
+                                    "Plugin install failed: ${error.message}",
+                                    error,
+                                )
+                            },
+                        )
+                    }
+                }
+
+                command(name = "list", description = "List installed sidecar plugins") {
+                    option("d", "plugin-dir", "Plugin directory override")
+                    action { ctx ->
+                        val app = ctx.app ?: return@action
+                        val entries = com.rkhamatyarov.laret.plugin.runtime.PluginCatalog(
+                            app.pluginDirectories(ctx.option("plugin-dir").takeIf { it.isNotBlank() }?.let(Path::of)),
+                            app.getPluginConfig(),
+                        ).refresh()
+                        if (entries.isEmpty()) {
+                            println("No plugins installed")
+                        } else {
+                            entries.forEach { entry ->
+                                val reason = entry.reason?.let { " ($it)" }.orEmpty()
+                                println("${entry.name}\t${entry.status.name.lowercase()}$reason")
+                            }
+                        }
+                    }
+                }
+
+                command(name = "remove", description = "Remove an installed sidecar plugin") {
+                    argument("name", "Plugin name")
+                    option("d", "plugin-dir", "Plugin directory override")
+                    option("f", "force", "Remove without confirmation", takesValue = false)
+                    action { ctx ->
+                        val app = ctx.app ?: return@action
+                        val name = ctx.argument("name")
+                        val force = ctx.optionBool("force")
+                        val confirmed = force ||
+                            (ctx.isInteractive() && ctx.prompt().confirm("Remove plugin '$name'?", false))
+                        if (!confirmed) {
+                            System.err.println("Removal not confirmed; use --force for non-interactive removal")
+                            return@action
+                        }
+                        val catalog = com.rkhamatyarov.laret.plugin.runtime.PluginCatalog(
+                            app.pluginDirectories(ctx.option("plugin-dir").takeIf { it.isNotBlank() }?.let(Path::of)),
+                            app.getPluginConfig(),
+                        )
+                        catalog.refresh()
+                        catalog.remove(name, force).fold(
+                            onSuccess = {
+                                app.refreshSidecarPlugins()
+                                println("Plugin removed: $name")
+                            },
+                            onFailure = { error ->
+                                throw IllegalStateException(
+                                    "Plugin remove failed: ${error.message}",
+                                    error,
+                                )
+                            },
+                        )
+                    }
+                }
+            }
             group(name = "schema", description = "LLM schema export") {
                 command(name = "export", description = "Export commands as an LLM function-calling schema") {
                     option("f", "format", "Schema dialect: openai or anthropic", "openai", true)

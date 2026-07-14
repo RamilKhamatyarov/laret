@@ -85,9 +85,22 @@
     "allPublicConstructors": true
   },
   {
-    "name": "com.rkhamatyarov.laret.config.model.PluginConfig",
+    "name": "com.rkhamatyarov.laret.plugin.model.PluginConfig",
     "allDeclaredConstructors": true,
-    "allPublicConstructors": true
+    "allPublicConstructors": true,
+    "allDeclaredFields": true,
+    "allPublicFields": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true
+  },
+  {
+    "name": "com.rkhamatyarov.laret.plugin.model.PluginMetadata",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredFields": true,
+    "allPublicFields": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true
   },
   {
     "name": "com.rkhamatyarov.laret.config.model.LoggingConfig",

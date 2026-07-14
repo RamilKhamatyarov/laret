@@ -56,9 +56,15 @@ class CompletionEngine(private val app: CliApp) {
     }
 
     private fun groupCandidates(prefix: String): CompletionResult = CompletionResult(
-        app.groups
-            .filter { it.name.startsWith(prefix) }
-            .map { CompletionCandidate(it.name, it.description) },
+        (
+            app.groups
+                .filter { it.name.startsWith(prefix) }
+                .map { CompletionCandidate(it.name, it.description) } +
+                app.getSidecarPlugins()
+                    .filter { it.status == com.rkhamatyarov.laret.plugin.model.PluginStatus.INSTALLED }
+                    .filter { it.name.startsWith(prefix) }
+                    .map { CompletionCandidate(it.name, "Execute installed sidecar plugin") }
+            ),
     )
 
     private fun commandCandidates(group: CommandGroup, prefix: String): CompletionResult = CompletionResult(
