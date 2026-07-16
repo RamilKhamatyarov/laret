@@ -1,5 +1,6 @@
 package com.rkhamatyarov.laret
 
+import com.rkhamatyarov.laret.config.TestCli
 import com.rkhamatyarov.laret.core.CliApp
 import com.rkhamatyarov.laret.dsl.cli
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -14,6 +15,7 @@ import java.io.PrintStream
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 
 class CliTest {
     private lateinit var app: CliApp
@@ -172,11 +174,11 @@ class CliTest {
         // given
         val testFile = File(testDir, "test.txt")
         // when
-        app.run(arrayOf("file", "create", testFile.absolutePath, "-c", "Hello World"))
+        val result = TestCli(app).run("file", "create", testFile.absolutePath, "-c", "Hello World")
         // then
         assertTrue(testFile.exists())
         assertEquals("Hello World", testFile.readText())
-        assertTrue(getOutput().contains("File created"))
+        result.assertSuccess().assertStdoutContains("File created")
     }
 
     @Test
@@ -290,9 +292,10 @@ class CliTest {
 
     @Test
     fun `version flag displays version info`() {
-        clearOutput()
-        app.run(arrayOf("--version"))
-        assertTrue(getOutput().contains("laret version 1.0.0"))
+        TestCli(app)
+            .run("--version")
+            .assertSuccess()
+            .assertStdoutContains("laret version 1.0.0")
     }
 
     @Test
@@ -322,9 +325,10 @@ class CliTest {
 
     @Test
     fun `invalid group outputs error message`() {
-        clearOutput()
-        app.run(arrayOf("invalid", "command"))
-        assertTrue(getOutput().contains("Group not found"))
+        TestCli(app)
+            .run("invalid", "command")
+            .assertFailure(1)
+            .assertStdoutContains("Group not found")
     }
 
     @Test
@@ -375,7 +379,7 @@ class CliTest {
         clearOutput()
         app.run(arrayOf("file", "delete", testFile.absolutePath))
 
-        advanceTimeBy(100)
+        advanceTimeBy(100.milliseconds)
 
         // then
         val output = getOutput()
@@ -423,7 +427,7 @@ class CliTest {
             clearOutput()
             app.run(arrayOf("file", "delete", file.absolutePath))
 
-            advanceTimeBy(100)
+            advanceTimeBy(100.milliseconds)
 
             val output = getOutput()
             assertTrue(
