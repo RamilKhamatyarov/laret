@@ -8,8 +8,13 @@ import com.rkhamatyarov.laret.ui.redBold
 import kotlinx.coroutines.runBlocking
 
 object CommandRunner {
+    @Deprecated("Superseded by CliApp.middlewares; retained as a fallback source during resolution.")
     internal var globalMiddlewares: List<Middleware> = emptyList()
+
+    @Deprecated("Superseded by CliApp.middlewares; retained as a fallback source during resolution.")
     internal var groupMiddlewares: Map<String, List<Middleware>> = emptyMap()
+
+    @Deprecated("Superseded by CliApp.middlewares; retained as a fallback source during resolution.")
     internal var commandMiddlewares: Map<String, List<Middleware>> = emptyMap()
 
     fun execute(app: CliApp, args: Array<String>): Int {
@@ -92,11 +97,7 @@ object CommandRunner {
             return 1
         }
 
-        val groupMws = groupMiddlewares[groupName] ?: emptyList()
-        val commandMws = commandMiddlewares[command.name] ?: emptyList()
-        val allMiddlewares = (globalMiddlewares + groupMws + commandMws).sortedBy { it.priority }
-
-        val chain = MiddlewareChain(allMiddlewares, command.action)
+        val chain = MiddlewareChain(resolveMiddlewares(app, groupName, command.name), command.action)
 
         return try {
             chain.execute(ctx)
@@ -106,6 +107,29 @@ object CommandRunner {
             command.onError.invoke(ctx, e)
             1
         }
+    }
+
+    /**
+     * Middlewares applying to a command, ordered outermost first.
+     *
+     * The application registry is authoritative; the deprecated static maps are
+     * merged in for callers that still set them, de-duplicated by instance
+     * identity so a middleware present in both sources runs once. The final
+     * sort is flat across scopes and stable, so lower priority wraps more and
+     * equal priorities keep registration order.
+     */
+    internal fun resolveMiddlewares(app: CliApp, groupName: String, commandName: String): List<Middleware> {
+        val fromRegistry = app.middlewares.resolve(groupName, commandName).map { it.middleware }
+
+        @Suppress("DEPRECATION")
+        val legacy = globalMiddlewares +
+            (groupMiddlewares[groupName] ?: emptyList()) +
+            (commandMiddlewares[commandName] ?: emptyList())
+
+        val merged = fromRegistry + legacy.filterNot { candidate ->
+            fromRegistry.any { it === candidate }
+        }
+        return merged.sortedBy { it.priority }
     }
 
     internal fun isDryRunInvocation(app: CliApp, args: Array<String>): Boolean {

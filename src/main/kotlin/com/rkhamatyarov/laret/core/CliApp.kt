@@ -35,6 +35,7 @@ data class CliApp(
     val version: String = "1.0.0",
     val description: String = "",
     val groups: List<CommandGroup> = emptyList(),
+    val middlewares: MiddlewareRegistry = MiddlewareRegistry.EMPTY,
 ) {
     private val pluginManager = PluginManager()
     private val logManager = LogManager()
@@ -233,7 +234,7 @@ data class CliApp(
 
     fun refreshSidecarPlugins() {
         val reserved = groups.map { it.name }.toMutableSet()
-        reserved += setOf("plugin", "help", "version")
+        reserved += setOf("plugin", "help", "version", "middleware")
         val directories = PluginCatalog.directories(appConfig.plugins.paths)
         sidecarCatalog = PluginCatalog(directories, appConfig.plugins, reserved)
         sidecarCatalog.refresh()

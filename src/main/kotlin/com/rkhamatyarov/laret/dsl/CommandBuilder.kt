@@ -2,6 +2,7 @@ package com.rkhamatyarov.laret.dsl
 
 import com.rkhamatyarov.laret.completion.Completer
 import com.rkhamatyarov.laret.core.CommandContext
+import com.rkhamatyarov.laret.core.Middleware
 import com.rkhamatyarov.laret.model.Argument
 import com.rkhamatyarov.laret.model.Command
 import com.rkhamatyarov.laret.model.Option
@@ -12,6 +13,18 @@ class CommandBuilder(val name: String, val description: String = "") {
     private val aliases = mutableListOf<String>()
     private var hidden = false
     private var actionBlock: (CommandContext) -> Unit = {}
+
+    internal val middlewares = mutableListOf<Middleware>()
+
+    /**
+     * Register middleware at COMMAND scope: it runs only for this command.
+     *
+     * Ordering across scopes is by priority alone, so a low enough priority
+     * here still wraps a global middleware.
+     */
+    fun use(vararg middleware: Middleware) {
+        middlewares.addAll(middleware)
+    }
 
     var preExecute: suspend (CommandContext) -> Unit = {}
     var postExecute: suspend (CommandContext) -> Unit = {}

@@ -1232,6 +1232,110 @@ jobs:
           grep -q "START: read" /tmp/scope.stderr \
             || (echo "ERROR: Global middleware did not run for 'read'" && cat /tmp/scope.stderr && exit 1)
           echo "Global middleware applies to all commands"
+
+      - name: Test group-scoped middleware runs only for its own group
+        run: |
+          set -euo pipefail
+          # AuditMiddleware is registered inside group("file"); dir must not see it.
+          ./bin/laret file read /tmp/laret_fixture_1.txt > /dev/null 2>/tmp/group_in.stderr
+          grep -q "AUDIT: file read" /tmp/group_in.stderr \
+            || (echo "ERROR: GROUP middleware did not run for its own group" && cat /tmp/group_in.stderr && exit 1)
+
+          ./bin/laret dir list /tmp > /dev/null 2>/tmp/group_out.stderr
+          if grep -q "AUDIT:" /tmp/group_out.stderr; then
+            echo "ERROR: GROUP middleware leaked into another group"
+            cat /tmp/group_out.stderr
+            exit 1
+          fi
+          # Globals still apply there.
+          grep -q "START: list" /tmp/group_out.stderr \
+            || (echo "ERROR: global middleware missing for dir list" && cat /tmp/group_out.stderr && exit 1)
+          echo "GROUP-scoped middleware is confined to its group"
+
+      - name: Test command-scoped middleware runs only for its own command
+        run: |
+          set -euo pipefail
+          echo "doomed" > /tmp/mw_guard.txt
+          ./bin/laret file delete /tmp/mw_guard.txt > /dev/null 2>/tmp/cmd_in.stderr
+          grep -q "GUARD: destructive command delete" /tmp/cmd_in.stderr \
+            || (echo "ERROR: COMMAND middleware did not run for 'file delete'" && cat /tmp/cmd_in.stderr && exit 1)
+
+          # Sibling command in the same group must not trigger it.
+          ./bin/laret file create /tmp/mw_guard_sibling.txt -c x > /dev/null 2>/tmp/cmd_out.stderr
+          if grep -q "GUARD:" /tmp/cmd_out.stderr; then
+            echo "ERROR: COMMAND middleware leaked to a sibling command"
+            cat /tmp/cmd_out.stderr
+            exit 1
+          fi
+          echo "COMMAND-scoped middleware is confined to its command"
+
+      - name: Test lower priority wraps more of the chain
+        run: |
+          set -euo pipefail
+          echo "ordered" > /tmp/mw_prio.txt
+          ./bin/laret file delete /tmp/mw_prio.txt > /dev/null 2>/tmp/prio.stderr
+          # Expected nesting: Stats(-1000) > Logging(0) > Audit(0) > Guard(10).
+          # Stats is silent, so assert on the three that log, plus END last.
+          ACTUAL=$(grep -nE "START: delete|AUDIT: file delete|GUARD: destructive|END: delete" /tmp/prio.stderr \
+            | sed -E 's/^[0-9]+://' | sed -E 's/ took [0-9]+ms//')
+          EXPECTED=$'START: delete\nAUDIT: file delete\nGUARD: destructive command delete\nEND: delete'
+          [ "$ACTUAL" = "$EXPECTED" ] || {
+            echo "ERROR: middleware nesting order wrong"
+            echo "--- expected ---"; echo "$EXPECTED"
+            echo "--- actual ---";   echo "$ACTUAL"
+            exit 1
+          }
+          echo "Lower priority wraps more of the chain"
+
+      - name: Test middleware list reports every scope
+        run: |
+          set -euo pipefail
+          ./bin/laret middleware list > /tmp/mwlist.stdout 2>/dev/null
+          cat /tmp/mwlist.stdout
+          head -1 /tmp/mwlist.stdout | grep -qE "NAME +PRIORITY +SCOPE +TARGET" \
+            || (echo "ERROR: missing table header" && exit 1)
+          grep -qE "StatsMiddleware +-1000 +GLOBAL +\*" /tmp/mwlist.stdout \
+            || (echo "ERROR: global registration not listed correctly" && exit 1)
+          grep -qE "AuditMiddleware +0 +GROUP +file" /tmp/mwlist.stdout \
+            || (echo "ERROR: group registration not listed correctly" && exit 1)
+          grep -qE "DeleteGuardMiddleware +10 +COMMAND +file delete" /tmp/mwlist.stdout \
+            || (echo "ERROR: command registration not listed correctly" && exit 1)
+          echo "middleware list reports all three scopes"
+
+      - name: Test middleware list chain preview matches real execution
+        run: |
+          set -euo pipefail
+          ./bin/laret middleware list --command "file delete" > /tmp/chain.stdout 2>/dev/null
+          cat /tmp/chain.stdout
+          grep -q "Chain for 'file delete' (outermost first):" /tmp/chain.stdout \
+            || (echo "ERROR: missing chain header" && exit 1)
+
+          # Preview order, outermost first.
+          PREVIEW=$(sed -nE 's/^ *[0-9]+\. +([A-Za-z]+) .*/\1/p' /tmp/chain.stdout)
+          EXPECTED=$'StatsMiddleware\nLoggingMiddleware\nAuditMiddleware\nDeleteGuardMiddleware'
+          [ "$PREVIEW" = "$EXPECTED" ] || {
+            echo "ERROR: chain preview order wrong"
+            echo "--- expected ---"; echo "$EXPECTED"
+            echo "--- actual ---";   echo "$PREVIEW"
+            exit 1
+          }
+
+          # A command in another group sees only the globals.
+          ./bin/laret middleware list --command "dir list" > /tmp/chain2.stdout 2>/dev/null
+          grep -q "AuditMiddleware" /tmp/chain2.stdout \
+            && (echo "ERROR: group middleware leaked into another group's preview" && exit 1)
+          grep -q "StatsMiddleware" /tmp/chain2.stdout \
+            || (echo "ERROR: global middleware missing from preview" && exit 1)
+          echo "Chain preview matches resolution and respects scope"
+
+      - name: Test middleware list rejects a malformed target
+        run: |
+          set -euo pipefail
+          ./bin/laret middleware list --command "file" > /tmp/bad.stdout 2>/tmp/bad.stderr
+          grep -q "Invalid --command value" /tmp/bad.stderr \
+            || (echo "ERROR: malformed --command was not reported" && cat /tmp/bad.stderr && exit 1)
+          echo "middleware list validates its target argument"
+
   integration-manpages:
     name: Integration - Man Page Generation
     runs-on: ubuntu-latest
