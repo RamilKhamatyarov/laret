@@ -79,7 +79,6 @@ fun main(args: Array<String>) {
             use(LoggingMiddleware())
             use(StatsMiddleware())
 
-            onAppInit = { System.err.println(Localization.t("app.initializing")) }
             onAppShutdown = { System.err.println(Localization.t("app.shutting.down")) }
 
             group(name = "completion", description = "Shell completion") {
