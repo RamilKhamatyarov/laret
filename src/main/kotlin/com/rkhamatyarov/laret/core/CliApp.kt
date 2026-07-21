@@ -50,7 +50,10 @@ data class CliApp(
     internal var onShutdownHook: suspend (CliApp) -> Unit = {}
 
     /** Initialize the application, optionally loading a config file. */
-    fun init(configPath: String? = null, profile: String? = null): CliApp {
+    fun init(configPath: String? = null, profile: String? = null): CliApp =
+        runBlocking { initSuspending(configPath, profile) }
+
+    internal suspend fun initSuspending(configPath: String? = null, profile: String? = null): CliApp {
         this.configPath = configPath
         this.configProfile = profile
         appConfig = configLoader.load(configPath, profile)
@@ -63,11 +66,11 @@ data class CliApp(
         applyConfiguration(appConfig)
         refreshSidecarPlugins()
         initializePlugins()
-        runBlocking { onInitHook(this@CliApp) }
+        onInitHook(this@CliApp)
         return this
     }
 
-    private fun executeCommand(args: Array<String>): Int {
+    private suspend fun executeCommand(args: Array<String>): Int {
         val groupInput = args.getOrNull(0) ?: return 0
 
         if (args.size == 2 && (args[1] == "-h" || args[1] == "--help")) {
@@ -100,9 +103,7 @@ data class CliApp(
                 return 1
             }
 
-        return runBlocking {
-            CommandRunner.executeCommand(command, cmdArgs, this@CliApp, group.name)
-        }
+        return CommandRunner.executeCommand(command, cmdArgs, this@CliApp, group.name)
     }
 
     /**
@@ -117,7 +118,7 @@ data class CliApp(
         OldBinaryCleaner.cleanupSilently()
         AnsiConsole.systemInstall()
         try {
-            return dispatch(args)
+            return runBlocking { dispatch(args) }
         } finally {
             shutdownPlugins()
             AnsiConsole.systemUninstall()
@@ -133,12 +134,22 @@ data class CliApp(
      */
     fun runForTest(args: Array<String>): Int {
         logManager.disableLogging()
-        val exitCode = dispatch(args)
+        val exitCode = runBlocking { dispatch(args) }
         shutdownPlugins()
         return exitCode
     }
 
-    private fun dispatch(args: Array<String>): Int {
+    /** Suspending test entry point that cooperates with the caller's coroutine scheduler. */
+    internal suspend fun runForTestSuspending(args: Array<String>): Int {
+        logManager.disableLogging()
+        return try {
+            dispatch(args)
+        } finally {
+            shutdownPlugins()
+        }
+    }
+
+    private suspend fun dispatch(args: Array<String>): Int {
         if (args.firstOrNull() == CompletionEngine.COMPLETE_COMMAND) {
             print(CompletionEngine(this).complete(args.drop(1)))
             return 0
@@ -146,7 +157,7 @@ data class CliApp(
 
         val global = extractGlobalOptions(args)
         if (global.configPath != null || global.profile != null) {
-            init(global.configPath ?: configPath, global.profile ?: configProfile)
+            initSuspending(global.configPath ?: configPath, global.profile ?: configProfile)
             return dispatch(global.remaining)
         }
 
@@ -173,7 +184,7 @@ data class CliApp(
             }
 
             args[0] == "--config" && args.size > 1 -> {
-                init(args[1])
+                initSuspending(args[1])
                 val remaining = args.drop(2).toTypedArray()
                 return if (remaining.isNotEmpty()) {
                     executeCommand(remaining)

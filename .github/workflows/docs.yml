@@ -53,6 +53,11 @@ jobs:
           java -jar build/libs/laret-fat.jar \
             doc generate --format md --lang all --output-dir site/docs
 
+      - name: Generate Pages landing page
+        run: |
+          java -jar build/libs/laret-fat.jar \
+            doc index --readme README.md --lang en --output-dir site/docs
+
       - name: Install VHS
         run: |
           set -euo pipefail

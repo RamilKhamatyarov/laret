@@ -5,6 +5,8 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9+-7F52FF.svg?logo=kotlin)](https://kotlinlang.org)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+![Laret CLI overview](https://ramilkhamatyarov.github.io/laret/assets/overview.gif)
+
 ## Features
 
 - **Intuitive DSL**
