@@ -12,11 +12,11 @@ class ZshCompletionGenerator(val templateEngine: TemplateEngine = TemplateEngine
         val contextMap = baseContext.toMap().toMutableMap()
         val items = mutableListOf<Map<String, String>>()
         app.groups.forEach { group ->
-            items.add(mapOf("name" to group.name, "description" to "${group.name} command"))
+            items.add(mapOf("name" to group.name, "description" to zshQuoted("${group.name} command")))
         }
         app.groups.forEach { group ->
             group.commands.forEach { cmd ->
-                items.add(mapOf("name" to cmd.name, "description" to cmd.description))
+                items.add(mapOf("name" to cmd.name, "description" to zshQuoted(cmd.description)))
             }
         }
         contextMap["items"] = items
@@ -36,7 +36,7 @@ class ZshCompletionGenerator(val templateEngine: TemplateEngine = TemplateEngine
                             TemplateContext.OptionContext(
                                 long = opt.long,
                                 short = opt.short,
-                                description = opt.description,
+                                description = zshBracketed(opt.description),
                             )
                         },
                     )
@@ -48,4 +48,8 @@ class ZshCompletionGenerator(val templateEngine: TemplateEngine = TemplateEngine
     private fun loadTemplate(name: String): String = javaClass.classLoader.getResource("templates/$name.tpl")
         ?.readText()
         ?: throw IllegalStateException("Zsh template '$name' not found")
+
+    private fun zshQuoted(text: String): String = text.replace("'", "'\\''")
+
+    private fun zshBracketed(text: String): String = zshQuoted(text).replace("[", "\\[").replace("]", "\\]")
 }

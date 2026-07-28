@@ -6,11 +6,7 @@ package com.rkhamatyarov.laret.core
  * @property target Human-readable registration target: `*` for global,
  *   the group name for group scope, `<group> <command>` for command scope.
  */
-data class MiddlewareRegistration(
-    val middleware: Middleware,
-    val scope: MiddlewareScope,
-    val target: String,
-) {
+data class MiddlewareRegistration(val middleware: Middleware, val scope: MiddlewareScope, val target: String) {
     val name: String get() = middleware.name
     val priority: Int get() = middleware.priority
 }
