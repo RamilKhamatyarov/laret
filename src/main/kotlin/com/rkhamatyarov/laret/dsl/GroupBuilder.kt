@@ -1,5 +1,6 @@
 package com.rkhamatyarov.laret.dsl
 
+import com.rkhamatyarov.laret.core.Middleware
 import com.rkhamatyarov.laret.model.Command
 import com.rkhamatyarov.laret.model.CommandGroup
 
@@ -18,6 +19,19 @@ class GroupBuilder(val name: String, val description: String = "") {
     private val commands = mutableListOf<Command>()
     private val aliases = mutableListOf<String>()
 
+    /** Middleware registered at GROUP scope, and per-command registrations collected from nested `command { }` blocks. */
+    internal val middlewares = mutableListOf<Middleware>()
+    internal val commandMiddlewares = mutableMapOf<String, List<Middleware>>()
+
+    /**
+     * Register middleware at GROUP scope: it runs for every command in this
+     * group. The target is the enclosing group, so the same middleware class
+     * can be reused in another group without modification.
+     */
+    fun use(vararg middleware: Middleware) {
+        middlewares.addAll(middleware)
+    }
+
     /**
      * Register one or more alternative names for this group.
      *
@@ -33,6 +47,9 @@ class GroupBuilder(val name: String, val description: String = "") {
         val cmdBuilder = CommandBuilder(name, description)
         cmdBuilder.block()
         commands.add(cmdBuilder.build())
+        if (cmdBuilder.middlewares.isNotEmpty()) {
+            commandMiddlewares[name] = cmdBuilder.middlewares.toList()
+        }
     }
 
     fun build(): CommandGroup = CommandGroup(name, description, commands.toList(), aliases.toList())

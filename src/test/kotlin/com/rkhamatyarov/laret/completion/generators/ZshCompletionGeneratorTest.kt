@@ -333,4 +333,42 @@ class ZshCompletionGeneratorTest {
             "Zsh completion script should not contain command execution line",
         )
     }
+
+    @Test
+    fun `descriptions with apostrophes keep single-quote parity balanced`() {
+        val trickyApp =
+            cli(name = "trickycli", version = "1.0.0") {
+                group(name = "g", description = "Group") {
+                    command(name = "run", description = "Preview a command's chain") {
+                        option("p", "pattern", "Match a [glob] pattern", "", true)
+                        action {}
+                    }
+                }
+            }
+
+        val script = CompletionCommand(trickyApp).generate(ShellType.ZSH)
+
+        assertContains(script, "command'\\''s chain")
+        assertContains(script, "Match a \\[glob\\] pattern")
+        assertTrue(singleQuotesBalanced(script), "Generated script has unbalanced single quotes:\n$script")
+    }
+
+    /**
+     * Emulates a POSIX/zsh single-quote scanner: outside quotes a backslash
+     * escapes the next character; inside single quotes everything is literal.
+     * Returns true when the string ends outside a quote (balanced).
+     */
+    private fun singleQuotesBalanced(text: String): Boolean {
+        var inQuote = false
+        var i = 0
+        while (i < text.length) {
+            val c = text[i]
+            when {
+                !inQuote && c == '\\' -> i++
+                c == '\'' -> inQuote = !inQuote
+            }
+            i++
+        }
+        return !inQuote
+    }
 }

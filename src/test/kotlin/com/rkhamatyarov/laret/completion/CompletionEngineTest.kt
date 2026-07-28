@@ -64,7 +64,7 @@ class CompletionEngineTest {
     fun test_empty_line_completes_group_names_with_descriptions() {
         val result = engine.resolve(listOf(""))
 
-        assertEquals(listOf("file", "doc"), result.candidates.map { it.value })
+        assertEquals(listOf("file", "doc", "middleware"), result.candidates.map { it.value })
         assertEquals("File operations", result.candidates.first().description)
         assertEquals(CompletionResult.NO_FILE_COMP, result.directive)
     }

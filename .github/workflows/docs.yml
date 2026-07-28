@@ -50,12 +50,12 @@ jobs:
       # DSL description for commands without a .md file.
       - name: Generate Markdown docs
         run: |
-          java -jar build/libs/laret-fat.jar \
+          java --enable-native-access=ALL-UNNAMED -jar build/libs/laret-fat.jar \
             doc generate --format md --lang all --output-dir site/docs
 
       - name: Generate Pages landing page
         run: |
-          java -jar build/libs/laret-fat.jar \
+          java --enable-native-access=ALL-UNNAMED -jar build/libs/laret-fat.jar \
             doc index --readme README.md --lang en --output-dir site/docs
 
       - name: Install VHS
@@ -76,10 +76,18 @@ jobs:
           set -euo pipefail
           # The tapes invoke `laret`; expose the fat JAR as an executable.
           mkdir -p "$HOME/.local/bin"
-          printf '#!/usr/bin/env bash\nexec java -jar "%s/build/libs/laret-fat.jar" "$@"\n' \
+          printf '#!/usr/bin/env bash\nexec java --enable-native-access=ALL-UNNAMED -jar "%s/build/libs/laret-fat.jar" "$@"\n' \
             "$GITHUB_WORKSPACE" > "$HOME/.local/bin/laret"
           chmod +x "$HOME/.local/bin/laret"
           export PATH="$HOME/.local/bin:$PATH"
+
+          laret --version > /tmp/laret-demo-version.out 2> /tmp/laret-demo-version.err
+          if grep -Eiq 'restricted method in java.lang.System|System::load.*JansiLoader' \
+            /tmp/laret-demo-version.err; then
+            cat /tmp/laret-demo-version.err >&2
+            echo "Restricted native-access warning detected in demo launcher" >&2
+            exit 1
+          fi
 
           for tape in demo/*.tape; do
             echo "Rendering $tape"

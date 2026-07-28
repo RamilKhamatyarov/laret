@@ -1007,6 +1007,7 @@ fun main(args: Array<String>) {
 
             group(name = "file", description = "File operations") {
                 aliases("f")
+                use(AuditMiddleware())
                 command(name = "create", description = "Create a new file") {
                     aliases("c")
                     argument("path", "File path", required = true)
@@ -1060,6 +1061,7 @@ fun main(args: Array<String>) {
 
                 command(name = "delete", description = "Delete a file") {
                     aliases("rm")
+                    use(DeleteGuardMiddleware())
                     argument("path", "File path", required = true)
                     action { ctx ->
                         val path = ctx.argument("path")
