@@ -263,6 +263,95 @@ class CommandPipelineTest {
     }
 
     @Test
+    fun `executeResult reports successful stages`() {
+        val pipeline = CommandPipeline(echoApp())
+
+        val result = pipeline.executeResult(
+            listOf(
+                arrayOf("echo", "print", "hello"),
+                arrayOf("upper", "convert", "-"),
+            ),
+        )
+
+        assertEquals("HELLO", result.output)
+        assertEquals(0, result.exitCode)
+        assertEquals(2, result.completedStages)
+        assertEquals(null, result.failedStage)
+    }
+
+    @Test
+    fun `executeResult stops after failed stage and preserves its output`() {
+        val executed = mutableListOf<String>()
+        val app = cli("piper", version = "1.0") {
+            group("flow") {
+                command("first") {
+                    action {
+                        executed += "first"
+                        print("first")
+                    }
+                }
+                command("fail") {
+                    action { ctx ->
+                        executed += "fail"
+                        print("partial")
+                        ctx.exit(7)
+                    }
+                }
+                command("never") {
+                    action {
+                        executed += "never"
+                        print("never")
+                    }
+                }
+            }
+        }
+        val pipeline = CommandPipeline(app)
+
+        val result = pipeline.executeResult(
+            listOf(
+                arrayOf("flow", "first"),
+                arrayOf("flow", "fail"),
+                arrayOf("flow", "never"),
+            ),
+        )
+
+        assertEquals("partial", result.output)
+        assertEquals(7, result.exitCode)
+        assertEquals(1, result.completedStages)
+        assertEquals(2, result.failedStage)
+        assertEquals(listOf("first", "fail"), executed)
+    }
+
+    @Test
+    fun `legacy execute remains nonthrowing and fail-fast`() {
+        var finalStageExecuted = false
+        val app = cli("piper", version = "1.0") {
+            group("flow") {
+                command("fail") {
+                    action { ctx ->
+                        print("failed output")
+                        ctx.exit(9)
+                    }
+                }
+                command("never") {
+                    action { finalStageExecuted = true }
+                }
+            }
+        }
+        val pipeline = CommandPipeline(app)
+
+        val output = pipeline.execute(
+            listOf(
+                arrayOf("flow", "fail"),
+                arrayOf("flow", "never"),
+            ),
+        )
+
+        assertEquals("failed output", output)
+        assertEquals(false, finalStageExecuted)
+    }
+
+    @Test
     fun `execute with empty list throws IllegalArgumentException`() {
         val app = cli("t") { group("g") { command("c") { action {} } } }
         val pipeline = CommandPipeline(app)

@@ -1,9 +1,9 @@
 plugins {
     kotlin("jvm") version "2.4.10"
-    id("org.graalvm.buildtools.native") version "1.1.6"
+    id("org.graalvm.buildtools.native") version "1.1.9"
     id("com.gradleup.shadow") version "9.6.1"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
-    id("com.diffplug.spotless") version "8.8.0"
+    id("com.diffplug.spotless") version "8.9.0"
     id("pmd")
     `maven-publish`
     application
@@ -40,9 +40,9 @@ dependencies {
     testImplementation("org.assertj:assertj-core:3.27.7")
     testImplementation("io.mockk:mockk:1.14.11")
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.2")
-    testImplementation("org.junit.jupiter:junit-jupiter-engine:6.1.2")
-    testImplementation("org.junit.jupiter:junit-jupiter-params:6.1.2")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.3")
+    testImplementation("org.junit.jupiter:junit-jupiter-engine:6.1.3")
+    testImplementation("org.junit.jupiter:junit-jupiter-params:6.1.3")
 }
 
 kotlin {
