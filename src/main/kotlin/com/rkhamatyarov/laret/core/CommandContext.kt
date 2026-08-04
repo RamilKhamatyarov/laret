@@ -23,6 +23,14 @@ class CommandContext(
 
     val options = mutableMapOf<String, String>()
 
+    var exitCode: Int = 0
+        private set
+
+    fun exit(code: Int) {
+        require(code in 0..255) { "Exit code must be between 0 and 255: $code" }
+        exitCode = code
+    }
+
     fun argument(name: String): String = arguments[name] ?: ""
 
     fun option(name: String): String = options[name] ?: ""

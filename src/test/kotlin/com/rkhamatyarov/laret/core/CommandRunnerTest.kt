@@ -26,6 +26,48 @@ class CommandRunnerTest {
     }
 
     @Test
+    fun test_explicit_exit_runs_postExecute_and_returns_last_code() {
+        var postExecuted = false
+        val app = cli(name = "test", version = "1.0.0") {
+            group(name = "task") {
+                command(name = "run") {
+                    postExecute = { ctx ->
+                        postExecuted = true
+                        ctx.exit(3)
+                    }
+                    action { ctx -> ctx.exit(7) }
+                }
+            }
+        }
+
+        val exitCode = app.runForTest(arrayOf("task", "run"))
+
+        assertEquals(3, exitCode)
+        assertTrue(postExecuted)
+    }
+
+    @Test
+    fun test_exception_after_explicit_exit_uses_error_code_and_onError() {
+        var errorObserved = false
+        val app = cli(name = "test", version = "1.0.0") {
+            group(name = "task") {
+                command(name = "run") {
+                    onError = { _, _ -> errorObserved = true }
+                    action { ctx ->
+                        ctx.exit(7)
+                        error("failed")
+                    }
+                }
+            }
+        }
+
+        val exitCode = app.runForTest(arrayOf("task", "run"))
+
+        assertEquals(1, exitCode)
+        assertTrue(errorObserved)
+    }
+
+    @Test
     fun test_shortN_is_not_a_global_dryRun_flag_and_stays_command_scoped() {
         var observedDryRun = true
         var observedName = ""
