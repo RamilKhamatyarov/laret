@@ -1551,6 +1551,31 @@ jobs:
               && cat /tmp/pipe_mixed.out /tmp/pipe_mixed.err && exit 1)
           echo "Three-stage pipeline with mixed --- and | separators works"
 
+      - name: Pipe - failed stage stops pipeline and propagates exit code
+        run: |
+          set -euo pipefail
+          rm -f /tmp/laret_pipe_marker.txt
+          echo "existing" > /tmp/laret_pipe_existing.txt
+          set +e
+          ./bin/laret pipe run \
+            echo print payload \
+            --- \
+            file create /tmp/laret_pipe_existing.txt \
+            --- \
+            file create /tmp/laret_pipe_marker.txt \
+            > /tmp/pipe_failure.out 2>/tmp/pipe_failure.err
+          PIPE_EXIT=$?
+          set -e
+          [ "$PIPE_EXIT" -eq 1 ] \
+            || (echo "ERROR: expected pipeline exit 1, got $PIPE_EXIT" \
+              && cat /tmp/pipe_failure.out /tmp/pipe_failure.err && exit 1)
+          [ ! -e /tmp/laret_pipe_marker.txt ] \
+            || (echo "ERROR: stage after failure was executed" && exit 1)
+          grep -q "Pipeline stage 2 failed with exit code 1" /tmp/pipe_failure.err \
+            || (echo "ERROR: missing pipeline failure diagnostic" \
+              && cat /tmp/pipe_failure.err && exit 1)
+          echo "Failed stage stops pipeline and propagates exit code"
+
       - name: Upload pipeline artifacts
         if: always()
         uses: actions/upload-artifact@v4

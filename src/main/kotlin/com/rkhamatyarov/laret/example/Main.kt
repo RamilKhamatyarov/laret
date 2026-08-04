@@ -555,7 +555,14 @@ fun main(args: Array<String>) {
                             return@action
                         }
                         System.err.println(Localization.t("pipe.started", stages.size))
-                        pipeline.execute(stages, dryRun = ctx.isDryRun)
+                        val result = pipeline.executeResult(stages, dryRun = ctx.isDryRun)
+                        result.failedStage?.let { stageIndex ->
+                            val commandLine = stages[stageIndex - 1].joinToString(" ")
+                            System.err.println(
+                                "Pipeline stage $stageIndex failed with exit code ${result.exitCode}: $commandLine",
+                            )
+                        }
+                        ctx.exit(result.exitCode)
                     }
                 }
             }

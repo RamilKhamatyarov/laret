@@ -64,7 +64,7 @@ object CommandRunner {
             command.parseArgumentsAndOptions(executionArgs.args, ctx, groupName)
             return try {
                 command.action(ctx)
-                0
+                ctx.exitCode
             } catch (e: Exception) {
                 System.err.println(e.message)
                 1
@@ -102,7 +102,7 @@ object CommandRunner {
         return try {
             chain.execute(ctx)
             command.postExecute.invoke(ctx)
-            0
+            ctx.exitCode
         } catch (e: Exception) {
             command.onError.invoke(ctx, e)
             1
