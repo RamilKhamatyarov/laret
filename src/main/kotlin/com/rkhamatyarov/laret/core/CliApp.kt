@@ -15,7 +15,6 @@ import com.rkhamatyarov.laret.plugin.runtime.PluginExecutor
 import com.rkhamatyarov.laret.plugin.runtime.PluginManager
 import com.rkhamatyarov.laret.update.OldBinaryCleaner
 import kotlinx.coroutines.runBlocking
-import org.fusesource.jansi.AnsiConsole
 import java.nio.file.Path
 
 /**
@@ -110,28 +109,26 @@ data class CliApp(
     /**
      * Run the CLI with the supplied argument array.
      *
-     * Installs Jansi's ANSI console wrappers around [System.out] / [System.err]
-     * for rich terminal output.  Use [runForTest] in unit tests so that
-     * [System.setOut] / [System.setErr] capture streams are not overridden.
+     * laret writes raw ANSI escapes (gated by `Colors.isColorSupported()`) and
+     * lets the terminal render them, which is correct for modern terminals
+     * (WezTerm, Windows Terminal, ConPTY, and Unix). See the
+     * `colored-output-native-image-and-detection` ADR for why the previous
+     * Jansi console wrapper was removed.
      */
     fun run(args: Array<String>): Int {
         logManager.disableLogging()
         OldBinaryCleaner.cleanupSilently()
-        AnsiConsole.systemInstall()
         try {
             return runBlocking { dispatch(args) }
         } finally {
             shutdownPlugins()
-            AnsiConsole.systemUninstall()
         }
     }
 
     /**
-     * Run the CLI **without** installing Jansi's console wrappers.
-     *
-     * This preserves any [System.setOut] / [System.setErr] streams that unit
-     * tests have installed, so [println] output is captured correctly.
-     * Do **not** call this from production code — use [run] instead.
+     * Run the CLI, preserving any [System.setOut] / [System.setErr] streams that
+     * unit tests have installed so [println] output is captured correctly.
+     * Behaves like [run]; kept as the explicit test entry point.
      */
     fun runForTest(args: Array<String>): Int {
         logManager.disableLogging()
@@ -297,7 +294,27 @@ data class CliApp(
 
     fun findPlugin(name: String): LaretPlugin? = pluginManager.getPlugins().find { it.name == name }
 
-    private data class GlobalOptions(val configPath: String?, val profile: String?, val remaining: Array<String>)
+    private data class GlobalOptions(val configPath: String?, val profile: String?, val remaining: Array<String>) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+
+            other as GlobalOptions
+
+            if (configPath != other.configPath) return false
+            if (profile != other.profile) return false
+            if (!remaining.contentEquals(other.remaining)) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = configPath?.hashCode() ?: 0
+            result = 31 * result + (profile?.hashCode() ?: 0)
+            result = 31 * result + remaining.contentHashCode()
+            return result
+        }
+    }
 
     private fun extractGlobalOptions(args: Array<String>): GlobalOptions {
         var nextConfigPath: String? = null

@@ -42,3 +42,21 @@ fun redItalic(text: String): String = if (Colors.isColorSupported()) {
 } else {
     text
 }
+
+fun bold(text: String): String = if (Colors.isColorSupported()) {
+    "${Colors.BOLD}$text${Colors.RESET}"
+} else {
+    text
+}
+
+fun green(text: String): String = if (Colors.isColorSupported()) {
+    "${Colors.GREEN}$text${Colors.RESET}"
+} else {
+    text
+}
+
+fun blue(text: String): String = if (Colors.isColorSupported()) {
+    "${Colors.BLUE}$text${Colors.RESET}"
+} else {
+    text
+}

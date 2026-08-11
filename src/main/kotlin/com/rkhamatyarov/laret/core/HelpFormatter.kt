@@ -2,33 +2,37 @@ package com.rkhamatyarov.laret.core
 
 import com.rkhamatyarov.laret.model.Command
 import com.rkhamatyarov.laret.model.CommandGroup
+import com.rkhamatyarov.laret.ui.blue
+import com.rkhamatyarov.laret.ui.bold
+import com.rkhamatyarov.laret.ui.cyanBold
+import com.rkhamatyarov.laret.ui.green
 import com.rkhamatyarov.laret.ui.redBold
-import org.fusesource.jansi.Ansi
 
 /** Centralized formatter for displaying help messages across the CLI application. */
 object HelpFormatter {
     /** Display help for the entire CLI application */
     fun showApplicationHelp(app: CliApp) {
+        val divider = cyanBold("========================================")
         println(
             """
-            ${Ansi.ansi().bold().fg(Ansi.Color.CYAN)}========================================${Ansi.ansi().reset()}
-            ${Ansi.ansi().bold().fg(Ansi.Color.CYAN)}${app.name} v${app.version}${Ansi.ansi().reset()}
+            $divider
+            ${cyanBold("${app.name} v${app.version}")}
             ${app.description}
 
-            ${Ansi.ansi().bold().fg(Ansi.Color.CYAN)}========================================${Ansi.ansi().reset()}
+            $divider
 
-            ${Ansi.ansi().bold()}USAGE:${Ansi.ansi().reset()}
+            ${bold("USAGE:")}
             ${app.name} [COMMAND] [SUBCOMMAND] [OPTIONS]
 
-            ${Ansi.ansi().bold()}COMMANDS:${Ansi.ansi().reset()}
+            ${bold("COMMANDS:")}
             ${formatCommandGroups(app.groups)}
             ${formatPlugins(app)}
 
-            ${Ansi.ansi().bold()}GLOBAL OPTIONS:${Ansi.ansi().reset()}
+            ${bold("GLOBAL OPTIONS:")}
             -h, --help ${" ".repeat(15)} Show this help message
             -v, --version ${" ".repeat(12)} Show version
 
-            ${Ansi.ansi().bold()}EXAMPLES:${Ansi.ansi().reset()}
+            ${bold("EXAMPLES:")}
             ${app.name} file create /tmp/test.txt --content "hello"
             ${app.name} dir list . --long --all
             ${app.name} completion bash > completion.sh
@@ -80,11 +84,10 @@ object HelpFormatter {
 
     /** Format command groups for display in help text */
     private fun formatCommandGroups(groups: List<CommandGroup>): String = groups.joinToString("\n") { group ->
-        val groupHeader =
-            "${Ansi.ansi().fg(Ansi.Color.GREEN)}${group.name}${Ansi.ansi().reset()} ${group.description}"
+        val groupHeader = "${green(group.name)} ${group.description}"
         val commandsList =
             group.commands.joinToString("\n") { command ->
-                "  ${Ansi.ansi().fg(Ansi.Color.BLUE)}${command.name}${Ansi.ansi().reset()} ${command.description}"
+                "  ${blue(command.name)} ${command.description}"
             }
         "$groupHeader\n$commandsList"
     }
