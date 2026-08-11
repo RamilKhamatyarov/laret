@@ -5,8 +5,8 @@ package com.rkhamatyarov.laret.ui
  *
  * Default: ASCII when running on Windows with an attached console, because
  * legacy consoles (cmd.exe, older PowerShell on LTSC) may still render UTF-8
- * output through the system code page and produce mojibake even after Jansi's
- * `SetConsoleOutputCP` call. Override explicitly via:
+ * output through the system code page and produce mojibake. Override
+ * explicitly via:
  *   - `-Dlaret.ui.ascii=true|false`
  *   - `LARET_UI_ASCII=true|false`
  */
