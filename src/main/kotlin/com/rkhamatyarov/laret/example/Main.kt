@@ -1414,6 +1414,36 @@ fun main(args: Array<String>) {
                         println("Usage: [$bar] $percent%")
                     }
                 }
+
+                command(
+                    name = "sleep",
+                    description = "Sleep N seconds; demonstrates graceful shutdown cleanup on SIGINT/SIGTERM",
+                ) {
+                    option("s", "seconds", "Seconds to sleep", "30", true)
+                    option("m", "marker", "File to write when shutdown cleanup runs", "", true)
+                    action { ctx ->
+                        val seconds = ctx.optionInt("seconds").coerceAtLeast(1)
+                        val marker = ctx.option("marker")
+                        val stopped = java.util.concurrent.CountDownLatch(1)
+
+                        ctx.onShutdown {
+                            if (marker.isNotBlank()) File(marker).writeText("cleaned\n")
+                            System.err.println("sys sleep: shutdown cleanup ran")
+                            stopped.countDown()
+                        }
+
+                        println("Sleeping ${seconds}s (pid ${ProcessHandle.current().pid()})")
+                        System.out.flush()
+
+                        val interrupted = stopped.await(seconds.toLong(), java.util.concurrent.TimeUnit.SECONDS)
+                        if (interrupted) {
+                            System.err.println("sys sleep: interrupted before ${seconds}s")
+                            ctx.exit(130)
+                        } else {
+                            println("sys sleep: completed after ${seconds}s")
+                        }
+                    }
+                }
             }
 
             group(name = "fmt", description = "Data transformation and formatting") {

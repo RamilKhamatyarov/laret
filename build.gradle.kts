@@ -113,11 +113,17 @@ graalvmNative {
                 "--no-fallback",
                 "-Ob",
                 "--enable-native-access=ALL-UNNAMED",
+                "--install-exit-handlers",
                 "-H:+ReportExceptionStackTraces",
                 "-H:ReflectionConfigurationFiles=$reflectConfig",
                 "-H:ResourceConfigurationFiles=$resourceConfig",
                 "-H:IncludeResources=templates/.*\\.tpl$",
             )
+        named("main") {
+            imageName.set("laret")
+            mainClass.set("com.rkhamatyarov.laret.example.MainKt")
+            buildArgs.addAll(commonArgs)
+        }
         create("windows") {
             imageName.set("laret")
             mainClass.set("com.rkhamatyarov.laret.example.MainKt")

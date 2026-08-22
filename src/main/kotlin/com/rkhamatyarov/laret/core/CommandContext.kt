@@ -18,7 +18,16 @@ class CommandContext(
     var config: ConfigRegistry = ConfigRegistry.empty(),
     val isDryRun: Boolean = false,
     val fs: LaretFileSystem = RealFileSystem(),
+    val scope: CancellationScope = CancellationScope(),
 ) {
+    /**
+     * Register a cleanup to run on graceful shutdown (`SIGINT`/`SIGTERM`) and on
+     * normal completion. Delegates to the run's [CancellationScope]; cleanups
+     * run LIFO. The returned handle can [CancellationScope.Handle.dispose] the
+     * registration early.
+     */
+    fun onShutdown(block: suspend () -> Unit): CancellationScope.Handle = scope.onShutdown(block)
+
     val arguments = mutableMapOf<String, String>()
 
     val options = mutableMapOf<String, String>()

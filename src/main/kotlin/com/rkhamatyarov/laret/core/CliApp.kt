@@ -14,6 +14,7 @@ import com.rkhamatyarov.laret.plugin.runtime.PluginCatalog
 import com.rkhamatyarov.laret.plugin.runtime.PluginExecutor
 import com.rkhamatyarov.laret.plugin.runtime.PluginManager
 import com.rkhamatyarov.laret.update.OldBinaryCleaner
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
 
@@ -48,6 +49,24 @@ data class CliApp(
 
     internal var onInitHook: suspend (CliApp) -> Unit = {}
     internal var onShutdownHook: suspend (CliApp) -> Unit = {}
+
+    /**
+     * The current run's cancellation scope. Recreated per run so cancelling its
+     * job never leaks between runs; commands reach it via [CommandContext.scope].
+     */
+    @Volatile
+    internal var cancellationScope: CancellationScope = CancellationScope()
+        private set
+
+    /** Builds a fresh scope for a run and registers the outermost framework cleanups. */
+    private fun startScope(includeAppHooks: Boolean): CancellationScope {
+        val scope = CancellationScope()
+
+        if (includeAppHooks) scope.onShutdown { onShutdownHook(this@CliApp) }
+        scope.onShutdown { shutdownPlugins() }
+        cancellationScope = scope
+        return scope
+    }
 
     /** Initialize the application, optionally loading a config file. */
     fun init(configPath: String? = null, profile: String? = null): CliApp =
@@ -118,10 +137,16 @@ data class CliApp(
     fun run(args: Array<String>): Int {
         logManager.disableLogging()
         OldBinaryCleaner.cleanupSilently()
-        try {
-            return runBlocking { dispatch(args) }
+        val scope = startScope(includeAppHooks = true)
+        val hook = Thread({ scope.shutdown(CancellationScope.INTERRUPT_EXIT_CODE) }, "laret-signal")
+        Runtime.getRuntime().addShutdownHook(hook)
+        return try {
+            runBlocking(scope.coroutineContext) { dispatch(args) }
+        } catch (_: CancellationException) {
+            CancellationScope.INTERRUPT_EXIT_CODE
         } finally {
-            shutdownPlugins()
+            scope.shutdown(0)
+            runCatching { Runtime.getRuntime().removeShutdownHook(hook) }
         }
     }
 
@@ -132,18 +157,24 @@ data class CliApp(
      */
     fun runForTest(args: Array<String>): Int {
         logManager.disableLogging()
-        val exitCode = runBlocking { dispatch(args) }
-        shutdownPlugins()
-        return exitCode
+        val scope = startScope(includeAppHooks = false)
+        return try {
+            runBlocking(scope.coroutineContext) { dispatch(args) }
+        } catch (_: CancellationException) {
+            CancellationScope.INTERRUPT_EXIT_CODE
+        } finally {
+            scope.shutdown(0)
+        }
     }
 
     /** Suspending test entry point that cooperates with the caller's coroutine scheduler. */
     internal suspend fun runForTestSuspending(args: Array<String>): Int {
         logManager.disableLogging()
+        val scope = startScope(includeAppHooks = false)
         return try {
             dispatch(args)
         } finally {
-            shutdownPlugins()
+            scope.shutdown(0)
         }
     }
 
