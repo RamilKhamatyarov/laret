@@ -2,24 +2,34 @@
 
 ** A Cobra-like CLI framework for Kotlin** - Build beautiful, feature-rich command-line applications with a clean DSL.
 
-[![Kotlin](https://img.shields.io/badge/Kotlin-1.9+-7F52FF.svg?logo=kotlin)](https://kotlinlang.org)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.4+-7F52FF.svg?logo=kotlin)](https://kotlinlang.org)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ![Laret CLI overview](https://ramilkhamatyarov.github.io/laret/assets/overview.gif)
 
 ## Features
 
-- **Intuitive DSL**
-- **Command Groups**
-- **Arguments & Options**
-- **Colored Output**
-- **Multiple Output Formats**
-- **Shell Completion**
-- **Zero Dependencies**
+- **Intuitive DSL** — declarative `cli { group { command { } } }` builder
+- **Command Groups & Aliases** — two-level `group command [args]` grammar
+- **Arguments & Options** — typed, with defaults and persistent flags
+- **Middleware Pipeline** — priority-ordered, `GLOBAL`/`GROUP`/`COMMAND` scoping, and a built-in `middleware list` to inspect the resolved chain
+- **Graceful Shutdown** — `ctx.onShutdown { }` cleanups delivered on `SIGINT`/`SIGTERM` via a `CancellationScope`
+- **Colored Output** — auto-detected, honoring `NO_COLOR` / `CLICOLOR_FORCE`
+- **Multiple Output Formats** — JSON, YAML, TOML, table, and plain
+- **Advanced Shell Completion** — bash/zsh/PowerShell, static or dynamic (`--dynamic`) with type-aware completers
+- **Command Piping** — chain a command's output into the next with `---`
+- **Parallel Execution** — run commands concurrently with a bounded job pool
+- **Directory Watch** — emit filesystem CREATE/MODIFY/DELETE events
+- **File Diff** — LCS engine with unified/plain/JSON output
+- **Stats & Metrics** — persisted command metrics (Prometheus/JSON/plain)
+- **Undo / Redo & History** — record, replay, and reverse commands
+- **Interactive Prompts** — spinners, progress bars, confirmations
+- **Config (12Factor)** — YAML/TOML/JSON with env and flag precedence
+- **Man Pages & MCP Server** — Groff man-page and LLM schema/MCP export
+- **Sidecar Plugins** — verified, checksummed external subcommands
+- **Self-Update & Dry Run** — in-place binary updates and side-effect-free previews
+- **GraalVM Native Image** — reflection-free, fast-startup single binary
 - **Type-Safe**
-- **12Factor Configuration**
-- **Self-Update**
-- **Dry Run**
 
 ## Quick Start
 
@@ -901,8 +911,8 @@ Add the GraalVM Native Image plugin to your `build.gradle.kts`:
 ```kts
 
 plugins {
-    kotlin("jvm") version "1.9.20"
-    id("org.graalvm.buildtools.native") version "0.9.28"
+    kotlin("jvm") version "2.4.10"
+    id("org.graalvm.buildtools.native") version "1.1.9"
 }
 
 graalvmNative {
@@ -944,9 +954,13 @@ Complete `build.gradle.kts` for native image:
 ```kts
 
 plugins {
-    kotlin("jvm") version "1.9.20"
+    kotlin("jvm") version "2.4.10"
     application
-    id("org.graalvm.buildtools.native") version "0.9.28"
+    id("org.graalvm.buildtools.native") version "1.1.9"
+}
+
+kotlin {
+    jvmToolchain(25)
 }
 
 application {
@@ -998,7 +1012,7 @@ The native binary can update itself from [GitHub Releases](https://github.com/Ra
 
 laret update check
 
-# Current version: 0.2.0
+# Current version: 0.2.1
 # Latest release : 0.3.0
 # Update available. Run: laret update run
 

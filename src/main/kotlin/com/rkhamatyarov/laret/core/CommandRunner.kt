@@ -60,6 +60,7 @@ object CommandRunner {
                 groupName = groupName,
                 isDryRun = executionArgs.isDryRun,
                 fs = fs,
+                scope = app.cancellationScope,
             )
             command.parseArgumentsAndOptions(executionArgs.args, ctx, groupName)
             return try {
@@ -77,6 +78,7 @@ object CommandRunner {
             groupName = groupName,
             isDryRun = executionArgs.isDryRun,
             fs = fs,
+            scope = app.cancellationScope,
         )
         command.parseArgumentsAndOptions(executionArgs.args, ctx, groupName)
 
