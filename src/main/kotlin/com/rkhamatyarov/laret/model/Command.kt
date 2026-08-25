@@ -3,6 +3,7 @@ package com.rkhamatyarov.laret.model
 import com.rkhamatyarov.laret.config.registry.ConfigRegistry
 import com.rkhamatyarov.laret.core.CommandContext
 import com.rkhamatyarov.laret.core.FlagPersistence
+import com.rkhamatyarov.laret.core.Suggestions
 
 /**
  * A single executable command within a [CommandGroup].
@@ -36,6 +37,7 @@ data class Command(
         }
 
         val providedOptions = mutableMapOf<String, String>()
+        val unknownFlags = mutableListOf<String>()
         var i = 0
         while (i < args.size) {
             val token = args[i]
@@ -49,10 +51,31 @@ data class Command(
                     i++
                 }
             } else {
+                if (looksLikeFlag(token)) unknownFlags.add(token)
                 i++
             }
         }
+        warnUnknownFlags(unknownFlags)
 
+        return finishParsing(ctx, groupName, providedOptions)
+    }
+
+    /**
+     * True for a token that is an unknown option worth warning about — a `-x`
+     * or `--xyz` starting with a letter. Bare dashes and negative numbers
+     * (e.g. `-5`) are excluded to avoid false positives on positional values.
+     */
+    private fun looksLikeFlag(token: String): Boolean = FLAG_TOKEN.containsMatchIn(token) && token !in GLOBAL_FLAGS
+
+    /** Emits a "did you mean?" warning per unrecognized flag (never fails the command). */
+    private fun warnUnknownFlags(unknownFlags: List<String>) {
+        if (unknownFlags.isEmpty()) return
+        val optionNames = options.flatMap { listOf("--${it.long}", "-${it.short}") }
+        unknownFlags.forEach { Suggestions.warnUnknownFlag(it, optionNames) }
+    }
+
+    /** Resolves each option's effective value from config, env, flags, and defaults. */
+    private fun finishParsing(ctx: CommandContext, groupName: String, providedOptions: Map<String, String>) {
         ctx.config = ctx.app?.createConfigRegistry(this, groupName, providedOptions) ?: ctx.config
         val config = ctx.app?.getAppConfig()
         options.forEach { option ->
@@ -65,5 +88,13 @@ data class Command(
             }
             ctx.options[option.long] = registryValue ?: legacyValue ?: option.default
         }
+    }
+
+    private companion object {
+        /** A `-x` or `--xyz` token beginning with a letter (excludes `-`, `--`, `-5`). */
+        val FLAG_TOKEN = Regex("^--?[a-zA-Z]")
+
+        /** Global flags handled elsewhere; never reported as unknown by a command. */
+        val GLOBAL_FLAGS = setOf("-h", "--help", "-v", "--version", "--fix")
     }
 }
