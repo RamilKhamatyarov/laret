@@ -17,6 +17,7 @@
 - **Colored Output** — auto-detected, honoring `NO_COLOR` / `CLICOLOR_FORCE`
 - **Multiple Output Formats** — JSON, YAML, TOML, table, and plain
 - **Advanced Shell Completion** — bash/zsh/PowerShell, static or dynamic (`--dynamic`) with type-aware completers
+- **Typos & Smart Suggestions** — Damerau-Levenshtein "did you mean?" for mistyped commands/flags, with opt-in `--fix` correction
 - **Command Piping** — chain a command's output into the next with `---`
 - **Parallel Execution** — run commands concurrently with a bounded job pool
 - **Directory Watch** — emit filesystem CREATE/MODIFY/DELETE events
@@ -740,6 +741,54 @@ action { ctx ->
 > There is no `-n` shorthand — `--dry-run` is spelled out so it never collides with command-specific
 > short flags (e.g. `events --max-events`). Piped stages still execute for real, so `pipe run … --dry-run`
 > prints a warning that stdout interception makes dry-run piping unreliable.
+
+## Did You Mean? (Typo Suggestions)
+
+Mistyped a group, command, or flag? Laret suggests the closest match using a
+Damerau-Levenshtein edit distance (which counts an adjacent swap like
+`craete` → `create` as a single typo), ranked and capped so short inputs only
+match near-exact names.
+
+```bash
+$ laret fil create notes.txt
+Group not found: fil
+Did you mean 'file'?
+
+$ laret file creat notes.txt
+Error: Command not found: creat
+Did you mean one of: create, read?
+
+$ laret file create notes.txt --focre
+Unknown flag '--focre'. Did you mean '--force'?   # warning only — the command still runs
+```
+
+Unknown flags are **warnings**, not errors: the command still executes and the
+exit code is unchanged, so existing scripts keep working.
+
+### Interactive correction
+
+Pass the global `--fix` flag to opt into interactive correction. When the input
+is a single edit away from exactly one name and you're on a terminal, Laret
+asks before running the corrected command:
+
+```bash
+$ laret file creat notes.txt --fix
+Did you mean 'create'? [Y/n] y
+# runs: laret file create notes.txt
+```
+
+Without `--fix`, or in a non-interactive shell (scripts, CI), Laret never
+prompts and never auto-runs — corrections always require explicit consent.
+
+### Disabling suggestions
+
+Set `LARET_NO_SUGGEST` (to any non-empty value) to suppress suggestions and keep
+a stable, minimal error string:
+
+```bash
+$ LARET_NO_SUGGEST=1 laret fil create notes.txt
+Group not found: fil
+```
 
 ## 12Factor Configuration
 

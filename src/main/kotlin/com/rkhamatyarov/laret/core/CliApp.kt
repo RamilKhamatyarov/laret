@@ -47,6 +47,9 @@ data class CliApp(
     private var configPath: String? = null
     private var configProfile: String? = null
 
+    /** Whether the global `--fix` flag enabled opt-in interactive typo correction. */
+    private var fixMode: Boolean = false
+
     internal var onInitHook: suspend (CliApp) -> Unit = {}
     internal var onShutdownHook: suspend (CliApp) -> Unit = {}
 
@@ -108,7 +111,14 @@ data class CliApp(
                     val forwarded = pluginArgs.filterNot { it == "--dry-run" }
                     return PluginExecutor(sidecarCatalog).execute(groupInput, forwarded, dryRun, configProfile)
                 }
+                val groupNames = groups.map { it.name }
+                if (fixMode) {
+                    Suggestions.promptFix(groupInput, groupNames)?.let { corrected ->
+                        return executeCommand((listOf(corrected) + args.drop(1)).toTypedArray())
+                    }
+                }
                 println("Group not found: $groupInput")
+                Suggestions.didYouMean(groupInput, groupNames)?.let { System.err.println(it) }
                 HelpFormatter.showApplicationHelp(this)
                 return 1
             }
@@ -118,7 +128,15 @@ data class CliApp(
 
         val command = group.commands.find { it.matches(commandInput) }
             ?: run {
+                val commandNames = group.commands.filterNot { it.hidden }.map { it.name }
+                if (fixMode) {
+                    Suggestions.promptFix(commandInput, commandNames)?.let { corrected ->
+                        val fixed = group.commands.first { it.name == corrected }
+                        return CommandRunner.executeCommand(fixed, cmdArgs, this@CliApp, group.name)
+                    }
+                }
                 HelpFormatter.showCommandNotFound(commandInput, group)
+                Suggestions.didYouMean(commandInput, commandNames)?.let { System.err.println(it) }
                 return 1
             }
 
@@ -178,11 +196,14 @@ data class CliApp(
         }
     }
 
-    private suspend fun dispatch(args: Array<String>): Int {
-        if (args.firstOrNull() == CompletionEngine.COMPLETE_COMMAND) {
-            print(CompletionEngine(this).complete(args.drop(1)))
+    private suspend fun dispatch(rawArgs: Array<String>): Int {
+        if (rawArgs.firstOrNull() == CompletionEngine.COMPLETE_COMMAND) {
+            print(CompletionEngine(this).complete(rawArgs.drop(1)))
             return 0
         }
+
+        if (rawArgs.any { it == FIX_FLAG }) fixMode = true
+        val args = if (fixMode) rawArgs.filterNot { it == FIX_FLAG }.toTypedArray() else rawArgs
 
         val global = extractGlobalOptions(args)
         if (global.configPath != null || global.profile != null) {
@@ -373,5 +394,9 @@ data class CliApp(
         }
 
         return GlobalOptions(nextConfigPath, nextProfile, remaining.toTypedArray())
+    }
+
+    private companion object {
+        const val FIX_FLAG = "--fix"
     }
 }

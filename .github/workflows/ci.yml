@@ -1412,6 +1412,79 @@ jobs:
             || { echo "ERROR: cleanup did not run on normal completion"; exit 1; }
           echo "Normal-completion cleanup OK"
 
+  integration-typo-suggestions:
+    name: Integration - Typo Suggestions
+    runs-on: ubuntu-latest
+    needs: [ build ]
+
+    steps:
+      - name: Download native binary
+        uses: actions/download-artifact@v4
+        with:
+          name: laret-native
+          path: ./bin
+
+      - name: Make binary executable
+        run: chmod +x ./bin/laret
+
+      - name: Mistyped group suggests the closest group
+        run: |
+          set +e
+          set -uo pipefail
+          ./bin/laret fil create /tmp/x > /tmp/typo_group.out 2>&1
+          CODE=$?
+          cat /tmp/typo_group.out
+          [ "$CODE" -ne 0 ] || { echo "ERROR: expected non-zero exit for unknown group"; exit 1; }
+          grep -q "Group not found: fil" /tmp/typo_group.out \
+            || { echo "ERROR: not-found line missing"; exit 1; }
+          grep -q "Did you mean 'file'?" /tmp/typo_group.out \
+            || { echo "ERROR: group suggestion missing"; exit 1; }
+          echo "Group suggestion OK"
+
+      - name: Mistyped command suggests the closest command
+        run: |
+          set +e
+          set -uo pipefail
+          ./bin/laret file creat /tmp/x > /tmp/typo_cmd.out 2>&1
+          cat /tmp/typo_cmd.out
+          grep -q "Command not found: creat" /tmp/typo_cmd.out \
+            || { echo "ERROR: not-found line missing"; exit 1; }
+          grep -q "Did you mean" /tmp/typo_cmd.out \
+            || { echo "ERROR: command suggestion missing"; exit 1; }
+          grep -q "create" /tmp/typo_cmd.out \
+            || { echo "ERROR: 'create' not among suggestions"; exit 1; }
+          echo "Command suggestion OK"
+
+      - name: Unknown flag warns with a suggestion but does not fail
+        run: |
+          set +e
+          set -uo pipefail
+          rm -f /tmp/typo_flag.txt
+          ./bin/laret file create /tmp/typo_flag.txt --content hi --focre > /tmp/typo_flag.out 2>&1
+          CODE=$?
+          cat /tmp/typo_flag.out
+          [ "$CODE" -eq 0 ] || { echo "ERROR: unknown flag should not fail the command, got $CODE"; exit 1; }
+          grep -q "Unknown flag '--focre'" /tmp/typo_flag.out \
+            || { echo "ERROR: unknown flag not reported"; exit 1; }
+          grep -q "Did you mean '--force'?" /tmp/typo_flag.out \
+            || { echo "ERROR: flag suggestion missing"; exit 1; }
+          [ -f /tmp/typo_flag.txt ] \
+            || { echo "ERROR: command did not run despite unknown flag"; exit 1; }
+          echo "Unknown-flag warning OK"
+
+      - name: LARET_NO_SUGGEST disables suggestions
+        run: |
+          set +e
+          set -uo pipefail
+          LARET_NO_SUGGEST=1 ./bin/laret fil create /tmp/x > /tmp/typo_off.out 2>&1
+          cat /tmp/typo_off.out
+          grep -q "Group not found: fil" /tmp/typo_off.out \
+            || { echo "ERROR: not-found line missing"; exit 1; }
+          if grep -q "Did you mean" /tmp/typo_off.out; then
+            echo "ERROR: suggestion shown despite LARET_NO_SUGGEST"; exit 1
+          fi
+          echo "Opt-out OK"
+
   integration-manpages:
     name: Integration - Man Page Generation
     runs-on: ubuntu-latest
