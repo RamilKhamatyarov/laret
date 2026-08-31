@@ -3,7 +3,7 @@ plugins {
     id("org.graalvm.buildtools.native") version "1.1.10"
     id("com.gradleup.shadow") version "9.6.1"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
-    id("com.diffplug.spotless") version "8.10.0"
+    id("com.diffplug.spotless") version "8.10.1"
     id("pmd")
     `maven-publish`
     application
