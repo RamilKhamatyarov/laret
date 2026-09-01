@@ -2556,7 +2556,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Set up Java 25
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           java-version: '25'
           distribution: 'temurin'
