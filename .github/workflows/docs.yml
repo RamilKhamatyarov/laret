@@ -33,7 +33,7 @@ jobs:
 
       # Java 25 to match jvmToolchain(25): the fat JAR is Java 25 bytecode.
       - name: Set up Java 25
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           java-version: '25'
           distribution: 'temurin'
