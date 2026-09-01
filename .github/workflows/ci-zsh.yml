@@ -84,7 +84,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin
@@ -221,7 +221,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin
@@ -307,7 +307,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin
@@ -402,7 +402,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin
@@ -561,7 +561,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin
@@ -639,7 +639,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin
@@ -793,7 +793,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin
@@ -896,7 +896,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin
@@ -980,7 +980,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin
@@ -1096,7 +1096,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin
@@ -1188,7 +1188,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh mandoc
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin
@@ -1295,7 +1295,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin
@@ -1459,7 +1459,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin
@@ -1529,7 +1529,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin
@@ -1705,7 +1705,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin
@@ -1825,7 +1825,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin
@@ -1986,7 +1986,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin
@@ -2089,7 +2089,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin
@@ -2195,7 +2195,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin
@@ -2363,7 +2363,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin
@@ -2488,7 +2488,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native-zsh
           path: ./bin

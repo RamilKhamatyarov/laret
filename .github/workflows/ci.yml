@@ -180,7 +180,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -316,7 +316,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -397,7 +397,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -485,7 +485,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -637,7 +637,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -708,7 +708,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -855,7 +855,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -951,7 +951,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -1029,7 +1029,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -1148,7 +1148,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -1343,7 +1343,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -1419,7 +1419,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -1492,7 +1492,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -1558,7 +1558,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -1655,7 +1655,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -1812,7 +1812,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -1875,7 +1875,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -2045,7 +2045,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -2159,7 +2159,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -2313,7 +2313,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -2412,7 +2412,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -2511,7 +2511,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -2677,7 +2677,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -2795,7 +2795,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
