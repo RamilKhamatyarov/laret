@@ -131,7 +131,7 @@ jobs:
           Copy-Item build\native\nativeCompile\laret.exe "release\${{ matrix.binary-name }}"
 
       - name: Upload platform binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           if-no-files-found: error
           name: ${{ matrix.artifact-name }}
@@ -140,7 +140,7 @@ jobs:
 
       - name: Upload native build report
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           if-no-files-found: ignore
           name: native-report-${{ matrix.target }}
@@ -174,7 +174,7 @@ jobs:
           sha256sum --check SHA256SUMS.txt
 
       - name: Upload release bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           if-no-files-found: error
           name: release-bundle
