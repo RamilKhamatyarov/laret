@@ -64,7 +64,7 @@ jobs:
         run: ./gradlew nativeCompile
 
       - name: Upload native binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: laret-native-zsh
           path: build/native/nativeCompile/laret
@@ -1270,7 +1270,7 @@ jobs:
 
       - name: Upload man pages and lint report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: man-pages-zsh
           path: |
@@ -1433,7 +1433,7 @@ jobs:
 
       - name: Upload pipeline artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pipeline-outputs-zsh
           path: |
@@ -1507,7 +1507,7 @@ jobs:
 
       - name: Upload parallel execution artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: parallel-execution-outputs-zsh
           path: |
@@ -1683,7 +1683,7 @@ jobs:
 
       - name: Upload watch artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: watch-outputs-zsh
           path: |
@@ -1803,7 +1803,7 @@ jobs:
 
       - name: Upload stats artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: stats-outputs-zsh
           path: |
@@ -1964,7 +1964,7 @@ jobs:
 
       - name: Upload diff artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: diff-outputs-zsh
           path: |
@@ -2067,7 +2067,7 @@ jobs:
 
       - name: Upload localization artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: localization-outputs-zsh
           path: |
@@ -2171,7 +2171,7 @@ jobs:
 
       - name: Upload undo artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: undo-outputs-zsh
           path: |
@@ -2341,7 +2341,7 @@ jobs:
 
       - name: Upload history artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: history-outputs-zsh
           path: |
@@ -2466,7 +2466,7 @@ jobs:
 
       - name: Upload dry-run artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dry-run-outputs-zsh
           path: |
@@ -2532,7 +2532,7 @@ jobs:
 
       - name: Upload MCP artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mcp-server-outputs-zsh
           path: |

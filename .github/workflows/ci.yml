@@ -80,7 +80,7 @@ jobs:
         run: ./gradlew nativeCompile
 
       - name: Upload native binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: laret-native
           path: build/native/nativeCompile/laret
@@ -1636,7 +1636,7 @@ jobs:
 
       - name: Upload man pages and lint report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: man-pages
           path: |
@@ -1793,7 +1793,7 @@ jobs:
 
       - name: Upload pipeline artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pipeline-outputs
           path: |
@@ -1860,7 +1860,7 @@ jobs:
 
       - name: Upload parallel execution artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: parallel-execution-outputs
           path: |
@@ -2030,7 +2030,7 @@ jobs:
 
       - name: Upload watch artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: watch-outputs
           path: |
@@ -2144,7 +2144,7 @@ jobs:
 
       - name: Upload stats artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: stats-outputs
           path: |
@@ -2298,7 +2298,7 @@ jobs:
 
       - name: Upload diff artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: diff-outputs
           path: |
@@ -2397,7 +2397,7 @@ jobs:
 
       - name: Upload localization artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: localization-outputs
           path: |
@@ -2494,7 +2494,7 @@ jobs:
 
       - name: Upload undo artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: undo-outputs
           path: |
@@ -2662,7 +2662,7 @@ jobs:
 
       - name: Upload history artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: history-outputs
           path: |
@@ -2780,7 +2780,7 @@ jobs:
 
       - name: Upload dry-run artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dry-run-outputs
           path: |
@@ -2839,7 +2839,7 @@ jobs:
 
       - name: Upload MCP artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mcp-server-outputs
           path: |
