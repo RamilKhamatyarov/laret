@@ -304,6 +304,8 @@ data class CliApp(
 
     fun getLoggingConfig() = appConfig.logging
 
+    fun getWatchConfig() = appConfig.watch
+
     fun saveConfig(outputPath: String) {
         configLoader.save(appConfig, outputPath)
     }

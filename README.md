@@ -21,6 +21,7 @@
 - **Command Piping** — chain a command's output into the next with `---`
 - **Parallel Execution** — run commands concurrently with a bounded job pool
 - **Directory Watch** — emit filesystem CREATE/MODIFY/DELETE events
+- **Live Watch Mode** — `watch live` re-runs any command on glob-matched changes, with debounce and failure caps
 - **File Diff** — LCS engine with unified/plain/JSON output
 - **Stats & Metrics** — persisted command metrics (Prometheus/JSON/plain)
 - **Undo / Redo & History** — record, replay, and reverse commands
@@ -708,6 +709,51 @@ command(name = "convert", description = "Uppercase input") {
         print(input.uppercase())
     }
 }
+```
+
+## Live Watch Mode
+
+`watch live` re-runs any Laret command whenever files matching your glob
+patterns change — the nodemon / cargo-watch loop. The target command follows a
+`--` separator:
+
+```bash
+laret watch live ./src \
+  --pattern '**/*.kt' \
+  --pattern '!**/generated/**' \
+  --debounce 200 \
+  -- build compile
+```
+
+- **Glob patterns** (`--pattern`, repeatable) use NIO glob syntax (`*`, `**`,
+  `?`, `{a,b}`, `[a-z]`), matched relative to the watched directory. A `!`
+  prefix **excludes**; a file triggers a re-run when it matches at least one
+  include and no exclude. With no include patterns, everything is watched.
+- **Runs once on start**, then again on each qualifying change.
+- **Debounce** (`--debounce <ms>`, default 150) coalesces bursts — a save-all or
+  a branch switch — into a single re-run.
+- **Supersede in-flight runs**: a new change cancels the previous run before
+  starting the next, so runs never overlap.
+- **Resilient**: a failing run is reported and watching continues.
+  `--max-restarts N` caps total runs (0 = unlimited); `--max-consecutive-failures N`
+  stops the session after N back-to-back failures (0 = off).
+- **Ctrl-C** stops the session cleanly through the `CancellationScope`, closing
+  the watcher and running registered cleanups.
+- Under `--dry-run`, the session starts and narrates each would-be run without
+  executing it.
+
+Defaults can also live in a `watch` section of the config file; CLI flags take
+precedence:
+
+```yaml
+# .laret.yml
+watch:
+  debounce-ms: 200
+  patterns:
+    - "**/*.kt"
+    - "!**/build/**"
+  max-restarts: 0
+  max-consecutive-failures: 5
 ```
 
 ## Dry Run

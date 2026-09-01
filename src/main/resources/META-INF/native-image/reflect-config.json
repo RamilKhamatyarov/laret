@@ -108,6 +108,11 @@
     "allPublicConstructors": true
   },
   {
+    "name": "com.rkhamatyarov.laret.config.model.WatchConfig",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
     "name": "com.rkhamatyarov.laret.stats.PersistedStats",
     "allDeclaredConstructors": true,
     "allPublicConstructors": true,
