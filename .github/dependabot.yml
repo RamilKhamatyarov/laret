@@ -4,7 +4,7 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 10
     labels:
       - "dependencies"
       - "gradle"
@@ -14,3 +14,55 @@ updates:
     ignore:
       - dependency-name: "org.graalvm.buildtools.native"
         versions: ["0.11.x"]
+    groups:
+      jackson:
+        patterns:
+          - "com.fasterxml.jackson*"
+        update-types:
+          - "minor"
+          - "patch"
+      junit:
+        patterns:
+          - "org.junit*"
+          - "junit*"
+        update-types:
+          - "minor"
+          - "patch"
+      kotlin:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "org.jetbrains.kotlinx*"
+        update-types:
+          - "minor"
+          - "patch"
+      mordant:
+        patterns:
+          - "com.github.ajalt.mordant*"
+        update-types:
+          - "minor"
+          - "patch"
+      gradle-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"

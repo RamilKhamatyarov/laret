@@ -8,6 +8,7 @@ import com.rkhamatyarov.laret.completion.SchemaExportCommand
 import com.rkhamatyarov.laret.completion.SchemaFormat
 import com.rkhamatyarov.laret.completion.ShellType
 import com.rkhamatyarov.laret.completion.completers.StaticCompleter
+import com.rkhamatyarov.laret.core.CommandContext
 import com.rkhamatyarov.laret.core.CommandHistory
 import com.rkhamatyarov.laret.core.CommandPipeline
 import com.rkhamatyarov.laret.core.CommandRunner
@@ -41,10 +42,19 @@ import com.rkhamatyarov.laret.stats.StatsCollector
 import com.rkhamatyarov.laret.stats.StatsFormat
 import com.rkhamatyarov.laret.stats.StatsMiddleware
 import com.rkhamatyarov.laret.ui.UnicodeSupport
+import com.rkhamatyarov.laret.ui.cyanBold
 import com.rkhamatyarov.laret.update.UpdateCommand
 import com.rkhamatyarov.laret.watch.DirectoryWatcher
+import com.rkhamatyarov.laret.watch.GlobMatcher
+import com.rkhamatyarov.laret.watch.LiveWatchSession
 import com.rkhamatyarov.laret.watch.WatchEventType
+import com.rkhamatyarov.laret.watch.WatchLogEvent
 import com.rkhamatyarov.laret.watch.WatchOptions
+import com.rkhamatyarov.laret.watch.WatchStopReason
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.jline.reader.EndOfFileException
 import org.jline.reader.LineReaderBuilder
@@ -664,6 +674,19 @@ fun main(args: Array<String>) {
                             Localization.t("watch.stopped", summary.emittedEvents, summary.stopReason.name),
                         )
                     }
+                }
+
+                command(
+                    name = "live",
+                    description = "Watch <path> for glob-matched changes and re-run a command after `--`",
+                ) {
+                    argument("path", "Directory to watch", required = false, optional = true)
+                    option("p", "pattern", "Glob to watch; repeatable; '!' prefix excludes (e.g. '**/*.kt')", "", true)
+                    option("b", "debounce", "Debounce window in milliseconds", "", true)
+                    option("m", "max-restarts", "Stop after N total runs (0 = unlimited)", "", true)
+                    option("x", "max-consecutive-failures", "Stop after N back-to-back failures (0 = off)", "", true)
+
+                    action { ctx -> runWatchLive(ctx) }
                 }
             }
 
@@ -1522,6 +1545,9 @@ fun main(args: Array<String>) {
     if (resolvedArgs.size >= 2 && resolvedArgs[0] == "watch" && resolvedArgs[1] == "run") {
         watchCommandArgs.set(resolvedArgs.copyOfRange(2, resolvedArgs.size))
     }
+    if (resolvedArgs.size >= 2 && resolvedArgs[0] == "watch" && resolvedArgs[1] == "live") {
+        watchLiveCommandArgs.set(resolvedArgs.copyOfRange(2, resolvedArgs.size))
+    }
 
     val exitCode = app.run(resolvedArgs)
 
@@ -1561,6 +1587,167 @@ internal val pipeCommandArgs: ThreadLocal<Array<String>?> = ThreadLocal.withInit
 internal val parallelCommandArgs: ThreadLocal<Array<String>?> = ThreadLocal.withInitial { null }
 
 internal val watchCommandArgs: ThreadLocal<Array<String>?> = ThreadLocal.withInitial { null }
+
+internal val watchLiveCommandArgs: ThreadLocal<Array<String>?> = ThreadLocal.withInitial { null }
+
+/** Parsed `watch live` invocation: watch options plus the target after `--`. */
+internal data class WatchLiveArgs(
+    val path: String?,
+    val patterns: List<String>,
+    val debounceMs: Long?,
+    val maxRestarts: Int?,
+    val maxConsecutiveFailures: Int?,
+    val target: List<String>,
+)
+
+/**
+ * Splits raw `watch live` args at the first `--` into watch options and the
+ * target command, collecting repeatable `--pattern`/`-p` values.
+ */
+internal fun parseWatchLiveArgs(rawArgs: Array<String>): WatchLiveArgs {
+    val separator = rawArgs.indexOf("--")
+    val head = if (separator >= 0) rawArgs.copyOfRange(0, separator) else rawArgs
+    val target = if (separator >= 0) rawArgs.copyOfRange(separator + 1, rawArgs.size).toList() else emptyList()
+
+    var path: String? = null
+    val patterns = mutableListOf<String>()
+    var debounce: Long? = null
+    var maxRestarts: Int? = null
+    var maxFailures: Int? = null
+
+    var i = 0
+    while (i < head.size) {
+        val token = head[i]
+        when (token) {
+            "--pattern", "-p" -> {
+                head.getOrNull(i + 1)?.let { patterns.add(it) }
+                i += 2
+            }
+            "--debounce" -> {
+                debounce = head.getOrNull(i + 1)?.toLongOrNull()
+                i += 2
+            }
+            "--max-restarts" -> {
+                maxRestarts = head.getOrNull(i + 1)?.toIntOrNull()
+                i += 2
+            }
+            "--max-consecutive-failures" -> {
+                maxFailures = head.getOrNull(i + 1)?.toIntOrNull()
+                i += 2
+            }
+            else -> {
+                if (!token.startsWith("-") && path == null) path = token
+                i++
+            }
+        }
+    }
+    return WatchLiveArgs(path, patterns, debounce, maxRestarts, maxFailures, target)
+}
+
+/** Executes the `watch live` command: bridges [DirectoryWatcher] to a [LiveWatchSession]. */
+internal fun runWatchLive(ctx: CommandContext) {
+    val app = ctx.app ?: return
+    val parsed = parseWatchLiveArgs(watchLiveCommandArgs.get() ?: emptyArray())
+
+    val path = parsed.path
+    if (path == null) {
+        System.err.println("watch live: a directory path is required")
+        ctx.exit(1)
+        return
+    }
+    val dir = File(path)
+    if (!dir.isDirectory) {
+        System.err.println("watch live: not a directory: $path")
+        ctx.exit(1)
+        return
+    }
+    if (parsed.target.isEmpty()) {
+        System.err.println("watch live: no target command after '--'")
+        ctx.exit(1)
+        return
+    }
+
+    val cfg = app.getWatchConfig()
+    val patterns = parsed.patterns.ifEmpty { cfg.patterns }
+    val debounce = parsed.debounceMs ?: cfg.debounceMs
+    val maxRestarts = parsed.maxRestarts ?: cfg.maxRestarts
+    val maxFailures = parsed.maxConsecutiveFailures ?: cfg.maxConsecutiveFailures
+
+    val root = dir.toPath().toAbsolutePath().normalize()
+    val matcher = GlobMatcher(patterns)
+    val target = parsed.target.toTypedArray()
+    val patternLabel = patterns.ifEmpty { listOf("<all>") }.joinToString(", ")
+    watchLine("watching $root | patterns: $patternLabel | target: ${parsed.target.joinToString(" ")}")
+
+    val watcher = DirectoryWatcher(root, WatchOptions(recursive = true))
+    ctx.onShutdown { watcher.close() }
+
+    val channel = Channel<Path>(Channel.UNLIMITED)
+    val summary = runBlocking {
+        val producer = launch(Dispatchers.IO) {
+            try {
+                watcher.watch { event ->
+                    channel.trySend(root.relativize(event.path.toAbsolutePath().normalize()))
+                }
+            } finally {
+                channel.close()
+            }
+        }
+        val session = LiveWatchSession(
+            matcher = matcher,
+            runner = { _ ->
+                if (ctx.isDryRun) {
+                    watchLine("[DRY-RUN] would run: ${parsed.target.joinToString(" ")}")
+                    0
+                } else {
+                    setMetaCommandArgs(target)
+                    app.runForTest(target)
+                }
+            },
+            debounceMillis = debounce,
+            maxRestarts = maxRestarts,
+            maxConsecutiveFailures = maxFailures,
+            onEvent = { event -> logWatchEvent(event, parsed.target) },
+        )
+        val result = session.run(channel.receiveAsFlow())
+        watcher.close()
+        producer.cancel()
+        result
+    }
+    if (summary.stopReason == WatchStopReason.MAX_CONSECUTIVE_FAILURES) ctx.exit(1)
+}
+
+/** Re-populates the raw-args ThreadLocals so a re-run target that is itself a meta-command works. */
+private fun setMetaCommandArgs(target: Array<String>) {
+    if (target.size < 2) return
+    val rest = target.copyOfRange(2, target.size)
+    when {
+        target[0] == "pipe" && target[1] == "run" -> pipeCommandArgs.set(rest)
+        target[0] == "parallel" && target[1] == "run" -> parallelCommandArgs.set(rest)
+        target[0] == "watch" && target[1] == "run" -> watchCommandArgs.set(rest)
+    }
+}
+
+private fun watchTimestamp(): String = java.time.LocalTime.now().withNano(0).toString()
+
+private fun watchLine(message: String) {
+    System.err.println(cyanBold("[watch ${watchTimestamp()}]") + " " + message)
+}
+
+/** Formats a [WatchLogEvent] as a timestamped, colored watch-infrastructure line on stderr. */
+internal fun logWatchEvent(event: WatchLogEvent, target: List<String>) {
+    val message = when (event) {
+        is WatchLogEvent.Running -> {
+            val trigger = event.trigger?.let { "changed $it" } ?: "startup"
+            "run #${event.attempt} ($trigger) -> ${target.joinToString(" ")}"
+        }
+
+        is WatchLogEvent.Succeeded -> "run #${event.attempt} ok"
+        is WatchLogEvent.Failed -> "run #${event.attempt} failed (exit ${event.exitCode})"
+        is WatchLogEvent.Stopped -> "stopped after ${event.restarts} run(s): ${event.reason}"
+    }
+    watchLine(message)
+}
 
 internal data class WatchRunArgs(
     val path: String?,

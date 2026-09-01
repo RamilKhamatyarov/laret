@@ -38,9 +38,17 @@ data class Command(
 
         val providedOptions = mutableMapOf<String, String>()
         val unknownFlags = mutableListOf<String>()
+        var sawSeparator = false
         var i = 0
         while (i < args.size) {
             val token = args[i]
+            // A bare `--` ends option parsing (POSIX); everything after it is a
+            // positional or a nested command's own flag — never "unknown" here.
+            if (token == "--") {
+                sawSeparator = true
+                i++
+                continue
+            }
             val opt = options.find { "-${it.short}" == token || "--${it.long}" == token }
             if (opt != null) {
                 if (opt.takesValue) {
@@ -51,7 +59,7 @@ data class Command(
                     i++
                 }
             } else {
-                if (looksLikeFlag(token)) unknownFlags.add(token)
+                if (!sawSeparator && looksLikeFlag(token)) unknownFlags.add(token)
                 i++
             }
         }

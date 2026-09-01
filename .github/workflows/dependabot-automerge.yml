@@ -1,0 +1,64 @@
+name: Dependabot Auto-Merge
+
+on:
+  workflow_run:
+    workflows: ["Build and Test Laret CLI"]
+    types:
+      - completed
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Merge successful Dependabot minor/patch updates
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.actor.login == 'dependabot[bot]'
+
+    steps:
+      - name: Resolve the pull request and check it is a grouped update
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          number=$(gh api "repos/$REPO/commits/$HEAD_SHA/pulls" --jq '.[0].number // empty')
+          if [[ -z "$number" ]]; then
+            echo "No pull request found for $HEAD_SHA; nothing to merge."
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          title=$(gh pr view "$number" --repo "$REPO" --json title --jq '.title')
+          echo "PR #$number: $title"
+
+          # Grouped Dependabot PRs (which are minor/patch by config) are titled
+          # "... bump the <name> group ...". Individual major PRs are not.
+          if [[ "$title" == *" group "* || "$title" == *" group with "* ]]; then
+            echo "number=$number" >> "$GITHUB_OUTPUT"
+            echo "eligible=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Not a grouped minor/patch update; leaving for manual review."
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Approve the pull request
+        if: steps.pr.outputs.eligible == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: gh pr review --approve "${{ steps.pr.outputs.number }}" --repo "$REPO"
+
+      - name: Squash-merge the pull request
+        if: steps.pr.outputs.eligible == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: gh pr merge --squash --delete-branch "${{ steps.pr.outputs.number }}" --repo "$REPO"

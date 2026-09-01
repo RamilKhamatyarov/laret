@@ -12,6 +12,8 @@ data class AppConfig(
     val plugins: PluginConfig = PluginConfig(),
     @field:JsonProperty("logging")
     val logging: LoggingConfig = LoggingConfig(),
+    @field:JsonProperty("watch")
+    val watch: WatchConfig = WatchConfig(),
     /**
      * Persistent flag overrides.
      *
