@@ -30,4 +30,5 @@ data class Option(
     val persistent: Boolean = false,
     val configKey: String? = null,
     val completer: Completer? = null,
+    val validators: List<Validator> = emptyList(),
 )

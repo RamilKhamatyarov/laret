@@ -32,6 +32,12 @@ class CommandContext(
 
     val options = mutableMapOf<String, String>()
 
+    /**
+     * Long names of the options the user actually passed, as opposed to those
+     * resolved from config or defaults. Used by mutually-exclusive validation.
+     */
+    val providedOptions = mutableSetOf<String>()
+
     var exitCode: Int = 0
         private set
 

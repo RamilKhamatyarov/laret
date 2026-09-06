@@ -6,11 +6,14 @@ import com.rkhamatyarov.laret.core.Middleware
 import com.rkhamatyarov.laret.model.Argument
 import com.rkhamatyarov.laret.model.Command
 import com.rkhamatyarov.laret.model.Option
+import com.rkhamatyarov.laret.model.ValidationBuilder
+import com.rkhamatyarov.laret.model.buildValidators
 
 class CommandBuilder(val name: String, val description: String = "") {
     private val arguments = mutableListOf<Argument>()
     private val options = mutableListOf<Option>()
     private val aliases = mutableListOf<String>()
+    private val exclusiveGroups = mutableListOf<Set<String>>()
     private var hidden = false
     private var actionBlock: (CommandContext) -> Unit = {}
 
@@ -39,6 +42,12 @@ class CommandBuilder(val name: String, val description: String = "") {
         hidden = true
     }
 
+    /**
+     * Declare a positional argument.
+     *
+     * @param validate optional rules for the resolved value, e.g.
+     *   `argument("port") { range(1, 65535) }`.
+     */
     fun argument(
         name: String,
         description: String = "",
@@ -46,10 +55,19 @@ class CommandBuilder(val name: String, val description: String = "") {
         optional: Boolean = false,
         default: String = "",
         completer: Completer? = null,
+        validate: (ValidationBuilder.() -> Unit)? = null,
     ) {
-        arguments.add(Argument(name, description, required, optional, default, completer))
+        arguments.add(
+            Argument(name, description, required, optional, default, completer, buildValidators(validate)),
+        )
     }
 
+    /**
+     * Declare a named option.
+     *
+     * @param validate optional rules for the resolved value, e.g.
+     *   `option("f", "format") { oneOf("json", "yaml") }`.
+     */
     fun option(
         short: String,
         long: String,
@@ -59,8 +77,29 @@ class CommandBuilder(val name: String, val description: String = "") {
         persistent: Boolean = false,
         configKey: String? = null,
         completer: Completer? = null,
+        validate: (ValidationBuilder.() -> Unit)? = null,
     ) {
-        options.add(Option(short, long, description, default, takesValue, persistent, configKey, completer))
+        options.add(
+            Option(
+                short,
+                long,
+                description,
+                default,
+                takesValue,
+                persistent,
+                configKey,
+                completer,
+                buildValidators(validate),
+            ),
+        )
+    }
+
+    /**
+     * Declare that at most one of [longNames] may be supplied. The rule fires
+     * only when two or more are explicitly passed on the command line.
+     */
+    fun mutuallyExclusive(vararg longNames: String) {
+        if (longNames.size >= 2) exclusiveGroups.add(longNames.toSet())
     }
 
     fun action(block: (CommandContext) -> Unit) {
@@ -70,5 +109,6 @@ class CommandBuilder(val name: String, val description: String = "") {
     fun build(): Command = Command(
         name, description, arguments, options, aliases.toList(),
         actionBlock, preExecute, postExecute, onError, hidden,
+        exclusiveGroups.toList(),
     )
 }
