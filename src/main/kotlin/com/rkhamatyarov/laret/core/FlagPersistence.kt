@@ -82,8 +82,10 @@ object FlagPersistence {
      */
     internal fun convertToString(value: Any, takesValue: Boolean): String = when {
         !takesValue && value is Boolean -> value.toString()
+
         !takesValue && value.toString().lowercase() in setOf("true", "false") ->
             value.toString().lowercase()
+
         else -> value.toString()
     }
 }

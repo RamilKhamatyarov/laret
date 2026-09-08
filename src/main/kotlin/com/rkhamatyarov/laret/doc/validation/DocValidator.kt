@@ -27,16 +27,19 @@ object DocValidator {
             MarkdownLinkExtractor.extract(file.content).forEach { link ->
                 when {
                     link.target.isBlank() || link.isExternal -> Unit
+
                     link.isAnchorOnly ->
                         if (!AnchorValidator.hasAnchor(file.content, link.anchorPart)) {
                             errors += "broken anchor '#${link.anchorPart}' in ${file.relativePath}"
                         }
+
                     link.isInternalMarkdown -> {
                         val resolved = resolver.resolve(file.relativePath, link.filePart)
                         if (resolved == null || !resolver.isKnown(resolved)) {
                             errors += "broken link '${link.target}' in ${file.relativePath}"
                         }
                     }
+
                     else -> Unit
                 }
             }

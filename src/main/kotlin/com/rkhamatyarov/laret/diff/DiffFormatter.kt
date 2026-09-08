@@ -27,11 +27,15 @@ class UnifiedFormatter : DiffFormatter {
         when {
             result.oldBinary && result.newBinary ->
                 append("Binary files ${result.oldPath} and ${result.newPath} differ\n")
+
             result.oldBinary ->
                 append("Binary file ${result.oldPath} and text file ${result.newPath} differ\n")
+
             result.newBinary ->
                 append("Text file ${result.oldPath} and binary file ${result.newPath} differ\n")
+
             result.identical -> return ""
+
             else -> {
                 append("--- ${result.oldPath}\n")
                 append("+++ ${result.newPath}\n")
@@ -69,8 +73,10 @@ class PlainFormatter : DiffFormatter {
         when {
             result.oldBinary || result.newBinary ->
                 append("Binary files differ: ${result.oldPath} vs ${result.newPath}\n")
+
             result.identical ->
                 append("Files are identical: ${result.oldPath}\n")
+
             else -> {
                 append("--- ${result.oldPath}\n")
                 append("+++ ${result.newPath}\n")

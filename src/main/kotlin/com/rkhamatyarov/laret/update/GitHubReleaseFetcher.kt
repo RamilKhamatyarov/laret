@@ -128,9 +128,12 @@ class GitHubReleaseFetcher(private val repo: String = DEFAULT_REPO, private val 
             val arm = osArch.lowercase() in setOf("aarch64", "arm64")
             return when {
                 os.contains("win") -> "laret-windows-x86_64.exe"
+
                 os.contains("mac") || os.contains("darwin") ->
                     if (arm) "laret-macos-aarch64" else "laret-macos-x86_64"
+
                 os.contains("linux") && !arm -> "laret-linux-x86_64"
+
                 else -> null
             }
         }

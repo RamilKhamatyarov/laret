@@ -164,6 +164,7 @@ fun main(args: Array<String>) {
                                     }
                                 generator.generate(cmd, app.name, app.version, grp.name)
                             }
+
                             else -> {
                                 buildString {
                                     app.groups.forEach { grp ->
@@ -1590,7 +1591,9 @@ fun getCompletionPath(shellType: ShellType, appName: String): String {
     val homeDir = System.getProperty("user.home")
     return when (shellType) {
         ShellType.BASH -> "$homeDir/.bash_completion.d/$appName"
+
         ShellType.ZSH -> "$homeDir/.zsh_completions/_$appName"
+
         ShellType.POWERSHELL -> {
             val profilePath = System.getenv("PROFILE")
             val profileDir =
@@ -1646,18 +1649,22 @@ internal fun parseWatchLiveArgs(rawArgs: Array<String>): WatchLiveArgs {
                 head.getOrNull(i + 1)?.let { patterns.add(it) }
                 i += 2
             }
+
             "--debounce" -> {
                 debounce = head.getOrNull(i + 1)?.toLongOrNull()
                 i += 2
             }
+
             "--max-restarts" -> {
                 maxRestarts = head.getOrNull(i + 1)?.toIntOrNull()
                 i += 2
             }
+
             "--max-consecutive-failures" -> {
                 maxFailures = head.getOrNull(i + 1)?.toIntOrNull()
                 i += 2
             }
+
             else -> {
                 if (!token.startsWith("-") && path == null) path = token
                 i++
@@ -1766,7 +1773,9 @@ internal fun logWatchEvent(event: WatchLogEvent, target: List<String>) {
         }
 
         is WatchLogEvent.Succeeded -> "run #${event.attempt} ok"
+
         is WatchLogEvent.Failed -> "run #${event.attempt} failed (exit ${event.exitCode})"
+
         is WatchLogEvent.Stopped -> "stopped after ${event.restarts} run(s): ${event.reason}"
     }
     watchLine(message)
@@ -1794,18 +1803,22 @@ internal fun parseWatchRunArgs(args: Array<String>): WatchRunArgs {
                 duration = args.getOrNull(index + 1)?.toLongOrNull()?.coerceAtLeast(0)
                 index += 2
             }
+
             "--max-events", "-n" -> {
                 maxEvents = args.getOrNull(index + 1)?.toIntOrNull()?.coerceAtLeast(0)
                 index += 2
             }
+
             "--events", "-e" -> {
                 events = args.getOrNull(index + 1)
                 index += 2
             }
+
             "--recursive", "-r" -> {
                 recursive = true
                 index++
             }
+
             else -> {
                 if (path == null && !token.startsWith("-")) path = token
                 index++
@@ -1838,10 +1851,12 @@ internal fun parseParallelRunArgs(args: Array<String>): Triple<List<String>, Int
                 jobs = args.getOrNull(index + 1)?.toIntOrNull()
                 index += 2
             }
+
             "--quiet", "-q" -> {
                 quiet = true
                 index++
             }
+
             else -> {
                 tokens += args[index]
                 index++

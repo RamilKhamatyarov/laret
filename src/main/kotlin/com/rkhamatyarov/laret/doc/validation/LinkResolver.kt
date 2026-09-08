@@ -24,6 +24,7 @@ class LinkResolver(generatedPaths: Set<String>) {
     fun resolve(fromPath: String, target: String): String? {
         val combined = when {
             target.startsWith("/") -> target.trimStart('/')
+
             else -> {
                 val baseDir = fromPath.substringBeforeLast('/', "")
                 if (baseDir.isEmpty()) target else "$baseDir/$target"
