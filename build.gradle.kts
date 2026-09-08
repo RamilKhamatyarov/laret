@@ -30,9 +30,9 @@ dependencies {
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.22.2")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.22.2")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.22.2")
-    implementation("com.github.ajalt.mordant:mordant:3.0.2")
-    implementation("com.github.ajalt.mordant:mordant-coroutines:3.0.2")
-    implementation("com.github.ajalt.mordant:mordant-markdown:3.0.2")
+    implementation("com.github.ajalt.mordant:mordant:3.1.0")
+    implementation("com.github.ajalt.mordant:mordant-coroutines:3.1.0")
+    implementation("com.github.ajalt.mordant:mordant-markdown:3.1.0")
 
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
