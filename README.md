@@ -9,28 +9,29 @@
 
 ## Features
 
-- **Intuitive DSL** — declarative `cli { group { command { } } }` builder
-- **Command Groups & Aliases** — two-level `group command [args]` grammar
-- **Arguments & Options** — typed, with defaults and persistent flags
-- **Middleware Pipeline** — priority-ordered, `GLOBAL`/`GROUP`/`COMMAND` scoping, and a built-in `middleware list` to inspect the resolved chain
-- **Graceful Shutdown** — `ctx.onShutdown { }` cleanups delivered on `SIGINT`/`SIGTERM` via a `CancellationScope`
-- **Colored Output** — auto-detected, honoring `NO_COLOR` / `CLICOLOR_FORCE`
-- **Multiple Output Formats** — JSON, YAML, TOML, table, and plain
-- **Advanced Shell Completion** — bash/zsh/PowerShell, static or dynamic (`--dynamic`) with type-aware completers
-- **Typos & Smart Suggestions** — Damerau-Levenshtein "did you mean?" for mistyped commands/flags, with opt-in `--fix` correction
-- **Command Piping** — chain a command's output into the next with `---`
-- **Parallel Execution** — run commands concurrently with a bounded job pool
-- **Directory Watch** — emit filesystem CREATE/MODIFY/DELETE events
-- **Live Watch Mode** — `watch live` re-runs any command on glob-matched changes, with debounce and failure caps
-- **File Diff** — LCS engine with unified/plain/JSON output
-- **Stats & Metrics** — persisted command metrics (Prometheus/JSON/plain)
-- **Undo / Redo & History** — record, replay, and reverse commands
-- **Interactive Prompts** — spinners, progress bars, confirmations
-- **Config (12Factor)** — YAML/TOML/JSON with env and flag precedence
-- **Man Pages & MCP Server** — Groff man-page and LLM schema/MCP export
-- **Sidecar Plugins** — verified, checksummed external subcommands
-- **Self-Update & Dry Run** — in-place binary updates and side-effect-free previews
-- **GraalVM Native Image** — reflection-free, fast-startup single binary
+- **Intuitive DSL** - declarative `cli { group { command { } } }` builder
+- **Command Groups & Aliases** - two-level `group command [args]` grammar
+- **Arguments & Options** - typed, with defaults and persistent flags
+- **Validation DSL** - declarative regex, range, length, oneOf, file/dir-exists, custom and mutually-exclusive rules with localized errors
+- **Middleware Pipeline** - priority-ordered, `GLOBAL`/`GROUP`/`COMMAND` scoping, and a built-in `middleware list` to inspect the resolved chain
+- **Graceful Shutdown** - `ctx.onShutdown { }` cleanups delivered on `SIGINT`/`SIGTERM` via a `CancellationScope`
+- **Colored Output** - auto-detected, honoring `NO_COLOR` / `CLICOLOR_FORCE`
+- **Multiple Output Formats** - JSON, YAML, TOML, table, and plain
+- **Advanced Shell Completion** - bash/zsh/PowerShell, static or dynamic (`--dynamic`) with type-aware completers
+- **Typos & Smart Suggestions** - Damerau-Levenshtein "did you mean?" for mistyped commands/flags, with opt-in `--fix` correction
+- **Command Piping** - chain a command's output into the next with `---`
+- **Parallel Execution** - run commands concurrently with a bounded job pool
+- **Directory Watch** - emit filesystem CREATE/MODIFY/DELETE events
+- **Live Watch Mode** - `watch live` re-runs any command on glob-matched changes, with debounce and failure caps
+- **File Diff** - LCS engine with unified/plain/JSON output
+- **Stats & Metrics** - persisted command metrics (Prometheus/JSON/plain)
+- **Undo / Redo & History** - record, replay, and reverse commands
+- **Interactive Prompts** - spinners, progress bars, confirmations
+- **Config (12Factor)** - YAML/TOML/JSON with env and flag precedence
+- **Man Pages & MCP Server** - Groff man-page and LLM schema/MCP export
+- **Sidecar Plugins** - verified, checksummed external subcommands
+- **Self-Update & Dry Run** - in-place binary updates and side-effect-free previews
+- **GraalVM Native Image** - reflection-free, fast-startup single binary
 - **Type-Safe**
 
 ## Quick Start
@@ -649,7 +650,7 @@ Troubleshooting:
 
 ## Command Piping
 
-Laret lets you chain multiple commands together so the output of one becomes the input of the next — similar to Unix pipes.
+Laret lets you chain multiple commands together so the output of one becomes the input of the next - similar to Unix pipes.
 
 ![Laret Piping Demo](https://ramilkhamatyarov.github.io/laret/assets/piping.gif)
 
@@ -714,7 +715,7 @@ command(name = "convert", description = "Uppercase input") {
 ## Live Watch Mode
 
 `watch live` re-runs any Laret command whenever files matching your glob
-patterns change — the nodemon / cargo-watch loop. The target command follows a
+patterns change - the nodemon / cargo-watch loop. The target command follows a
 `--` separator:
 
 ```bash
@@ -730,8 +731,8 @@ laret watch live ./src \
   prefix **excludes**; a file triggers a re-run when it matches at least one
   include and no exclude. With no include patterns, everything is watched.
 - **Runs once on start**, then again on each qualifying change.
-- **Debounce** (`--debounce <ms>`, default 150) coalesces bursts — a save-all or
-  a branch switch — into a single re-run.
+- **Debounce** (`--debounce <ms>`, default 150) coalesces bursts - a save-all or
+  a branch switch - into a single re-run.
 - **Supersede in-flight runs**: a new change cancels the previous run before
   starting the next, so runs never overlap.
 - **Resilient**: a failing run is reported and watching continues.
@@ -774,7 +775,7 @@ $ laret file delete notes.txt --dry-run
 [DRY-RUN] Would delete notes.txt
 ```
 
-Because the interception lives in `ctx.fs`, command actions never branch on a dry-run flag — accidental
+Because the interception lives in `ctx.fs`, command actions never branch on a dry-run flag - accidental
 side-effects are structurally impossible rather than something a reviewer must catch:
 
 ```kt
@@ -784,7 +785,7 @@ action { ctx ->
 }
 ```
 
-> There is no `-n` shorthand — `--dry-run` is spelled out so it never collides with command-specific
+> There is no `-n` shorthand - `--dry-run` is spelled out so it never collides with command-specific
 > short flags (e.g. `events --max-events`). Piped stages still execute for real, so `pipe run … --dry-run`
 > prints a warning that stdout interception makes dry-run piping unreliable.
 
@@ -805,7 +806,7 @@ Error: Command not found: creat
 Did you mean one of: create, read?
 
 $ laret file create notes.txt --focre
-Unknown flag '--focre'. Did you mean '--force'?   # warning only — the command still runs
+Unknown flag '--focre'. Did you mean '--force'?   # warning only - the command still runs
 ```
 
 Unknown flags are **warnings**, not errors: the command still executes and the
@@ -824,7 +825,7 @@ Did you mean 'create'? [Y/n] y
 ```
 
 Without `--fix`, or in a non-interactive shell (scripts, CI), Laret never
-prompts and never auto-runs — corrections always require explicit consent.
+prompts and never auto-runs - corrections always require explicit consent.
 
 ### Disabling suggestions
 
@@ -834,6 +835,79 @@ a stable, minimal error string:
 ```bash
 $ LARET_NO_SUGGEST=1 laret fil create notes.txt
 Group not found: fil
+```
+
+## Argument & Option Validation
+
+Attach declarative validators to arguments and options with a trailing
+`validate` block, so rules live next to the declaration they constrain.
+Cross-field rules are declared at command level:
+
+```kotlin
+command(name = "run") {
+    argument("port", "Port number") { range(1, 65535) }
+    option("e", "email", "Contact email", "", true) { regex("^[^@]+@[^@]+\\.[^@]+$") }
+    option("f", "format", "Output format", "", true) { oneOf("json", "yaml", "text") }
+    option("i", "input", "Input file", "", true) { fileExists() }
+    option("j", "json", "JSON output", "", false)
+    option("y", "yaml", "YAML output", "", false)
+
+    mutuallyExclusive("json", "yaml")
+
+    action { ctx -> println("port=" + ctx.argument("port")) }
+}
+```
+
+### Built-in validators
+
+| Validator | Rule |
+|---|---|
+| `regex(pattern)` | value matches the pattern |
+| `min(n)` / `max(n)` | numeric lower / upper bound |
+| `range(min, max)` | numeric range, inclusive |
+| `minLength(n)` / `maxLength(n)` | string length bound |
+| `oneOf("a", "b")` | value is one of the listed choices |
+| `notBlank()` | value is not empty or whitespace |
+| `fileExists()` | value names an existing file |
+| `dirExists()` | value names an existing directory |
+| `custom(message) { predicate }` | any rule you like |
+| `mutuallyExclusive("a", "b")` | at most one of these options (command level) |
+
+Every built-in takes an optional `message` that overrides the default text:
+
+```kotlin
+option("v", "version", "Version tag") { regex("^v\\d+$", message = "use vN form") }
+```
+
+### Behavior
+
+All validators run and **every** failure is reported in one pass, followed by
+the command help, with exit code 1:
+
+```bash
+$ laret check run abc --email bad --format xml
+Invalid value for argument 'port': must be a number
+Invalid value for option '--email': must match ^[^@]+@[^@]+\.[^@]+$
+Invalid value for option '--format': must be one of: json, yaml, text
+```
+
+Validation runs after parsing and before `preExecute`, so an invalid invocation
+never reaches middleware or your action.
+
+Validators skip blank values, so a rule on an optional flag does not fire when
+that flag is unset. `notBlank()` opts in and still fires on blanks, and a
+missing required argument is already caught by the required-argument check.
+
+`mutuallyExclusive` fires only when two or more of its options are explicitly
+supplied on the command line, not when their defaults happen to coincide.
+
+Built-in messages are localized through the `validation.*` keys in
+`messages.properties` and `messages_es.properties`. A message you pass yourself
+is used literally.
+
+```bash
+$ LARET_LOCALE=es laret check run 99999
+Valor invalido para el argumento 'port': debe ser un numero entre 1 y 65535
 ```
 
 ## 12Factor Configuration
@@ -1099,7 +1173,7 @@ tar -czf laret-linux-x64.tar.gz -C build/native/nativeCompile laret
 
 ## Self-Update
 
-The native binary can update itself from [GitHub Releases](https://github.com/RamilKhamatyarov/laret/releases) — no package manager needed.
+The native binary can update itself from [GitHub Releases](https://github.com/RamilKhamatyarov/laret/releases) - no package manager needed.
 
 ### Check for Updates
 
@@ -1128,7 +1202,7 @@ laret update run --force
 ### How It Works
 
 1. Queries the GitHub Releases API for the latest tag and picks the binary matching your OS and architecture (`linux-x86_64`, `macos-x86_64`, `macos-aarch64`, `windows-x86_64`).
-2. Downloads the binary next to the current executable and verifies its **SHA-256 checksum** against the release's `SHA256SUMS.txt` — a corrupted download never replaces a working binary.
+2. Downloads the binary next to the current executable and verifies its **SHA-256 checksum** against the release's `SHA256SUMS.txt` - a corrupted download never replaces a working binary.
 3. Renames the running executable to `laret.old` (allowed even on Windows, where a running `.exe` cannot be deleted) and atomically moves the new binary into place. If anything fails mid-swap, the previous binary is restored.
 4. The leftover `laret.old` is cleaned up automatically on the next launch.
 

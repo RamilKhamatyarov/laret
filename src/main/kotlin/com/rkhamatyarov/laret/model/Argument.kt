@@ -16,4 +16,6 @@ data class Argument(
     val optional: Boolean = false,
     val default: String = "",
     val completer: Completer? = null,
+    /** Rules applied to the resolved value; see the validation DSL. */
+    val validators: List<Validator> = emptyList(),
 )

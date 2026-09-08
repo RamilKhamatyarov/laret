@@ -2599,6 +2599,79 @@ jobs:
           sed -i 's/PROFILE/${{ matrix.profile }}/g' /tmp/laret_config_precedence_test.sh
           zsh /tmp/laret_config_precedence_test.sh
 
+  integration-validation:
+    name: Integration - Argument & Option Validation (zsh)
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    defaults:
+      run:
+        shell: zsh {0}
+
+    steps:
+      - name: Install zsh
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -q zsh
+
+      - name: Download native binary
+        uses: actions/download-artifact@v4
+        with:
+          name: laret-native-zsh
+          path: ./bin
+
+      - name: Make binary executable
+        run: chmod +x ./bin/laret
+
+      - name: Valid input passes validation and runs the command
+        run: |
+          set -euo pipefail
+          ./bin/laret check run 8080 --format json > /tmp/vz_ok.out 2>&1
+          cat /tmp/vz_ok.out
+          grep -q "check ok: port=8080" /tmp/vz_ok.out \
+            || { echo "ERROR: valid input did not run the command"; exit 1; }
+          echo "Valid input OK (zsh)"
+
+      - name: Invalid values are rejected under zsh
+        run: |
+          set +e
+          set -uo pipefail
+          ./bin/laret check run 99999 > /tmp/vz_range.out 2>&1
+          CODE=$?
+          cat /tmp/vz_range.out
+          [ "$CODE" -ne 0 ] || { echo "ERROR: expected non-zero exit for out-of-range port"; exit 1; }
+          grep -q "Invalid value for argument 'port'" /tmp/vz_range.out \
+            || { echo "ERROR: argument error not reported"; exit 1; }
+          grep -q "between 1 and 65535" /tmp/vz_range.out \
+            || { echo "ERROR: range message missing"; exit 1; }
+
+          ./bin/laret check run 80 --format xml > /tmp/vz_one.out 2>&1
+          grep -q "must be one of: json, yaml, text" /tmp/vz_one.out \
+            || { echo "ERROR: oneOf rule not enforced"; cat /tmp/vz_one.out; exit 1; }
+          echo "Invalid value rejection OK (zsh)"
+
+      - name: Mutually exclusive options are rejected under zsh
+        run: |
+          set +e
+          set -uo pipefail
+          ./bin/laret check run 80 --json --yaml > /tmp/vz_mx.out 2>&1
+          CODE=$?
+          cat /tmp/vz_mx.out
+          [ "$CODE" -ne 0 ] || { echo "ERROR: expected non-zero exit for exclusive options"; exit 1; }
+          grep -q "mutually exclusive" /tmp/vz_mx.out \
+            || { echo "ERROR: exclusivity not enforced"; exit 1; }
+          echo "Mutually exclusive OK (zsh)"
+
+      - name: Unset optional flags skip validation under zsh
+        run: |
+          set +e
+          set -uo pipefail
+          ./bin/laret check run 80 > /tmp/vz_blank.out 2>&1
+          CODE=$?
+          [ "$CODE" -eq 0 ] || { echo "ERROR: unset optional flags must not fail"; cat /tmp/vz_blank.out; exit 1; }
+          if grep -q "Invalid value" /tmp/vz_blank.out; then
+            echo "ERROR: blank values were validated"; cat /tmp/vz_blank.out; exit 1
+          fi
+          echo "Blank-skip OK (zsh)"
+
   summary:
     name: Build Summary (zsh)
     runs-on: ubuntu-latest

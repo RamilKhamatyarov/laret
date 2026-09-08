@@ -1469,6 +1469,29 @@ fun main(args: Array<String>) {
                 }
             }
 
+            group(name = "check", description = "Argument and option validation demo") {
+                command(
+                    name = "run",
+                    description = "Validate inputs against the validation DSL and echo them when all rules pass",
+                ) {
+                    argument("port", "Port number (1-65535)", required = true) { range(1, 65535) }
+                    option("e", "email", "Contact email", "", true) { regex("^[^@]+@[^@]+\\.[^@]+$") }
+                    option("f", "format", "Output format (json, yaml, text)", "", true) {
+                        oneOf("json", "yaml", "text")
+                    }
+                    // Named "input", not "config": --config is a global Laret
+                    // flag and would be consumed before reaching the command.
+                    option("i", "input", "Path to an existing input file", "", true) { fileExists() }
+                    option("j", "json", "JSON output", "", false)
+                    option("y", "yaml", "YAML output", "", false)
+                    mutuallyExclusive("json", "yaml")
+
+                    action { ctx ->
+                        println("check ok: port=${ctx.argument("port")}")
+                    }
+                }
+            }
+
             group(name = "fmt", description = "Data transformation and formatting") {
                 command(name = "json", description = "Parse and format JSON from stdin") {
                     option("q", "query", "JQ-like path query (simple: .items[0].name)", "", true)

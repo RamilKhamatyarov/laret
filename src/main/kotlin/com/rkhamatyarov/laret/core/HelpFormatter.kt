@@ -100,6 +100,12 @@ object HelpFormatter {
         }
     }
 
+    /** Display a single validation failure for an argument or option. */
+    fun showValidationError(error: com.rkhamatyarov.laret.model.ValidationError) {
+        val key = if (error.isOption) "validation.failed.option" else "validation.failed.argument"
+        println(redBold(Localization.t(key, error.field, error.message)))
+    }
+
     /** Display a required argument missing error */
     fun showArgumentMissingError(argumentName: String) {
         println(redBold("Error: Required argument '$argumentName' not provided"))

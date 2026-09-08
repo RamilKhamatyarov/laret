@@ -26,6 +26,7 @@ data class Command(
     val postExecute: suspend (CommandContext) -> Unit = {},
     val onError: suspend (CommandContext, Exception) -> Unit = { _, _ -> },
     val hidden: Boolean = false,
+    val exclusiveGroups: List<Set<String>> = emptyList(),
 ) {
     /** True when [input] equals the primary name or any alias. */
     fun matches(input: String): Boolean = input == name || input in aliases
@@ -64,6 +65,7 @@ data class Command(
             }
         }
         warnUnknownFlags(unknownFlags)
+        ctx.providedOptions.addAll(providedOptions.keys)
 
         return finishParsing(ctx, groupName, providedOptions)
     }

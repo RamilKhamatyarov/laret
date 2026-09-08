@@ -92,6 +92,13 @@ object CommandRunner {
             return 1
         }
 
+        val validationErrors = CommandValidator.validate(command, ctx)
+        if (validationErrors.isNotEmpty()) {
+            validationErrors.forEach { HelpFormatter.showValidationError(it) }
+            HelpFormatter.showCommandHelp(command)
+            return 1
+        }
+
         try {
             command.preExecute.invoke(ctx)
         } catch (e: Exception) {
