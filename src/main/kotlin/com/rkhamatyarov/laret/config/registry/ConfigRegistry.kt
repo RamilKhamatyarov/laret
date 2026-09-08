@@ -86,11 +86,13 @@ class ConfigRegistry(
         val value = get(key) ?: return default
         return when (value) {
             is Boolean -> value
+
             is String -> when (value.lowercase()) {
                 "true", "1", "yes", "y", "on" -> true
                 "false", "0", "no", "n", "off" -> false
                 else -> logConversionFailure(key, value, "Boolean", default)
             }
+
             else -> logConversionFailure(key, value, "Boolean", default)
         }
     }

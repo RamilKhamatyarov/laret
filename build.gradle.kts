@@ -74,14 +74,14 @@ spotless {
             "src/**/completion/ZshCompletionGenerator.kt",
             "src/**/completion/PowerShellCompletionGenerator.kt",
         )
-        ktlint("1.0.1")
+        ktlint("1.7.1")
             .setEditorConfigPath(".editorconfig")
         trimTrailingWhitespace()
         endWithNewline()
     }
 
     kotlinGradle {
-        ktlint("1.0.1")
+        ktlint("1.7.1")
         target("*.gradle.kts")
         trimTrailingWhitespace()
         endWithNewline()
@@ -89,7 +89,7 @@ spotless {
 }
 
 ktlint {
-    version.set("1.0.1")
+    version.set("1.7.1")
     android.set(false)
     ignoreFailures.set(false)
     enableExperimentalRules.set(false)

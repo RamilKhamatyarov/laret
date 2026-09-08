@@ -63,11 +63,13 @@ class TemplateEngine {
                     if (close == -1) return -1
                     j = close + BLOCK_CLOSE.length
                 }
+
                 template.startsWith(IF_CLOSE, j) -> {
                     depth--
                     if (depth == 0) return j
                     j += IF_CLOSE.length
                 }
+
                 else -> j++
             }
         }

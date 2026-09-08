@@ -87,7 +87,9 @@ class DocGenerateCommand(private val app: CliApp) {
         format == DocFormat.MAN -> listOf(
             if (lang == ALL || lang.isBlank()) ResourceProseProvider.FALLBACK_LANG else lang,
         )
+
         lang == ALL -> SUPPORTED_LANGUAGES
+
         else -> listOf(lang)
     }
 

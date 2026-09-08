@@ -19,7 +19,9 @@ fun CliApp.installCompletion(shell: String = "bash") {
     val file =
         when (shellType) {
             ShellType.BASH -> File(homeDir, ".bash_completion.d/$name")
+
             ShellType.ZSH -> File(homeDir, ".zsh_completions/_$name")
+
             ShellType.POWERSHELL -> {
                 val profilePath = System.getenv("PROFILE")
                 val profileDir =
