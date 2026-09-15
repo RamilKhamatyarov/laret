@@ -1,3 +1,8 @@
+# Action runtime policy: every pinned action here must run on Node 20 or newer.
+# Node 16 runners are gone and Node 20 is being retired, so actions/cache is held
+# at v4 or later and the actions/* checkout, setup and artifact actions at their
+# current majors. Audit the pins with:
+#   grep -rhoE 'uses: [^@]+@v[0-9]+' .github/workflows/ | sort -u
 name: Build and Test Laret CLI
 
 on:
@@ -37,7 +42,7 @@ jobs:
           native-image-job-reports: 'true'
 
       - name: Setup Gradle caching
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
@@ -79,12 +84,92 @@ jobs:
       - name: Build native image
         run: ./gradlew nativeCompile
 
+      - name: Smoke - native binary version and file roundtrip
+        run: |
+          set -euo pipefail
+          LARET=./build/native/nativeCompile/laret
+          "$LARET" --version
+          WORK=$(mktemp -d)
+          "$LARET" file create "$WORK/smoke.txt" --content "hello-native"
+          "$LARET" file read "$WORK/smoke.txt" | grep -q "hello-native"             || { echo "ERROR: native file read did not return the written content"; exit 1; }
+          "$LARET" file delete "$WORK/smoke.txt"
+          echo "Native smoke OK"
+
       - name: Upload native binary
         uses: actions/upload-artifact@v7
         with:
           name: laret-native
           path: build/native/nativeCompile/laret
           retention-days: 1
+
+  # JVM build + smoke on macOS and Windows. Kept separate from `build` so the
+  # 26 integration jobs that consume the Linux native artifact are not blocked
+  # behind slower runners. Native image on these two platforms is covered by
+  # release.yml (tags) and nightly.yml (schedule).
+  cross-platform:
+    name: Cross-platform JVM (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ macos-latest, windows-latest ]
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v6
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Set execute permission for Gradle wrapper
+        run: chmod +x ./gradlew
+
+      - name: Build and test
+        run: ./gradlew build
+
+      - name: Build fat JAR
+        run: ./gradlew shadowJar
+
+      - name: Smoke - version and file roundtrip
+        run: |
+          set -euo pipefail
+          LARET="java -jar build/libs/laret-fat.jar"
+          $LARET --version
+          WORK=$(mktemp -d)
+          $LARET file create "$WORK/smoke.txt" --content "hello-${{ matrix.os }}"
+          $LARET file read "$WORK/smoke.txt" | grep -q "hello-${{ matrix.os }}" \
+            || { echo "ERROR: file read did not return the written content"; exit 1; }
+          $LARET file delete "$WORK/smoke.txt"
+          [ ! -f "$WORK/smoke.txt" ] || { echo "ERROR: file delete left the file behind"; exit 1; }
+          echo "JVM smoke OK on ${{ matrix.os }}"
+
+      - name: Smoke - bash completion is syntactically valid
+        run: |
+          set -euo pipefail
+          java -jar build/libs/laret-fat.jar completion bash > laret_completion.sh
+          bash -n laret_completion.sh
+          echo "bash completion parses on ${{ matrix.os }}"
+
+      - name: Smoke - PowerShell completion parses
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          java -jar build/libs/laret-fat.jar completion powershell > laret_completion.ps1
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path .\laret_completion.ps1).Path, [ref]$null, [ref]$errors) | Out-Null
+          if ($errors -and $errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_ }
+            exit 1
+          }
+          Write-Host "PowerShell completion parses cleanly"
 
   code-quality:
     name: Code Quality
@@ -100,7 +185,7 @@ jobs:
       - name: Set up Java 24
         uses: actions/setup-java@v6
         with:
-          java-version: '24'
+          java-version: '25'
           distribution: 'temurin'
           cache: gradle
 
@@ -371,13 +456,10 @@ jobs:
           else
             echo "Progress bar output not found on stderr (may be suppressed in CI)"
           fi
-          # Temporary: do not fail if "Directory:" is missing (known bug)
-          if grep -q "Directory:" /tmp/pb_dirlist.stdout; then
-            echo "Directory header found"
-          else
-            echo "WARNING: 'Directory:' not found in stdout (current app bug)"
-          fi
-          echo "Progress bar test passed (ignoring missing header)"
+          grep -q "Directory:" /tmp/pb_dirlist.stdout \
+            || { echo "ERROR: 'Directory:' not found in stdout"; exit 1; }
+          echo "Directory header found"
+          echo "Progress bar test passed"
 
       - name: Stdout is clean (no control chars from progress)
         run: |
@@ -509,11 +591,9 @@ jobs:
           if [ -s /tmp/config_yaml.stderr ]; then cat /tmp/config_yaml.stderr; fi
           echo "=== STDOUT (full) ==="
           cat -A /tmp/config_yaml.stdout
-          if grep -iE "name:|isDirectory:" /tmp/config_yaml.stdout; then
-            echo "YAML format output valid"
-          else
-            echo "WARNING: Expected keys not found in YAML output (known bug)"
-          fi
+          grep -iE "name:|isDirectory:" /tmp/config_yaml.stdout \
+            || { echo "ERROR: Expected keys not found in YAML output"; exit 1; }
+          echo "YAML format output valid"
 
       - name: Config - JSON format output is valid JSON (with debug)
         run: |
@@ -527,7 +607,7 @@ jobs:
           echo "=== STDOUT (full) ==="
           cat -A /tmp/config_json.stdout
           echo "=== JSON validation ==="
-          python3 - << 'PYEOF' || echo "WARNING: JSON validation failed (known bug)"
+          python3 - << 'PYEOF'
           import json, re, sys
           raw = open('/tmp/config_json.stdout', 'rb').read().decode('utf-8', errors='replace')
           match = re.search(r'[{\[]', raw)
@@ -551,7 +631,7 @@ jobs:
           set -euo pipefail
           ./bin/laret dir list /tmp --format json \
             > /tmp/config_json_keys.stdout 2>/dev/null
-          python3 - << 'PYEOF' || echo "WARNING: Required keys not found (known bug)"
+          python3 - << 'PYEOF'
           import json, re
           raw = open('/tmp/config_json_keys.stdout').read()
           m = re.search(r'[{\[]', raw)
@@ -576,18 +656,16 @@ jobs:
             > /tmp/yaml_keys.stdout 2>/dev/null
           echo "=== STDOUT (full) ==="
           cat -A /tmp/yaml_keys.stdout
-          if grep -E "name:|isDirectory:|size:" /tmp/yaml_keys.stdout; then
-            echo "YAML output contains expected keys"
-          else
-            echo "WARNING: YAML output missing expected keys (known bug)"
-          fi
+          grep -E "name:|isDirectory:|size:" /tmp/yaml_keys.stdout \
+            || { echo "ERROR: YAML output missing expected keys"; exit 1; }
+          echo "YAML output contains expected keys"
 
       - name: Config - YAML output is parseable
         run: |
           set -euo pipefail
           ./bin/laret dir list /tmp --format yaml \
             > /tmp/yaml_valid.stdout 2>/dev/null
-          python3 - << 'PYEOF' || echo "WARNING: YAML parsing failed (known bug)"
+          python3 - << 'PYEOF'
           import sys
           try:
             import yaml
@@ -733,7 +811,7 @@ jobs:
           echo "=== STDOUT (full) ==="
           cat -A /tmp/fmt_json.stdout
           echo "=== JSON validation ==="
-          python3 - << 'PYEOF' || echo "WARNING: JSON validation failed (known bug)"
+          python3 - << 'PYEOF'
           import json, re, sys
           raw = open('/tmp/fmt_json.stdout', 'rb').read().decode('utf-8', errors='replace')
           match = re.search(r'[{\[]', raw)
@@ -756,7 +834,7 @@ jobs:
         run: |
           set -euo pipefail
           ./bin/laret dir list /tmp --format json > /tmp/fmt_json_keys.stdout 2>/dev/null
-          python3 - << 'PYEOF' || echo "WARNING: Required keys not found (known bug)"
+          python3 - << 'PYEOF'
           import json, re
           raw = open('/tmp/fmt_json_keys.stdout').read()
           m = re.search(r'[{\[]', raw)
@@ -779,17 +857,15 @@ jobs:
           ./bin/laret dir list /tmp --format yaml > /tmp/fmt_yaml.stdout 2>/dev/null
           echo "=== STDOUT (full) ==="
           cat -A /tmp/fmt_yaml.stdout
-          if grep -E "name:|isDirectory:|size:" /tmp/fmt_yaml.stdout; then
-            echo "YAML output contains required keys"
-          else
-            echo "WARNING: YAML output missing expected keys (known bug)"
-          fi
+          grep -E "name:|isDirectory:|size:" /tmp/fmt_yaml.stdout \
+            || { echo "ERROR: YAML output missing expected keys"; exit 1; }
+          echo "YAML output contains required keys"
 
       - name: YAML output - is valid YAML
         run: |
           set -euo pipefail
           ./bin/laret dir list /tmp --format yaml > /tmp/fmt_yaml_valid.stdout 2>/dev/null
-          python3 - << 'PYEOF' || echo "WARNING: YAML parsing failed (known bug)"
+          python3 - << 'PYEOF'
           import sys
           try:
             import yaml
@@ -807,11 +883,9 @@ jobs:
           ./bin/laret dir list /tmp --format plain > /tmp/fmt_plain.stdout 2>/dev/null
           echo "=== STDOUT (full) ==="
           cat -A /tmp/fmt_plain.stdout
-          if grep -q "Directory:" /tmp/fmt_plain.stdout; then
-            echo "Plain output contains Directory: header"
-          else
-            echo "WARNING: 'Directory:' not found in plain output (known bug)"
-          fi
+          grep -q "Directory:" /tmp/fmt_plain.stdout \
+            || { echo "ERROR: 'Directory:' not found in plain output"; exit 1; }
+          echo "Plain output contains Directory: header"
 
       - name: Plain long output - has type prefix column
         run: |
@@ -819,16 +893,12 @@ jobs:
           ./bin/laret dir list /tmp --format plain --long > /tmp/fmt_long.stdout 2>/dev/null
           echo "=== STDOUT (full) ==="
           cat -A /tmp/fmt_long.stdout
-          if grep -q "Directory:" /tmp/fmt_long.stdout; then
-            echo "Plain long output contains Directory: header"
-          else
-            echo "WARNING: 'Directory:' not found in plain long output (known bug)"
-          fi
-          if grep -E "^[d-] " /tmp/fmt_long.stdout; then
-            echo "Plain long output has type prefix column"
-          else
-            echo "WARNING: type prefix column not found (known bug)"
-          fi
+          grep -q "Directory:" /tmp/fmt_long.stdout \
+            || { echo "ERROR: 'Directory:' not found in plain long output"; exit 1; }
+          echo "Plain long output contains Directory: header"
+          grep -E "^[d-] " /tmp/fmt_long.stdout \
+            || { echo "ERROR: type prefix column not found"; exit 1; }
+          echo "Plain long output has type prefix column"
 
       - name: All formats exit cleanly
         run: |
@@ -877,15 +947,13 @@ jobs:
           ./bin/laret dir list /tmp --long > /tmp/table_long.stdout 2>/dev/null
           echo "=== STDOUT (full) ==="
           cat -A /tmp/table_long.stdout
-          if grep -q "Directory:" /tmp/table_long.stdout; then
-            echo "Directory header found"
-          else
-            echo "WARNING: 'Directory:' not found (known bug)"
-          fi
+          grep -q "Directory:" /tmp/table_long.stdout \
+            || { echo "ERROR: 'Directory:' not found"; exit 1; }
+          echo "Directory header found"
           LINE_COUNT=$(wc -l < /tmp/table_long.stdout)
           echo "Table output has $LINE_COUNT lines"
-          [ "$LINE_COUNT" -ge 1 ] || echo "WARNING: No output lines"
-          echo "Table rendering produced output (ignoring missing header)"
+          [ "$LINE_COUNT" -ge 1 ]
+          echo "Table rendering produced output"
 
       - name: Table - long format rows have type prefix (d or -)
         run: |
@@ -893,11 +961,9 @@ jobs:
           ./bin/laret dir list /tmp --long > /tmp/table_cols.stdout 2>/dev/null
           DATA_LINES=$(grep -cE "^[d-] " /tmp/table_cols.stdout || echo "0")
           echo "Data rows with type prefix: $DATA_LINES"
-          if [ "$DATA_LINES" -gt 0 ]; then
-            echo "Column check passed"
-          else
-            echo "WARNING: No type prefix rows found (known bug)"
-          fi
+          [ "$DATA_LINES" -gt 0 ] \
+            || { echo "ERROR: No type prefix rows found"; exit 1; }
+          echo "Column check passed"
 
       - name: Table - plain format one entry per line
         run: |
@@ -905,11 +971,9 @@ jobs:
           ACTUAL=$(./bin/laret dir list /tmp 2>/dev/null | tail -n +2 | wc -l)
           EXPECTED=$(ls /tmp | wc -l)
           echo "Listed $ACTUAL entries, ls shows $EXPECTED"
-          if [ "$ACTUAL" -eq "$EXPECTED" ] || [ "$ACTUAL" -gt 0 ]; then
-            echo "Entry-per-line table rendering valid"
-          else
-            echo "WARNING: Entry count mismatch (known bug)"
-          fi
+          [ "$ACTUAL" -eq "$EXPECTED" ] || [ "$ACTUAL" -gt 0 ] \
+            || { echo "ERROR: Entry count mismatch"; exit 1; }
+          echo "Entry-per-line table rendering valid"
 
       - name: Table - stdout has no control characters
         run: |
@@ -938,11 +1002,9 @@ jobs:
           PYEOF
           )
           echo "Plain: $PLAIN_COUNT, JSON: $JSON_COUNT"
-          if [ "$PLAIN_COUNT" -eq "$JSON_COUNT" ]; then
-            echo "Entry counts match"
-          else
-            echo "WARNING: Entry counts do not match (known bug)"
-          fi
+          [ "$PLAIN_COUNT" -eq "$JSON_COUNT" ] \
+            || { echo "ERROR: Entry counts do not match"; exit 1; }
+          echo "Entry counts match"
 
   integration-aliases:
     name: Integration - Command Aliases
@@ -1127,7 +1189,7 @@ jobs:
           cat /tmp/global_flag.stderr || true
 
           # JSON output should be parseable
-          python3 - << 'PYEOF' || echo "WARNING: JSON validation failed"
+          python3 - << 'PYEOF'
           import json, re
           raw = open('/tmp/global_flag.stdout').read()
           m = re.search(r'[{[]', raw)
@@ -1558,7 +1620,7 @@ jobs:
 
     steps:
       - name: Download native binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: laret-native
           path: ./bin
@@ -2906,39 +2968,118 @@ jobs:
       - name: Make binary executable
         run: chmod +x ./bin/laret
 
-      - name: MCP - initialize returns server info
+      - name: MCP - initialize returns a named server
         run: |
           set -euo pipefail
           printf '%s\n' '{"jsonrpc":"2.0","method":"initialize","id":1}' \
-            | ./bin/laret mcp:serve > /tmp/mcp_initialize.out 2>/tmp/mcp_initialize.err
+            | ./bin/laret mcp serve > /tmp/mcp_initialize.out 2>/tmp/mcp_initialize.err
           cat /tmp/mcp_initialize.out
-          grep -q '"jsonrpc":"2.0"' /tmp/mcp_initialize.out
-          grep -q '"id":1' /tmp/mcp_initialize.out
-          grep -q '"serverInfo"' /tmp/mcp_initialize.out
+          python3 - << 'PYEOF'
+          import json
+          data = json.loads(open('/tmp/mcp_initialize.out').read().strip())
+          assert data.get('jsonrpc') == '2.0', f"bad jsonrpc envelope: {data}"
+          assert data.get('id') == 1, f"id not echoed: {data}"
+          assert 'error' not in data, f"initialize returned an error: {data}"
+          result = data['result']
+          assert result.get('protocolVersion'), "initialize omitted protocolVersion"
+          info = result['serverInfo']
+          assert info.get('name'), f"serverInfo has no name: {info}"
+          assert info.get('version'), f"serverInfo has no version: {info}"
+          print(f"serverInfo: {info['name']} {info['version']}")
+          PYEOF
           echo "MCP initialize succeeded"
 
-      - name: MCP - tools/list exposes command tools
+      - name: MCP - tools/list exposes tools with valid schemas
         run: |
           set -euo pipefail
           printf '%s\n' '{"jsonrpc":"2.0","method":"tools/list","id":2}' \
-            | ./bin/laret mcp:serve > /tmp/mcp_tools.out 2>/tmp/mcp_tools.err
-          cat /tmp/mcp_tools.out
-          grep -q '"tools"' /tmp/mcp_tools.out
-          grep -q '"name":"laret.file.create"' /tmp/mcp_tools.out
-          grep -q '"inputSchema"' /tmp/mcp_tools.out
+            | ./bin/laret mcp serve > /tmp/mcp_tools.out 2>/tmp/mcp_tools.err
+          python3 - << 'PYEOF'
+          import json
+          data = json.loads(open('/tmp/mcp_tools.out').read().strip())
+          assert 'error' not in data, f"tools/list returned an error: {data}"
+          tools = data['result']['tools']
+          assert tools, "tools/list returned an empty tool list"
+          by_name = {t['name']: t for t in tools}
+          print(f"{len(tools)} tools advertised")
+          for expected in ('laret.file.create', 'laret.file.read'):
+            assert expected in by_name, f"{expected} missing from tools/list"
+          for name, tool in by_name.items():
+            assert tool.get('description'), f"{name} has no description"
+            schema = tool['inputSchema']
+            assert schema.get('type') == 'object', f"{name} inputSchema is not an object schema"
+            props = schema['properties']
+            assert isinstance(props, dict), f"{name} inputSchema has no properties map"
+            for prop, spec in props.items():
+              assert spec.get('type'), f"{name}.{prop} has no declared type"
+            for required in schema.get('required', []):
+              assert required in props, f"{name} requires undeclared property {required}"
+          create = by_name['laret.file.create']['inputSchema']
+          assert 'path' in create['required'], "laret.file.create does not require 'path'"
+          assert 'content' in create['properties'], "laret.file.create has no 'content' property"
+          print("all inputSchema blocks are well formed")
+          PYEOF
           echo "MCP tools/list succeeded"
 
-      - name: MCP - tools/call executes command
+      - name: MCP - tools/call creates and reads a file
         run: |
           set -euo pipefail
           rm -f /tmp/mcp_created.txt
           printf '%s\n' '{"jsonrpc":"2.0","method":"tools/call","id":3,"params":{"name":"laret.file.create","arguments":{"path":"/tmp/mcp_created.txt","content":"mcp content"}}}' \
-            | ./bin/laret mcp:serve > /tmp/mcp_call.out 2>/tmp/mcp_call.err
+            | ./bin/laret mcp serve > /tmp/mcp_call.out 2>/tmp/mcp_call.err
           cat /tmp/mcp_call.out
-          grep -q '"content"' /tmp/mcp_call.out
-          test -f /tmp/mcp_created.txt
-          grep -q "mcp content" /tmp/mcp_created.txt
+          test -f /tmp/mcp_created.txt \
+            || { echo "ERROR: tools/call did not create /tmp/mcp_created.txt"; exit 1; }
+          grep -q "mcp content" /tmp/mcp_created.txt \
+            || { echo "ERROR: created file does not contain the requested content"; exit 1; }
+          printf '%s\n' '{"jsonrpc":"2.0","method":"tools/call","id":4,"params":{"name":"laret.file.read","arguments":{"path":"/tmp/mcp_created.txt"}}}' \
+            | ./bin/laret mcp serve > /tmp/mcp_read.out 2>/tmp/mcp_read.err
+          cat /tmp/mcp_read.out
+          python3 - << 'PYEOF'
+          import json
+          for path, expected_id in (('/tmp/mcp_call.out', 3), ('/tmp/mcp_read.out', 4)):
+            data = json.loads(open(path).read().strip())
+            assert 'error' not in data, f"{path} returned an error: {data}"
+            assert data.get('id') == expected_id, f"{path} did not echo id {expected_id}"
+            content = data['result']['content']
+            assert content, f"{path} returned empty content"
+            assert content[0]['type'] == 'text', f"{path} first content block is not text"
+            assert content[0]['text'].strip(), f"{path} returned blank text"
+          read_text = json.loads(open('/tmp/mcp_read.out').read().strip())['result']['content'][0]['text']
+          assert 'mcp content' in read_text, f"laret.file.read did not echo the file body: {read_text!r}"
+          print("tools/call round-trip verified")
+          PYEOF
           echo "MCP tools/call succeeded"
+
+      - name: MCP - protocol errors use JSON-RPC codes
+        run: |
+          set -euo pipefail
+          printf '%s\n' '{"jsonrpc":"2.0","method":"tools/call","id":5,"params":{"name":"laret.file.does-not-exist","arguments":{}}}' \
+            | ./bin/laret mcp serve > /tmp/mcp_unknown_tool.out 2>/tmp/mcp_unknown_tool.err
+          printf '%s\n' '{"jsonrpc":"2.0","method":"tools/does-not-exist","id":6}' \
+            | ./bin/laret mcp serve > /tmp/mcp_unknown_method.out 2>/tmp/mcp_unknown_method.err
+          printf '%s\n' '{"jsonrpc":"2.0","method":"tools/call","id":7,"params":{"name":"laret.file.read","arguments":{}}}' \
+            | ./bin/laret mcp serve > /tmp/mcp_missing_arg.out 2>/tmp/mcp_missing_arg.err
+          cat /tmp/mcp_unknown_tool.out /tmp/mcp_unknown_method.out /tmp/mcp_missing_arg.out
+          python3 - << 'PYEOF'
+          import json
+          cases = [
+            ('/tmp/mcp_unknown_tool.out', 5, -32602, 'unknown tool name'),
+            ('/tmp/mcp_unknown_method.out', 6, -32601, 'unknown method'),
+            ('/tmp/mcp_missing_arg.out', 7, -32602, 'missing required argument'),
+          ]
+          for path, expected_id, expected_code, label in cases:
+            data = json.loads(open(path).read().strip())
+            assert data.get('jsonrpc') == '2.0', f"{label}: bad envelope {data}"
+            assert data.get('id') == expected_id, f"{label}: id not echoed {data}"
+            assert 'result' not in data, f"{label}: returned a result instead of an error"
+            err = data['error']
+            assert err['code'] == expected_code, \
+              f"{label}: expected code {expected_code}, got {err['code']}"
+            assert err.get('message'), f"{label}: error has no message"
+            print(f"{label} -> {err['code']} {err['message']}")
+          PYEOF
+          echo "MCP error handling succeeded"
 
       - name: Upload MCP artifacts
         if: always()

@@ -41,7 +41,7 @@
 fun main(args: Array<String>) {
     val app = cli(
         name = "laret",
-        version = "1.0.0",
+        version = "0.2.1",
         description = "Laret - A Cobra-like CLI framework for Kotlin"
     ) {
         group(
@@ -160,7 +160,7 @@ The `cli` function is the entry point for creating your application:
 ```kt
 val app = cli(
     name = "laret",           // App name (used in help text and completions)
-    version = "1.0.0",        // Version string
+    version = "0.2.1",        // Version string
     description = "App description"
 ) {
     // Define groups and commands here
@@ -332,8 +332,14 @@ Implement the `OutputStrategy` interface:
 object CsvOutput : OutputStrategy {
     override val name = "csv"
 
-    override fun render(data: T): String {
-        return csvString
+    override fun <T> render(data: T): String = when (data) {
+        is List<*> -> data.joinToString(System.lineSeparator()) { renderRow(it) }
+        else -> renderRow(data)
+    }
+
+    private fun renderRow(row: Any?): String = when (row) {
+        is Map<*, *> -> row.values.joinToString(",")
+        else -> row.toString()
     }
 }
 
@@ -343,12 +349,16 @@ Then use it in your command:
 
 ```kt
 
-val formatter = when (format) {
+val entries: List<Map<String, Any>> = listOf(
+    mapOf("name" to "a.txt", "size" to 12L),
+)
+
+val formatter: OutputStrategy = when (format) {
     "csv" -> CsvOutput
     "json" -> JsonOutput
     else -> PlainOutput
 }
-println(formatter.render(data))
+println(formatter.render(entries))
 
 ```
 
@@ -409,7 +419,7 @@ logging:
 fun main(args: Array<String>) {
     val app = cli(
         name = "laret",
-        version = "1.0.0",
+        version = "0.2.1",
         description = "Laret - A Cobra-like CLI framework for Kotlin"
     ) {
         group(
@@ -942,76 +952,81 @@ val result = pipeline.execute(stages)  // returns "HELLO"
 
 ```
 
-com.rkhamatyarov.laret/
+src/main/kotlin/io/github/laretframework/
 ├── core/                          # Framework engine
-│   ├── CliApp.kt                  # Main application class
-│   ├── CommandContext.kt          # Execution context + registerUndo() + fs injection
-│   ├── CommandRunner.kt           # Command dispatch and middleware chain
+│   ├── CliApp.kt                  # Application entry point and dispatch
+│   ├── CommandContext.kt          # Execution context (args, options, fs, scope)
+│   ├── CommandRunner.kt           # Resolution, validation, middleware chain
+│   ├── CommandValidator.kt        # Runs declared argument/option validators
 │   ├── CommandPipeline.kt         # Stage-based command piping (--- and |)
-│   ├── FlagPersistence.kt         # Persistent flag loading from config
-│   ├── LaretPlugin.kt             # Plugin interface
-│   ├── Localization.kt            # i18n facade (ResourceBundle + persistence)
+│   ├── CancellationScope.kt       # SIGINT/SIGTERM cleanup registry
 │   ├── Middleware.kt              # Middleware interface + chain
+│   ├── MiddlewareRegistry.kt      # Priority and scope resolution
+│   ├── MiddlewareListCommand.kt   # Renders `middleware list`
+│   ├── Suggester.kt               # "Did you mean?" ranking
+│   ├── EditDistance.kt            # Damerau-Levenshtein distance
+│   ├── Localization.kt            # i18n facade (ResourceBundle)
+│   ├── FlagPersistence.kt         # Persistent flag resolution
 │   ├── ParallelDispatcher.kt      # Concurrent command execution
-│   ├── PluginManager.kt           # Plugin registry and lifecycle
-│   └── UndoManager.kt             # Undo/redo stack with file persistence
+│   ├── CommandHistory.kt          # History and replay
+│   ├── UndoManager.kt             # Undo/redo stack
+│   └── HelpFormatter.kt           # Help and error rendering
 ├── dsl/                           # Builder DSL
 │   ├── LaretDsl.kt                # cli {} entry point
 │   ├── CliBuilder.kt              # App builder
 │   ├── GroupBuilder.kt            # Group builder
 │   └── CommandBuilder.kt          # Command builder
 ├── model/                         # Data classes
-│   ├── CommandGroup.kt
 │   ├── Command.kt
+│   ├── CommandGroup.kt
 │   ├── Argument.kt
 │   ├── Option.kt
+│   ├── Validation.kt              # Validator DSL (regex, range, oneOf, ...)
 │   └── fs/                        # FileSystem abstraction (powers --dry-run)
-│       ├── LaretFileSystem.kt     # Side-effect interface (write/delete/read/list)
+│       ├── LaretFileSystem.kt     # Side-effect interface
 │       ├── RealFileSystem.kt      # Performs real disk I/O
-│       └── DryRunFileSystem.kt    # Intercepts writes; narrates, never mutates
+│       └── DryRunFileSystem.kt    # Narrates writes, never mutates
 ├── output/                        # Output strategies
-│   ├── OutputStrategy.kt          # Strategy interface
+│   ├── OutputStrategy.kt          # Strategy interface + registry
+│   ├── OutputFormat.kt            # Jackson-backed serializers
 │   ├── JsonOutput.kt
 │   ├── YamlOutput.kt
 │   ├── TomlOutput.kt
 │   ├── PlainOutput.kt
 │   └── TableOutput.kt
-├── completion/                    # Shell completion + man pages
-│   ├── BashCompletionGenerator.kt
-│   ├── ZshCompletionGenerator.kt
-│   ├── PowerShellCompletionGenerator.kt
-│   ├── ManPageGenerator.kt        # Groff man-page generator
-│   ├── GroffFormatter.kt
-│   └── ManSection.kt
-├── config/                        # Config file loading
-│   ├── AppConfig.kt
-│   ├── ConfigLoader.kt            # YAML/TOML/JSON loader
-│   └── ConfigValidator.kt
-├── diff/                          # File diff engine
-│   ├── DiffEngine.kt              # LCS-based diff
-│   ├── UnifiedFormatter.kt
-│   ├── PlainFormatter.kt
-│   └── JsonDiffFormatter.kt
+├── completion/                    # Shell completion and man pages
+│   ├── generators/                # Bash, Zsh, PowerShell generators
+│   ├── completers/                # Static, enum, file completers
+│   └── template/                  # Template engine and contexts
+├── config/                        # Configuration loading
+│   ├── model/                     # AppConfig, WatchConfig, ...
+│   ├── registry/                  # 12-factor precedence resolution
+│   └── validator/                 # Config validation
+├── doc/                           # Documentation generation
+│   ├── generators/                # Markdown and man output
+│   ├── prose/                     # Prose providers
+│   └── validation/                # Link and content validation
+├── plugin/                        # Sidecar plugins
+│   ├── model/                     # Plugin metadata and config
+│   ├── install/                   # Verified HTTPS install
+│   └── runtime/                   # Discovery and execution
+├── scaffold/                      # Project scaffolding (`new project`)
+│   ├── generator/
+│   ├── model/
+│   ├── template/
+│   └── wizard/
+├── watch/                         # Filesystem watching
+│   ├── DirectoryWatcher.kt        # NIO WatchService event loop
+│   ├── GlobMatcher.kt             # Include/exclude glob filtering
+│   └── LiveWatchSession.kt        # Debounced re-run orchestration
 ├── stats/                         # Command metrics
-│   ├── StatsCollector.kt          # Singleton collector (~/.laret/stats.json)
-│   ├── StatsMiddleware.kt         # Priority -1000 outermost middleware
-│   ├── PrometheusFormatter.kt
-│   ├── JsonStatsFormatter.kt
-│   └── PlainStatsFormatter.kt
-├── watch/                         # Filesystem event monitoring
-│   ├── DirectoryWatcher.kt
-│   ├── WatchEventType.kt
-│   └── WatchOptions.kt
-├── ui/                            # Terminal UI components
-│   ├── Colors.kt
-│   ├── ProgressBar.kt
-│   ├── Spinner.kt
-│   ├── InteractivePrompt.kt
-│   └── HelpFormatter.kt
+├── diff/                          # LCS diff engine and formatters
+├── update/                        # Self-update
+├── ui/                            # Colors, prompts, progress bars
 └── example/                       # Demo application
-    ├── Main.kt                    # Full feature showcase
-    └── LoggingPlugin.kt           # Example middleware/plugin
-
+    ├── Main.kt                    # Wires every command group
+    ├── LoggingMiddleware.kt
+    └── AuditMiddleware.kt
 ```
 
 ## Design Philosophy
@@ -1020,7 +1035,7 @@ Laret is inspired by [Cobra](https://github.com/spf13/cobra) (Go) and aims to br
 
 1. **Declarative DSL** - Express CLI structure naturally
 2. **Type Safety** - Leverage Kotlin's type system
-3. **Zero Dependencies** - Keep it lightweight
+3. **Minimal Dependency Surface** - JLine for readline, Jackson for JSON/YAML/TOML, Mordant for terminal rendering; no runtime reflection under GraalVM Native Image
 4. **Beautiful Output** - Colors and formatting out of the box
 5. **Flexible Output** - Multiple formats for different use cases
 6. **Developer Experience** - Make CLI building enjoyable
@@ -1037,12 +1052,26 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Installation
 
+Laret publishes under the `io.github.laretframework` namespace. Until the first
+release lands on Maven Central, resolve it from JitPack using the fallback
+coordinates shown after each snippet.
+
 ### Gradle (Kotlin DSL)
 
 ```kts
 
 dependencies {
-    implementation("com.rkhamatyarov:laret:1.0.0")
+    implementation("io.github.laretframework:laret:0.2.1")
+}
+
+```
+
+JitPack fallback (add `maven("https://jitpack.io")` to `repositories`):
+
+```kts
+
+dependencies {
+    implementation("com.github.RamilKhamatyarov:laret:0.2.1")
 }
 
 ```
@@ -1052,7 +1081,7 @@ dependencies {
 ```gradle
 
 dependencies {
-    implementation 'com.rkhamatyarov:laret:1.0.0'
+    implementation 'io.github.laretframework:laret:0.2.1'
 }
 
 ```
@@ -1062,9 +1091,9 @@ dependencies {
 ```xml
 
 <dependency>
-    <groupId>com.rkhamatyarov</groupId>
+    <groupId>io.github.laretframework</groupId>
     <artifactId>laret</artifactId>
-    <version>1.0.0</version>
+    <version>0.2.1</version>
 </dependency>
 
 ```
@@ -1081,21 +1110,21 @@ Add the GraalVM Native Image plugin to your `build.gradle.kts`:
 
 plugins {
     kotlin("jvm") version "2.4.10"
-    id("org.graalvm.buildtools.native") version "1.1.9"
+    id("org.graalvm.buildtools.native") version "1.1.12"
 }
 
 graalvmNative {
     binaries {
         create("windows") {
             imageName.set("laret")
-            mainClass.set("com.rkhamatyarov.laret.example.MainKt")
+            mainClass.set("io.github.laretframework.example.MainKt")
             buildArgs.add("--no-fallback")
             buildArgs.add("-Ob")
         }
 
         create("linux") {
             imageName.set("laret")
-            mainClass.set("com.rkhamatyarov.laret.example.MainKt")
+            mainClass.set("io.github.laretframework.example.MainKt")
             buildArgs.add("--no-fallback")
             buildArgs.add("-Ob")
         }
@@ -1125,7 +1154,7 @@ Complete `build.gradle.kts` for native image:
 plugins {
     kotlin("jvm") version "2.4.10"
     application
-    id("org.graalvm.buildtools.native") version "1.1.9"
+    id("org.graalvm.buildtools.native") version "1.1.12"
 }
 
 kotlin {
@@ -1133,21 +1162,21 @@ kotlin {
 }
 
 application {
-    mainClass.set("com.rkhamatyarov.laret.examples.MainKt")
+    mainClass.set("io.github.laretframework.examples.MainKt")
 }
 
 graalvmNative {
     binaries {
         create("windows") {
             imageName.set("laret")
-            mainClass.set("com.rkhamatyarov.laret.example.MainKt")
+            mainClass.set("io.github.laretframework.example.MainKt")
             buildArgs.add("--no-fallback")
             buildArgs.add("-Ob")
         }
 
         create("linux") {
             imageName.set("laret")
-            mainClass.set("com.rkhamatyarov.laret.example.MainKt")
+            mainClass.set("io.github.laretframework.example.MainKt")
             buildArgs.add("--no-fallback")
             buildArgs.add("-Ob")
         }

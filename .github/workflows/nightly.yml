@@ -1,0 +1,89 @@
+# Action runtime policy: every pinned action here must run on Node 20 or newer.
+# Node 16 runners are gone and Node 20 is being retired, so actions/cache is held
+# at v4 or later and the actions/* checkout, setup and artifact actions at their
+# current majors. Audit the pins with:
+#   grep -rhoE 'uses: [^@]+@v[0-9]+' .github/workflows/ | sort -u
+#
+# Nightly GraalVM native builds for macOS and Windows. These are too slow to run
+# on every pull request, so ci.yml covers JVM on all three platforms plus Linux
+# native, release.yml covers native on all three for tags, and this workflow
+# keeps macOS and Windows native honest in between.
+name: Nightly Native Build
+
+on:
+  schedule:
+    # 03:17 UTC daily; off the hour to avoid the scheduling stampede.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: Native image (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ macos-latest, windows-latest ]
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up GraalVM
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '25'
+          distribution: 'graalvm-community'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          native-image-job-reports: 'true'
+
+      - name: Setup Gradle caching
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Set execute permission for Gradle wrapper
+        run: chmod +x ./gradlew
+
+      - name: Build native image
+        run: ./gradlew nativeCompile --no-daemon --console=plain
+
+      - name: Locate native binary
+        id: binary
+        run: |
+          set -euo pipefail
+          if [ -f build/native/nativeCompile/laret.exe ]; then
+            echo "path=build/native/nativeCompile/laret.exe" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=build/native/nativeCompile/laret" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Smoke - version and file roundtrip
+        run: |
+          set -euo pipefail
+          LARET="${{ steps.binary.outputs.path }}"
+          "$LARET" --version
+          WORK=$(mktemp -d)
+          "$LARET" file create "$WORK/smoke.txt" --content "hello-nightly"
+          "$LARET" file read "$WORK/smoke.txt" | grep -q "hello-nightly" \
+            || { echo "ERROR: native file read did not return the written content"; exit 1; }
+          "$LARET" file delete "$WORK/smoke.txt"
+          echo "Nightly native smoke OK on ${{ matrix.os }}"
+
+      - name: Upload native binary
+        uses: actions/upload-artifact@v7
+        with:
+          name: laret-native-${{ matrix.os }}
+          path: ${{ steps.binary.outputs.path }}
+          retention-days: 7
