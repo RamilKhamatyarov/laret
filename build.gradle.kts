@@ -6,14 +6,15 @@ plugins {
     id("com.diffplug.spotless") version "8.10.2"
     id("pmd")
     `maven-publish`
+    signing
     application
 }
 
-group = "com.rkhamatyarov"
-version = "0.2.1-SNAPSHOT"
+group = "io.github.laretframework"
+version = "0.2.1"
 
 application {
-    mainClass.set("com.rkhamatyarov.laret.example.MainKt")
+    mainClass.set("io.github.laretframework.example.MainKt")
 }
 
 repositories {
@@ -44,8 +45,30 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-params:6.1.3")
 }
 
+val generateBuildInfo by tasks.registering {
+    val outputDir = layout.buildDirectory.dir("generated/buildinfo")
+    val projectVersion = version.toString()
+    inputs.property("version", projectVersion)
+    outputs.dir(outputDir)
+    doLast {
+        val packageDir = outputDir.get().asFile.resolve("io/github/laretframework")
+        packageDir.mkdirs()
+        packageDir.resolve("BuildInfo.kt").writeText(
+            """
+            package io.github.laretframework
+
+            /** Generated from the Gradle project version. Do not edit. */
+            internal object BuildInfo {
+                const val VERSION: String = "$projectVersion"
+            }
+            """.trimIndent() + "\n",
+        )
+    }
+}
+
 kotlin {
     jvmToolchain(25)
+    sourceSets["main"].kotlin.srcDir(generateBuildInfo)
 }
 
 pmd {
@@ -94,6 +117,10 @@ ktlint {
     ignoreFailures.set(false)
     enableExperimentalRules.set(false)
 
+    filter {
+        exclude { "generated" in it.file.absolutePath }
+    }
+
     reporters {
         reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.PLAIN)
         reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.CHECKSTYLE)
@@ -121,17 +148,17 @@ graalvmNative {
             )
         named("main") {
             imageName.set("laret")
-            mainClass.set("com.rkhamatyarov.laret.example.MainKt")
+            mainClass.set("io.github.laretframework.example.MainKt")
             buildArgs.addAll(commonArgs)
         }
         create("windows") {
             imageName.set("laret")
-            mainClass.set("com.rkhamatyarov.laret.example.MainKt")
+            mainClass.set("io.github.laretframework.example.MainKt")
             buildArgs.addAll(commonArgs)
         }
         create("linux") {
             imageName.set("laret")
-            mainClass.set("com.rkhamatyarov.laret.example.MainKt")
+            mainClass.set("io.github.laretframework.example.MainKt")
             buildArgs.addAll(commonArgs)
         }
     }
@@ -142,14 +169,14 @@ tasks {
         archiveClassifier.set("")
         archiveFileName.set("laret-fat.jar")
         manifest {
-            attributes["Main-Class"] = "com.rkhamatyarov.laret.example.MainKt"
+            attributes["Main-Class"] = "io.github.laretframework.example.MainKt"
         }
     }
 
     jar {
         archiveFileName.set("laret.jar")
         manifest {
-            attributes["Main-Class"] = "com.rkhamatyarov.laret.example.MainKt"
+            attributes["Main-Class"] = "io.github.laretframework.example.MainKt"
         }
     }
 
@@ -193,22 +220,50 @@ publishing {
             artifact(tasks["javadocJar"])
 
             pom {
-                name.set("Kotlin Laret")
-                url.set("https://github.com/rkhamatyarov/laret")
+                name.set("Laret")
+                description.set(
+                    "A Cobra-like CLI framework for Kotlin with GraalVM Native Image support",
+                )
+                url.set("https://github.com/laretframework/laret")
                 licenses {
                     license {
                         name.set("MIT License")
                         url.set("https://opensource.org/licenses/MIT")
                     }
                 }
+                developers {
+                    developer {
+                        id.set("laretframework")
+                        name.set("Laret Framework")
+                        url.set("https://github.com/laretframework")
+                    }
+                }
                 scm {
-                    connection.set("scm:git:github.com/rkhamatyarov/laret.git")
-                    url.set("https://github.com/rkhamatyarov/laret")
+                    connection.set("scm:git:https://github.com/laretframework/laret.git")
+                    developerConnection.set("scm:git:ssh://git@github.com/laretframework/laret.git")
+                    url.set("https://github.com/laretframework/laret")
                 }
             }
         }
     }
     repositories {
+        maven {
+            name = "sonatype"
+            url = uri(
+                if (version.toString().endsWith("SNAPSHOT")) {
+                    "https://s01.oss.sonatype.org/content/repositories/snapshots/"
+                } else {
+                    "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+                },
+            )
+            credentials {
+                username = project.findProperty("ossrhUsername") as String?
+                    ?: System.getenv("OSSRH_USERNAME")
+                password = project.findProperty("ossrhPassword") as String?
+                    ?: System.getenv("OSSRH_TOKEN")
+            }
+        }
+
         maven("GitHubPackages") {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/RamilKhamatyarov/laret")
@@ -217,5 +272,15 @@ publishing {
                 password = project.findProperty("gpr.key") as String? ?: System.getenv("GITHUB_TOKEN")
             }
         }
+    }
+}
+
+signing {
+    val signingKey = System.getenv("SIGNING_KEY")
+    val signingPassword = System.getenv("SIGNING_PASSWORD")
+    isRequired = !signingKey.isNullOrBlank()
+    if (isRequired) {
+        useInMemoryPgpKeys(signingKey, signingPassword)
+        sign(publishing.publications["mavenKotlin"])
     }
 }

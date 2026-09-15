@@ -1,3 +1,8 @@
+# Action runtime policy: every pinned action here must run on Node 20 or newer.
+# Node 16 runners are gone and Node 20 is being retired, so actions/cache is held
+# at v4 or later and the actions/* checkout, setup and artifact actions at their
+# current majors. Audit the pins with:
+#   grep -rhoE 'uses: [^@]+@v[0-9]+' .github/workflows/ | sort -u
 name: Qodana
 on:
   workflow_dispatch:

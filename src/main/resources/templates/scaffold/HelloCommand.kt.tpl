@@ -1,6 +1,6 @@
 package ${packageName}.commands
 
-import com.rkhamatyarov.laret.dsl.GroupBuilder
+import io.github.laretframework.dsl.GroupBuilder
 
 /**
  * Hello demo command. Demonstrates the 12-factor config precedence:

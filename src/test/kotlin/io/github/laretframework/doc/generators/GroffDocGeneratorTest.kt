@@ -1,0 +1,80 @@
+package io.github.laretframework.doc.generators
+
+import io.github.laretframework.core.CliApp
+import io.github.laretframework.doc.prose.Prose
+import io.github.laretframework.doc.prose.ProseProvider
+import io.github.laretframework.model.Command
+import io.github.laretframework.model.CommandGroup
+import io.mockk.every
+import io.mockk.mockk
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+@DisplayName("GroffDocGenerator")
+class GroffDocGeneratorTest {
+
+    private val app = CliApp(
+        name = "laret",
+        version = "1.0.0",
+        groups = listOf(
+            CommandGroup(
+                name = "file",
+                commands = listOf(Command(name = "create", description = "Create a new file")),
+            ),
+        ),
+    )
+
+    private fun providerReturning(prose: Prose): ProseProvider = mockk {
+        every { resolve(any(), any(), any()) } returns prose
+    }
+
+    private val prose = Prose(
+        title = "Create a file",
+        summary = "Create a new file.",
+        synopsis = null,
+        examples = emptyList(),
+        seeAlso = listOf("laret-file-delete"),
+        body = "",
+    )
+
+    @Test
+    fun test_groff_generator_uses_flat_man1_structure() {
+        val files = GroffDocGenerator(providerReturning(prose)).generate(app, "en")
+
+        assertEquals("man1/laret-file-create.1", files.first().relativePath)
+    }
+
+    @Test
+    fun test_groff_generator_emits_valid_troff_header() {
+        val content = GroffDocGenerator(providerReturning(prose)).generate(app, "en").first().content
+
+        assertTrue(content.startsWith(".TH "))
+    }
+
+    @Test
+    fun test_groff_generator_includes_prose_see_also() {
+        val content = GroffDocGenerator(providerReturning(prose)).generate(app, "en").first().content
+
+        assertTrue(content.contains("laret-file-delete"))
+    }
+
+    @Test
+    fun test_groff_generator_skips_hidden_commands_unless_included() {
+        val hiddenApp = CliApp(
+            name = "laret",
+            version = "1.0.0",
+            groups = listOf(
+                CommandGroup(
+                    name = "file",
+                    commands = listOf(Command(name = "secret", description = "Internal", hidden = true)),
+                ),
+            ),
+        )
+        val generator = GroffDocGenerator(providerReturning(prose))
+
+        assertTrue(generator.generate(hiddenApp, "en", includeHidden = false).isEmpty())
+        assertEquals(1, generator.generate(hiddenApp, "en", includeHidden = true).size)
+    }
+}

@@ -1,6 +1,6 @@
 package ${packageName}
 
-import com.rkhamatyarov.laret.dsl.cli
+import io.github.laretframework.dsl.cli
 import ${packageName}.commands.helloCommand
 import kotlin.system.exitProcess
 

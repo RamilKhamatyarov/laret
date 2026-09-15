@@ -1,0 +1,82 @@
+package io.github.laretframework.core
+
+import io.github.laretframework.config.registry.ConfigRegistry
+import io.github.laretframework.model.Command
+import io.github.laretframework.model.fs.LaretFileSystem
+import io.github.laretframework.model.fs.RealFileSystem
+import io.github.laretframework.output.OutputStrategy
+import io.github.laretframework.output.PlainOutput
+import io.github.laretframework.ui.InteractivePrompt
+import io.github.laretframework.ui.ProgressBar
+import io.github.laretframework.ui.Spinner
+
+class CommandContext(
+    val command: Command,
+    val app: CliApp? = null,
+    val outputStrategy: OutputStrategy = PlainOutput,
+    val groupName: String,
+    var config: ConfigRegistry = ConfigRegistry.empty(),
+    val isDryRun: Boolean = false,
+    val fs: LaretFileSystem = RealFileSystem(),
+    val scope: CancellationScope = CancellationScope(),
+) {
+    /**
+     * Register a cleanup to run on graceful shutdown (`SIGINT`/`SIGTERM`) and on
+     * normal completion. Delegates to the run's [CancellationScope]; cleanups
+     * run LIFO. The returned handle can [CancellationScope.Handle.dispose] the
+     * registration early.
+     */
+    fun onShutdown(block: suspend () -> Unit): CancellationScope.Handle = scope.onShutdown(block)
+
+    val arguments = mutableMapOf<String, String>()
+
+    val options = mutableMapOf<String, String>()
+
+    /**
+     * Long names of the options the user actually passed, as opposed to those
+     * resolved from config or defaults. Used by mutually-exclusive validation.
+     */
+    val providedOptions = mutableSetOf<String>()
+
+    var exitCode: Int = 0
+        private set
+
+    fun exit(code: Int) {
+        require(code in 0..255) { "Exit code must be between 0 and 255: $code" }
+        exitCode = code
+    }
+
+    fun argument(name: String): String = arguments[name] ?: ""
+
+    fun option(name: String): String = options[name] ?: ""
+
+    fun optionBool(name: String): Boolean = options[name]?.toBoolean() ?: false
+
+    fun optionInt(name: String): Int = options[name]?.toIntOrNull() ?: 0
+
+    fun optionLong(name: String): Long = options[name]?.toLongOrNull() ?: 0L
+
+    @Suppress("unused")
+    fun optionDouble(name: String): Double = options[name]?.toDoubleOrNull() ?: 0.0
+
+    fun argumentInt(name: String): Int = argument(name).toIntOrNull() ?: 0
+
+    @Suppress("unused")
+    fun argumentLong(name: String): Long = argument(name).toLongOrNull() ?: 0L
+
+    fun render(data: Any): String = outputStrategy.render(data)
+
+    fun progressBar(total: Int, label: String = "", width: Int = 40): ProgressBar =
+        ProgressBar(total = total, width = width, label = label, enabled = isInteractive())
+
+    fun spinner(label: String = ""): Spinner = Spinner(label = label, enabled = isInteractive())
+
+    fun prompt(): InteractivePrompt = InteractivePrompt(enabled = isInteractive())
+
+    fun registerUndo(description: String, undoArgs: Array<String>, redoArgs: Array<String> = emptyArray()) {
+        UndoManager.push(
+            UndoManager.newEntry(description, undoArgs.toList(), redoArgs.toList()),
+            isDryRun = isDryRun,
+        )
+    }
+}

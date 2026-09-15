@@ -66,7 +66,7 @@
     "allPublicConstructors": true
   },
   {
-    "name": "com.rkhamatyarov.laret.config.model.AppConfig",
+    "name": "io.github.laretframework.config.model.AppConfig",
     "allDeclaredConstructors": true,
     "allPublicConstructors": true,
     "allDeclaredFields": true,
@@ -75,17 +75,17 @@
     "allPublicMethods": true
   },
   {
-    "name": "com.rkhamatyarov.laret.config.model.AppMetadata",
+    "name": "io.github.laretframework.config.model.AppMetadata",
     "allDeclaredConstructors": true,
     "allPublicConstructors": true
   },
   {
-    "name": "com.rkhamatyarov.laret.config.model.OutputConfig",
+    "name": "io.github.laretframework.config.model.OutputConfig",
     "allDeclaredConstructors": true,
     "allPublicConstructors": true
   },
   {
-    "name": "com.rkhamatyarov.laret.plugin.model.PluginConfig",
+    "name": "io.github.laretframework.plugin.model.PluginConfig",
     "allDeclaredConstructors": true,
     "allPublicConstructors": true,
     "allDeclaredFields": true,
@@ -94,7 +94,7 @@
     "allPublicMethods": true
   },
   {
-    "name": "com.rkhamatyarov.laret.plugin.model.PluginMetadata",
+    "name": "io.github.laretframework.plugin.model.PluginMetadata",
     "allDeclaredConstructors": true,
     "allPublicConstructors": true,
     "allDeclaredFields": true,
@@ -103,17 +103,17 @@
     "allPublicMethods": true
   },
   {
-    "name": "com.rkhamatyarov.laret.config.model.LoggingConfig",
+    "name": "io.github.laretframework.config.model.LoggingConfig",
     "allDeclaredConstructors": true,
     "allPublicConstructors": true
   },
   {
-    "name": "com.rkhamatyarov.laret.config.model.WatchConfig",
+    "name": "io.github.laretframework.config.model.WatchConfig",
     "allDeclaredConstructors": true,
     "allPublicConstructors": true
   },
   {
-    "name": "com.rkhamatyarov.laret.stats.PersistedStats",
+    "name": "io.github.laretframework.stats.PersistedStats",
     "allDeclaredConstructors": true,
     "allPublicConstructors": true,
     "allDeclaredFields": true,
@@ -122,7 +122,7 @@
     "allPublicMethods": true
   },
   {
-    "name": "com.rkhamatyarov.laret.stats.PersistedEntry",
+    "name": "io.github.laretframework.stats.PersistedEntry",
     "allDeclaredConstructors": true,
     "allPublicConstructors": true,
     "allDeclaredFields": true,

@@ -1,3 +1,8 @@
+# Action runtime policy: every pinned action here must run on Node 20 or newer.
+# Node 16 runners are gone and Node 20 is being retired, so actions/cache is held
+# at v4 or later and the actions/* checkout, setup and artifact actions at their
+# current majors. Audit the pins with:
+#   grep -rhoE 'uses: [^@]+@v[0-9]+' .github/workflows/ | sort -u
 name: Release
 
 on:
@@ -26,25 +31,18 @@ jobs:
 
       - name: Check version consistency
         run: |
+          set -euo pipefail
           GRADLE_VERSION=$(grep '^version = ' build.gradle.kts | grep -o '"[^"]*"' | tr -d '"')
-          WIZARD_VERSION=$(grep 'DEFAULT_LARET_VERSION' \
-            src/main/kotlin/com/rkhamatyarov/laret/scaffold/wizard/InteractiveWizard.kt \
-            | grep -o '"[^"]*"' | tr -d '"')
-          MAIN_VERSION=$(grep -m1 'version = "' \
-            src/main/kotlin/com/rkhamatyarov/laret/example/Main.kt \
-            | grep -o '"[^"]*"' | tr -d '"')
-
           echo "Gradle version : $GRADLE_VERSION"
-          echo "Wizard version : $WIZARD_VERSION"
-          echo "Main version   : $MAIN_VERSION"
 
-          if [[ "$GRADLE_VERSION" != "$WIZARD_VERSION" ]]; then
-            echo "Version mismatch between build.gradle.kts ($GRADLE_VERSION) and InteractiveWizard ($WIZARD_VERSION)"
-            exit 1
-          fi
+          # The CLI and the scaffolding wizard must read the generated BuildInfo
+          # constant rather than repeating a literal, so there is exactly one
+          # source of truth for the version.
+          grep -q 'version = BuildInfo.VERSION'             src/main/kotlin/io/github/laretframework/example/Main.kt             || { echo "ERROR: Main.kt does not read BuildInfo.VERSION"; exit 1; }
+          grep -q 'DEFAULT_LARET_VERSION = BuildInfo.VERSION'             src/main/kotlin/io/github/laretframework/scaffold/wizard/InteractiveWizard.kt             || { echo "ERROR: InteractiveWizard does not read BuildInfo.VERSION"; exit 1; }
 
-          if [[ "$GRADLE_VERSION" != "$MAIN_VERSION" ]]; then
-            echo "Version mismatch between build.gradle.kts ($GRADLE_VERSION) and example/Main.kt ($MAIN_VERSION)"
+          if [[ "$GRADLE_VERSION" == *-SNAPSHOT ]]; then
+            echo "ERROR: refusing to release a SNAPSHOT version ($GRADLE_VERSION)"
             exit 1
           fi
 
@@ -53,12 +51,11 @@ jobs:
             echo "Tag version    : $TAG_VERSION"
             if [[ "$GRADLE_VERSION" != "$TAG_VERSION" ]]; then
               echo "Tag v$TAG_VERSION does not match build.gradle.kts version $GRADLE_VERSION"
-              echo "Run: ./scripts/bump-version.sh $TAG_VERSION"
               exit 1
             fi
           fi
 
-          echo "All versions consistent: $GRADLE_VERSION"
+          echo "Version is single-sourced and consistent: $GRADLE_VERSION"
 
   build-native:
     name: Build Native - ${{ matrix.target }}
@@ -180,6 +177,57 @@ jobs:
           name: release-bundle
           path: release/*
           retention-days: 1
+
+  # Maven Central publication. The io.github.laretframework namespace must be
+  # verified against the github.com/laretframework organisation before this can
+  # succeed, so the step is guarded on its credentials: without them the release
+  # still validates, builds and attaches binaries, and simply logs a skip.
+  publish-maven:
+    name: Publish to Maven Central
+    if: github.event_name == 'push' || github.event.inputs.publish == 'true'
+    needs:
+      - validate-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v6
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Set execute permission for Gradle wrapper
+        run: chmod +x ./gradlew
+
+      - name: Report publishing prerequisites
+        id: creds
+        env:
+          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          OSSRH_TOKEN: ${{ secrets.OSSRH_TOKEN }}
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -n "${OSSRH_TOKEN:-}" ] && [ -n "${OSSRH_USERNAME:-}" ] && [ -n "${SIGNING_KEY:-}" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "Sonatype credentials and signing key present; publishing."
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping Maven Central publish: OSSRH_USERNAME, OSSRH_TOKEN or SIGNING_KEY is not configured."
+            echo "Verify the io.github.laretframework namespace at central.sonatype.com, then add the secrets."
+          fi
+
+      - name: Publish to Sonatype
+        if: steps.creds.outputs.ready == 'true'
+        env:
+          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          OSSRH_TOKEN: ${{ secrets.OSSRH_TOKEN }}
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+        run: ./gradlew publishMavenKotlinPublicationToSonatypeRepository --no-daemon --console=plain
 
   publish-release:
     name: Publish GitHub Release
