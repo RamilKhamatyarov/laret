@@ -2,11 +2,10 @@ package io.github.laretframework.core
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicInteger
 
 data class ParallelTask(val command: String, val args: List<String>)
 
@@ -26,16 +25,22 @@ object ParallelDispatcher {
         require(maxJobs in 1..16) { "maxJobs must be in range 1..16" }
         if (tasks.isEmpty()) return emptyList()
 
-        val permits = Semaphore(maxJobs)
-        return coroutineScope {
-            tasks
-                .map { task ->
-                    async(Dispatchers.IO) {
-                        permits.withPermit { runTask(task, onOutput) }
+        val results = arrayOfNulls<ParallelResult>(tasks.size)
+        val cursor = AtomicInteger(0)
+
+        coroutineScope {
+            repeat(minOf(maxJobs, tasks.size)) {
+                launch(Dispatchers.IO) {
+                    while (true) {
+                        val index = cursor.getAndIncrement()
+                        if (index >= tasks.size) break
+                        results[index] = runTask(tasks[index], onOutput)
                     }
                 }
-                .awaitAll()
+            }
         }
+
+        return results.map { checkNotNull(it) { "Task result was not produced" } }
     }
 
     private suspend fun runTask(
