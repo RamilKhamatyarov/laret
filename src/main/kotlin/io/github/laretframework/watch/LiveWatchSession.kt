@@ -89,7 +89,6 @@ class LiveWatchSession(
                     if (stop != null) throw StopSignal()
                 }
             }
-            // The change source completed on its own.
             stop = stop ?: WatchStopReason.SOURCE_CLOSED
         } catch (_: StopSignal) {
             // A cap was reached; `stop` already holds the reason.

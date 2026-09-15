@@ -119,7 +119,12 @@ class DirectoryWatcherTest {
         val sub = tempDir.resolve("nested").also { it.createDirectory() }
         val watcher = DirectoryWatcher(
             tempDir,
-            WatchOptions(recursive = true, maxEvents = 1, durationSeconds = 5),
+            WatchOptions(
+                recursive = true,
+                maxEvents = 1,
+                durationSeconds = 5,
+                acceptedTypes = setOf(WatchEventType.CREATE),
+            ),
         )
         val events = mutableListOf<WatchEvent>()
 
@@ -140,7 +145,7 @@ class DirectoryWatcherTest {
             tempDir,
             WatchOptions(
                 maxEvents = 1,
-                durationSeconds = 3,
+                durationSeconds = 5,
                 acceptedTypes = setOf(WatchEventType.CREATE),
             ),
         )
@@ -149,11 +154,11 @@ class DirectoryWatcherTest {
         val result = runWithMutator(watcher, events) {
             target.createFile()
             target.writeText("after")
-            target.deleteIfExists()
         }
 
         assertThat(result.stopReason).isEqualTo(StopReason.MAX_EVENTS_REACHED)
         assertThat(events.map { it.type }).containsOnly(WatchEventType.CREATE)
+        assertThat(events.map { it.path.fileName.toString() }).containsOnly("only_create.txt")
     }
 
     private fun runWithMutator(

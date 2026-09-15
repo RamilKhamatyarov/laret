@@ -988,22 +988,31 @@ jobs:
       - name: Table - JSON and plain entry counts match
         run: |
           set -euo pipefail
-          PLAIN_COUNT=$(./bin/laret dir list /tmp 2>/dev/null | tail -n +2 | wc -l)
-          ./bin/laret dir list /tmp --format json > /tmp/table_json.stdout 2>/dev/null
-          JSON_COUNT=$(python3 - << 'PYEOF' || echo 0
+          FIXTURE=/tmp/laret_table_fixture
+          rm -rf "$FIXTURE"
+          mkdir -p "$FIXTURE/sub"
+          : > "$FIXTURE/a.txt"
+          : > "$FIXTURE/b.txt"
+          ./bin/laret dir list "$FIXTURE" > /tmp/table_plain.stdout 2>/dev/null
+          ./bin/laret dir list "$FIXTURE" --format json > /tmp/table_json.stdout 2>/dev/null
+          cat /tmp/table_plain.stdout
+          cat /tmp/table_json.stdout
+          PLAIN_COUNT=$(tail -n +2 /tmp/table_plain.stdout | wc -l | tr -d ' ')
+          JSON_COUNT=$(python3 - << 'PYEOF'
           import json, re
           raw = open('/tmp/table_json.stdout').read()
           m = re.search(r'[{\[]', raw)
           if not m:
-            print(0)
-          else:
-            data = json.loads(raw[m.start():])
-            print(len(data) if isinstance(data, list) else 1)
+            raise SystemExit("No JSON found in /tmp/table_json.stdout")
+          data = json.loads(raw[m.start():])
+          print(len(data) if isinstance(data, list) else 1)
           PYEOF
           )
-          echo "Plain: $PLAIN_COUNT, JSON: $JSON_COUNT"
-          [ "$PLAIN_COUNT" -eq "$JSON_COUNT" ] \
-            || { echo "ERROR: Entry counts do not match"; exit 1; }
+          echo "Plain: $PLAIN_COUNT, JSON: $JSON_COUNT, expected: 3"
+          [ "$PLAIN_COUNT" -eq 3 ] \
+            || { echo "ERROR: plain listing reported $PLAIN_COUNT entries, expected 3"; exit 1; }
+          [ "$JSON_COUNT" -eq 3 ] \
+            || { echo "ERROR: JSON listing reported $JSON_COUNT entries, expected 3"; exit 1; }
           echo "Entry counts match"
 
   integration-aliases:

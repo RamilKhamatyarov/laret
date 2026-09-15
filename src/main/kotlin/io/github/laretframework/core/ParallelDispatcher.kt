@@ -1,10 +1,11 @@
 package io.github.laretframework.core
 
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 data class ParallelTask(val command: String, val args: List<String>)
@@ -17,7 +18,6 @@ data class ParallelResult(
 )
 
 object ParallelDispatcher {
-    @OptIn(ExperimentalCoroutinesApi::class)
     suspend fun execute(
         tasks: List<ParallelTask>,
         maxJobs: Int,
@@ -26,12 +26,12 @@ object ParallelDispatcher {
         require(maxJobs in 1..16) { "maxJobs must be in range 1..16" }
         if (tasks.isEmpty()) return emptyList()
 
-        val dispatcher = Dispatchers.IO.limitedParallelism(maxJobs)
-        return withContext(dispatcher) {
+        val permits = Semaphore(maxJobs)
+        return coroutineScope {
             tasks
                 .map { task ->
-                    async {
-                        runTask(task, onOutput)
+                    async(Dispatchers.IO) {
+                        permits.withPermit { runTask(task, onOutput) }
                     }
                 }
                 .awaitAll()

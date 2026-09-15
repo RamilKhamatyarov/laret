@@ -76,15 +76,12 @@ class CancellationScope(
         }
         if (pending.isEmpty()) return
 
-        // A dedicated daemon worker bounds even a cleanup that blocks without
-        // suspending: if it overruns we abandon it and force-halt.
         val worker = thread(start = true, isDaemon = true, name = "laret-shutdown") {
             runBlocking {
                 for (registration in pending) {
                     try {
                         registration.block()
                     } catch (_: CancellationException) {
-                        // A cleanup observing the cancelled job is fine; keep going.
                     } catch (t: Throwable) {
                         System.err.println("Shutdown cleanup failed: ${t.message}")
                     }

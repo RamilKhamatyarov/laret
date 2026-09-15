@@ -1481,8 +1481,6 @@ fun main(args: Array<String>) {
                     option("f", "format", "Output format (json, yaml, text)", "", true) {
                         oneOf("json", "yaml", "text")
                     }
-                    // Named "input", not "config": --config is a global Laret
-                    // flag and would be consumed before reaching the command.
                     option("i", "input", "Path to an existing input file", "", true) { fileExists() }
                     option("j", "json", "JSON output", "", false)
                     option("y", "yaml", "YAML output", "", false)
