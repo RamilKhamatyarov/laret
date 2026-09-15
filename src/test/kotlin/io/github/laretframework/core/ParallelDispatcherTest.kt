@@ -3,26 +3,25 @@ package io.github.laretframework.core
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import kotlin.system.measureTimeMillis
+import java.util.concurrent.CopyOnWriteArrayList
 
 class ParallelDispatcherTest {
 
     @Test
     fun executesTwoTasksConcurrently() = runTest {
-        val tasks = listOf(command("hello", delayMillis = 900), command("world", delayMillis = 900))
-        val outputs = mutableListOf<String>()
+        val tasks = listOf(markedCommand("first"), markedCommand("second"))
+        val outputs = CopyOnWriteArrayList<String>()
 
-        val elapsed = measureTimeMillis {
-            val results = ParallelDispatcher.execute(tasks, maxJobs = 2) { _, line, _ ->
-                outputs += line.trim()
-            }
-
-            assertThat(results).hasSize(2)
-            assertThat(results.map { it.exitCode }).containsOnly(0)
-            assertThat(outputs).containsExactlyInAnyOrder("hello", "world")
+        val results = ParallelDispatcher.execute(tasks, maxJobs = 2) { _, line, _ ->
+            outputs += line.trim()
         }
-        val maxMs = if (isWindows()) 1_950L else 1_600L
-        assertThat(elapsed).isLessThan(maxMs)
+
+        assertThat(results).hasSize(2)
+        assertThat(results.map { it.exitCode }).containsOnly(0)
+        assertThat(outputs)
+            .containsExactlyInAnyOrder("first-start", "first-end", "second-start", "second-end")
+        assertThat(outputs.take(2))
+            .containsExactlyInAnyOrder("first-start", "second-start")
     }
 
     @Test
@@ -45,14 +44,15 @@ class ParallelDispatcherTest {
 
     @Test
     fun jobsOneForcesSequentialExecution() = runTest {
-        val tasks = listOf(command("first", delayMillis = 300), command("second", delayMillis = 300))
-        val outputOrder = mutableListOf<String>()
+        val tasks = listOf(markedCommand("first"), markedCommand("second"))
+        val outputOrder = CopyOnWriteArrayList<String>()
 
         ParallelDispatcher.execute(tasks, maxJobs = 1) { _, line, _ ->
             outputOrder += line.trim()
         }
 
-        assertThat(outputOrder).containsExactly("first", "second")
+        assertThat(outputOrder)
+            .containsExactly("first-start", "first-end", "second-start", "second-end")
     }
 
     @Test
@@ -75,8 +75,11 @@ class ParallelDispatcherTest {
         assertThat(results.first { it.exitCode == 1 }.stderr.map { it.trim() }).contains("failed")
     }
 
-    private fun command(output: String, delayMillis: Int = 0): ParallelTask =
-        shellTask(script("sleep", delayMillis, "stdout", output, "exit", 0))
+    private fun command(output: String): ParallelTask = shellTask(script("stdout", output, "exit", 0))
+
+    private fun markedCommand(name: String): ParallelTask = shellTask(
+        script("stdout", "$name-start", "sleep", OVERLAP_WINDOW_MS, "stdout", "$name-end", "exit", 0),
+    )
 
     private fun failingCommand(): ParallelTask = shellTask(script("stderr", "failed", "exit", 1))
 
@@ -114,4 +117,8 @@ class ParallelDispatcherTest {
     }
 
     private fun isWindows(): Boolean = System.getProperty("os.name").lowercase().contains("windows")
+
+    companion object {
+        private const val OVERLAP_WINDOW_MS = 2_000
+    }
 }
