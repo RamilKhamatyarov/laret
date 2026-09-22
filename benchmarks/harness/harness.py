@@ -334,7 +334,12 @@ def main() -> int:
         args.lines = 1000
         args.workers = 20
 
+    all_names = [t.name for t in default_targets()]
     targets = [t for t in default_targets() if not args.only or t.name in args.only]
+    # Targets excluded by --only were never asked for; targets that are simply
+    # not built were asked for and could not run. The rendered table must be
+    # able to tell those two apart, so they are recorded separately.
+    not_requested = [name for name in all_names if name not in [t.name for t in targets]]
     missing = [t.name for t in targets if not t.available()]
     targets = [t for t in targets if t.available()]
     if not targets:
@@ -366,7 +371,10 @@ def main() -> int:
     document = {
         "schema_version": SCHEMA_VERSION,
         "provenance": provenance(args.cpus),
+        "requested_targets": [t.name for t in targets],
+        "not_requested_targets": not_requested,
         "skipped_targets": missing,
+        "quick": args.quick,
         "measurements": [asdict(m) for m in measurements],
     }
     Path(args.out).write_text(json.dumps(document, indent=2) + "\n")

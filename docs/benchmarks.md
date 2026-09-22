@@ -33,13 +33,13 @@ was rendered from.
 
 ## Targets
 
-| Target | Build |
-|---|---|
-| Cobra (Go) | `go build -trimpath -ldflags="-s -w"` |
-| clap (Rust) | `cargo build --release` |
-| picocli (Java) | `java -jar` |
-| Laret JVM | `java -jar` (shadow jar) |
-| Laret native | GraalVM Native Image |
+| Target | Build | This run |
+|---|---|---|
+| Cobra (Go) | `go build -trimpath -ldflags="-s -w"` | not measured |
+| clap (Rust) | `cargo build --release` | not measured |
+| picocli (Java) | `java -jar` | not measured |
+| Laret JVM | `java -jar` (shadow jar) | not measured |
+| Laret native | GraalVM Native Image | not measured |
 
 All five implement the same four commands with the same flags and the same
 stdout contract, so the harness invokes them identically.
@@ -169,10 +169,9 @@ python3 benchmarks/harness/harness.py --out results.json
 python3 benchmarks/harness/render.py results.json > docs/benchmarks.md
 ```
 
-CI does not gate on any timing. Pull requests run the scenarios once at reduced
-scale and assert only the deterministic properties — coalescing accuracy,
-aggregate counts, exit codes, cleanup ordering. The full five-target suite runs
-nightly and uploads `results.json` and the rendered table as artifacts.
-
-See [the ADR](../.github/adr/concurrency-benchmark-suite.md) for why the suite
-is shaped this way.
+CI does not gate on any timing. Every pull request builds all five targets and
+runs all four scenarios at reduced scale (`--quick`), rendering the full
+comparison into the job summary, but asserts only the deterministic properties:
+coalescing accuracy, aggregate counts, exit codes and cleanup ordering. The
+nightly job reruns the same suite at the scales the contract names and uploads
+`results.json` and the rendered table as artifacts.

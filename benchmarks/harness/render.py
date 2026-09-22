@@ -14,6 +14,14 @@ import sys
 from pathlib import Path
 
 TARGET_ORDER = ["Cobra", "clap", "picocli", "Laret JVM", "Laret native"]
+# The Targets table labels a target by language; results.json names it by target.
+TARGET_NAMES = {
+    "Cobra (Go)": "Cobra",
+    "clap (Rust)": "clap",
+    "picocli (Java)": "picocli",
+    "Laret JVM": "Laret JVM",
+    "Laret native": "Laret native",
+}
 NOT_MEASURED = "not measured"
 
 BUILDS = [
@@ -91,9 +99,9 @@ def render(document: dict) -> str:
     )
     add("")
 
-    skipped = document.get("skipped_targets") or []
-    if skipped:
-        add(f"> Targets not built for this run, so not measured: {', '.join(skipped)}.")
+    unbuilt = document.get("skipped_targets") or []
+    if unbuilt:
+        add(f"> Requested but not built, so not measured: {', '.join(unbuilt)}.")
         add("")
 
     add("## Provenance")
@@ -119,13 +127,45 @@ def render(document: dict) -> str:
 
     add("## Targets")
     add("")
-    add(table(["Target", "Build"], [[name, build] for name, build in BUILDS]))
+    measured = set(targets)
+    not_requested = set(document.get("not_requested_targets") or [])
+    unbuilt_set = set(unbuilt)
+
+    def status(label: str) -> str:
+        name = TARGET_NAMES.get(label, label)
+        if name in measured:
+            return "measured"
+        if name in not_requested:
+            return "not run in this configuration"
+        if name in unbuilt_set:
+            return "not built"
+        return NOT_MEASURED
+
+    add(table(
+        ["Target", "Build", "This run"],
+        [[label, build, status(label)] for label, build in BUILDS],
+    ))
     add("")
     add(
         "All five implement the same four commands with the same flags and the same\n"
         "stdout contract, so the harness invokes them identically."
     )
     add("")
+    if not_requested:
+        add(
+            f"> This run measured only {', '.join(sorted(measured))}. "
+            f"{', '.join(sorted(not_requested))} were not requested, so the tables\n"
+            "> below have no row for them. The pull-request gate restricts the suite to\n"
+            "> the Laret targets at reduced scale; the full five-target comparison runs\n"
+            "> nightly."
+        )
+        add("")
+    if document.get("quick"):
+        add(
+            "> Reduced scale (`--quick`): these are correctness parameters, not the\n"
+            "> scales the contract names. Do not read the timings as a comparison."
+        )
+        add("")
 
     add("## Rules")
     add("")
@@ -243,11 +283,6 @@ def render(document: dict) -> str:
         "CI does not gate on any timing. Pull requests run the scenarios once at reduced\n"
         "scale and assert only the deterministic properties. The full five-target suite\n"
         "runs nightly and uploads `results.json` and this table as artifacts."
-    )
-    add("")
-    add(
-        "See [the ADR](../.github/adr/concurrency-benchmark-suite.md) for why the suite\n"
-        "is shaped this way."
     )
     return "\n".join(out) + "\n"
 
