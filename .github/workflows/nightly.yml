@@ -115,7 +115,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: '1.23'
-          cache-dependency-path: benchmarks/cobra/go.sum
+          cache: false
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -137,8 +137,6 @@ jobs:
         run: go mod tidy
 
       - name: Build every benchmark target
-        env:
-          GRAALVM_HOME: ${{ env.JAVA_HOME }}
         run: ./benchmarks/harness/build.sh
 
       - name: Run the full suite

@@ -3118,6 +3118,24 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.23'
+          cache: false
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            benchmarks/clap/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('benchmarks/clap/Cargo.toml') }}
+
       - name: Download native binary
         uses: actions/download-artifact@v8
         with:
@@ -3131,8 +3149,31 @@ jobs:
           cp ./bin/laret build/native/nativeCompile/laret
           chmod +x build/native/nativeCompile/laret
 
-      - name: Build the fat JAR
+      - name: Build the Laret fat JAR
         run: ./gradlew shadowJar --console=plain
+
+      - name: Build the Cobra target
+        working-directory: benchmarks/cobra
+        run: |
+          set -euo pipefail
+          go mod tidy
+          go build -trimpath -ldflags="-s -w" -o bench-cobra .
+          ./bench-cobra bench fanout --tasks 10 --jobs 0
+
+      - name: Build the clap target
+        working-directory: benchmarks/clap
+        run: |
+          set -euo pipefail
+          cargo build --release
+          ./target/release/bench-clap bench fanout --tasks 10 --jobs 0
+
+      - name: Build the picocli target
+        working-directory: benchmarks/picocli
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew --quiet --no-daemon shadowJar
+          java -jar build/libs/bench-picocli.jar bench fanout --tasks 10 --jobs 0
 
       - name: Harness refuses to run without pinning support
         run: |
@@ -3141,16 +3182,15 @@ jobs:
             || { echo "ERROR: taskset missing; the pinning contract cannot be met"; exit 1; }
           echo "taskset available"
 
-      - name: Scenario correctness at reduced scale
+      - name: All five targets at reduced scale
         run: |
           set -euo pipefail
           python3 benchmarks/harness/harness.py \
             --out /tmp/bench-results.json \
             --quick \
-            --cpus 0-1 \
-            --only "Laret JVM" "Laret native"
+            --cpus 0-1
 
-      - name: Every deterministic check passed
+      - name: Every target ran and every deterministic check passed
         run: |
           set -euo pipefail
           python3 - << 'PYEOF'
@@ -3159,6 +3199,11 @@ jobs:
           assert document['schema_version'] == 1, document['schema_version']
           measurements = document['measurements']
           assert measurements, 'harness produced no measurements'
+
+          expected_targets = {'Cobra', 'clap', 'picocli', 'Laret JVM', 'Laret native'}
+          measured = {m['target'] for m in measurements}
+          missing = expected_targets - measured
+          assert not missing, f'targets produced no measurements: {sorted(missing)}'
 
           scenarios = {m['scenario'] for m in measurements}
           for required in ('A-fanout', 'B-storm', 'C-pipeline', 'D-cancel-SIGTERM', 'D-cancel-SIGINT'):
@@ -3169,18 +3214,17 @@ jobs:
             broken = [name for name, ok in m['checks'].items() if not ok] or ['run']
             print(f"FAIL {m['target']} {m['scenario']}: {', '.join(broken)} {m.get('error') or ''}")
           assert not failed, f'{len(failed)} of {len(measurements)} measurements failed'
-          print(f'{len(measurements)} measurements passed')
+          print(f'{len(measurements)} measurements passed across {len(measured)} targets')
           PYEOF
 
-      - name: Renderer produces a table from the results
+      - name: Render the comparison table
+        if: always()
         run: |
           set -euo pipefail
           python3 benchmarks/harness/render.py /tmp/bench-results.json > /tmp/bench-table.md
           grep -q "## Scenario A" /tmp/bench-table.md \
             || { echo "ERROR: rendered table has no Scenario A section"; exit 1; }
-          grep -q "Laret native" /tmp/bench-table.md \
-            || { echo "ERROR: rendered table does not mention the native target"; exit 1; }
-          echo "Rendered table looks well formed"
+          cat /tmp/bench-table.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload benchmark artifacts
         if: always()
