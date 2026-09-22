@@ -4,6 +4,7 @@ import io.github.laretframework.completion.CompletionGenerator
 import io.github.laretframework.completion.template.TemplateContext
 import io.github.laretframework.completion.template.TemplateEngine
 import io.github.laretframework.core.CliApp
+import io.github.laretframework.model.visible
 
 class PowerShellCompletionGenerator(val templateEngine: TemplateEngine = TemplateEngine()) : CompletionGenerator {
     override fun generate(app: CliApp, dynamic: Boolean): String {
@@ -14,7 +15,7 @@ class PowerShellCompletionGenerator(val templateEngine: TemplateEngine = Templat
 
     private fun buildContext(app: CliApp): TemplateContext {
         val uniqueOptions = mutableSetOf<Pair<String, String>>()
-        app.groups.forEach { group ->
+        app.groups.visible().forEach { group ->
             group.commands.forEach { cmd ->
                 cmd.options.forEach { opt ->
                     uniqueOptions.add(opt.long.trim() to opt.short.trim())
@@ -31,7 +32,7 @@ class PowerShellCompletionGenerator(val templateEngine: TemplateEngine = Templat
 
         return TemplateContext(
             appName = app.name.trim(),
-            groups = app.groups.map { group ->
+            groups = app.groups.visible().map { group ->
                 TemplateContext.GroupContext(
                     name = group.name.trim(),
                     commands = group.commands.map { cmd ->

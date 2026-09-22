@@ -4,6 +4,7 @@ import io.github.laretframework.core.CliApp
 import io.github.laretframework.model.Command
 import io.github.laretframework.model.CommandGroup
 import io.github.laretframework.model.Option
+import io.github.laretframework.model.visible
 
 /**
  * Runtime backend for dynamic shell completion — the hidden `__complete`
@@ -58,6 +59,7 @@ class CompletionEngine(private val app: CliApp) {
     private fun groupCandidates(prefix: String): CompletionResult = CompletionResult(
         (
             app.groups
+                .visible()
                 .filter { it.name.startsWith(prefix) }
                 .map { CompletionCandidate(it.name, it.description) } +
                 app.getSidecarPlugins()

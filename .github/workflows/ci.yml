@@ -221,6 +221,7 @@ jobs:
           VALIDATE_YAML: true
           DISABLE_GITHUB_STATUS_API: true
           VALIDATE_GIT_COMMIT_HISTORY: false
+          FILTER_REGEX_EXCLUDE: (^|/)benchmarks/
           HTTP_TIMEOUT: 30
         continue-on-error: false
 
@@ -3101,6 +3102,96 @@ jobs:
             /tmp/mcp_created.txt
           retention-days: 7
 
+  benchmarks-concurrency:
+    name: Integration - Concurrency Benchmarks
+    runs-on: ubuntu-latest
+    needs: [ build ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v6
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Download native binary
+        uses: actions/download-artifact@v8
+        with:
+          name: laret-native
+          path: ./bin
+
+      - name: Place the native binary where the harness looks for it
+        run: |
+          set -euo pipefail
+          mkdir -p build/native/nativeCompile
+          cp ./bin/laret build/native/nativeCompile/laret
+          chmod +x build/native/nativeCompile/laret
+
+      - name: Build the fat JAR
+        run: ./gradlew shadowJar --console=plain
+
+      - name: Harness refuses to run without pinning support
+        run: |
+          set -euo pipefail
+          command -v taskset > /dev/null \
+            || { echo "ERROR: taskset missing; the pinning contract cannot be met"; exit 1; }
+          echo "taskset available"
+
+      - name: Scenario correctness at reduced scale
+        run: |
+          set -euo pipefail
+          python3 benchmarks/harness/harness.py \
+            --out /tmp/bench-results.json \
+            --quick \
+            --cpus 0-1 \
+            --only "Laret JVM" "Laret native"
+
+      - name: Every deterministic check passed
+        run: |
+          set -euo pipefail
+          python3 - << 'PYEOF'
+          import json
+          document = json.load(open('/tmp/bench-results.json'))
+          assert document['schema_version'] == 1, document['schema_version']
+          measurements = document['measurements']
+          assert measurements, 'harness produced no measurements'
+
+          scenarios = {m['scenario'] for m in measurements}
+          for required in ('A-fanout', 'B-storm', 'C-pipeline', 'D-cancel-SIGTERM', 'D-cancel-SIGINT'):
+            assert required in scenarios, f'{required} was not measured'
+
+          failed = [m for m in measurements if not m['passed']]
+          for m in failed:
+            broken = [name for name, ok in m['checks'].items() if not ok] or ['run']
+            print(f"FAIL {m['target']} {m['scenario']}: {', '.join(broken)} {m.get('error') or ''}")
+          assert not failed, f'{len(failed)} of {len(measurements)} measurements failed'
+          print(f'{len(measurements)} measurements passed')
+          PYEOF
+
+      - name: Renderer produces a table from the results
+        run: |
+          set -euo pipefail
+          python3 benchmarks/harness/render.py /tmp/bench-results.json > /tmp/bench-table.md
+          grep -q "## Scenario A" /tmp/bench-table.md \
+            || { echo "ERROR: rendered table has no Scenario A section"; exit 1; }
+          grep -q "Laret native" /tmp/bench-table.md \
+            || { echo "ERROR: rendered table does not mention the native target"; exit 1; }
+          echo "Rendered table looks well formed"
+
+      - name: Upload benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmarks-concurrency
+          path: |
+            /tmp/bench-results.json
+            /tmp/bench-table.md
+          retention-days: 7
+
   integration-config-precedence:
     name: Integration - Config Precedence
     runs-on: ubuntu-latest
@@ -3184,6 +3275,7 @@ jobs:
       - integration-dry-run
       - integration-mcp-server
       - integration-config-precedence
+      - benchmarks-concurrency
     if: always()
 
     steps:
@@ -3215,6 +3307,7 @@ jobs:
           echo " integration-dry-run:        ${{ needs.integration-dry-run.result }}"
           echo " integration-mcp-server:     ${{ needs.integration-mcp-server.result }}"
           echo " integration-config-precedence: ${{ needs.integration-config-precedence.result }}"
+          echo " benchmarks-concurrency:   ${{ needs.benchmarks-concurrency.result }}"
           echo "=========================================="
 
       - name: Comment PR on failure

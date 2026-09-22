@@ -26,7 +26,6 @@ class SuggesterTest {
     fun `returns at most the limit sorted by distance then name`() {
         val ranked = Suggester.rank("redoo", groups, limit = 3)
         assertTrue(ranked.size <= 3)
-        // "redoo" is one edit from "redo" and two from "replay".
         assertEquals("redo", ranked.first().value)
         assertTrue(ranked.zipWithNext().all { (a, b) -> a.distance <= b.distance })
     }
@@ -38,14 +37,12 @@ class SuggesterTest {
 
     @Test
     fun `short input only matches distance one`() {
-        // "x" (len 1) has an allowed cap of 1, so distance-2 candidates are excluded.
         val ranked = Suggester.rank("x", listOf("ab", "cd"))
         assertTrue(ranked.isEmpty())
     }
 
     @Test
     fun `exact match is not suggested`() {
-        // distance 0 is filtered out (the token would have resolved normally).
         assertTrue(Suggester.rank("file", groups).none { it.value == "file" })
     }
 

@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.merge
 import java.nio.file.Path
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 /** Why a live watch session ended. */
 enum class WatchStopReason { MAX_RESTARTS, MAX_CONSECUTIVE_FAILURES, SOURCE_CLOSED, INTERRUPTED }
@@ -63,7 +65,7 @@ class LiveWatchSession(
 
         val changeTriggers = changes
             .filter { matcher.matches(it) }
-            .debounce(debounceMillis)
+            .debounce(debounceMillis.toDuration(DurationUnit.MILLISECONDS))
         val startTrigger: Flow<Path?> = if (runOnStart) flowOf(null) else emptyFlow()
         val triggers = merge(startTrigger, changeTriggers)
 
@@ -91,7 +93,7 @@ class LiveWatchSession(
             }
             stop = stop ?: WatchStopReason.SOURCE_CLOSED
         } catch (_: StopSignal) {
-            // A cap was reached; `stop` already holds the reason.
+            // ignored
         }
 
         val reason = stop ?: WatchStopReason.INTERRUPTED

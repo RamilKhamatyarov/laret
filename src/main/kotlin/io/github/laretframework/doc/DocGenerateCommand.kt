@@ -7,6 +7,7 @@ import io.github.laretframework.doc.prose.ProseProvider
 import io.github.laretframework.doc.prose.ResourceProseProvider
 import io.github.laretframework.doc.validation.DocValidator
 import io.github.laretframework.doc.validation.ValidationReport
+import io.github.laretframework.model.visible
 import io.github.laretframework.ui.yellowBold
 import java.nio.file.Files
 import java.nio.file.Path
@@ -100,12 +101,12 @@ class DocGenerateCommand(private val app: CliApp) {
         includeHidden: Boolean,
     ): List<String> {
         val problems = mutableListOf<String>()
-        val validTargets = app.groups.flatMap { group ->
+        val validTargets = app.groups.visible(includeHidden).flatMap { group ->
             group.commands.map { "${app.name}-${group.name}-${it.name}" }
         }.toSet()
 
         languages.forEach { lang ->
-            app.groups.forEach { group ->
+            app.groups.visible(includeHidden).forEach { group ->
                 group.commands.filter { includeHidden || !it.hidden }.forEach { command ->
                     if (!provider.exists(group.name, command.name, lang)) {
                         problems += "missing prose: docs/$lang/${group.name}/${command.name}.md"

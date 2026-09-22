@@ -57,7 +57,6 @@ class CommandContextShutdownTest {
         app.runForTest(arrayOf("svc", "start"))
         app.runForTest(arrayOf("svc", "start"))
 
-        // Two runs, one cleanup each — not 1 + 2 from a shared scope.
         assertEquals(2, runs.get())
     }
 
