@@ -4,6 +4,7 @@ import io.github.laretframework.completion.SchemaExporter
 import io.github.laretframework.core.CliApp
 import io.github.laretframework.model.Command
 import io.github.laretframework.model.CommandGroup
+import io.github.laretframework.model.visible
 import io.github.laretframework.output.OutputFormat
 
 /**
@@ -31,7 +32,7 @@ abstract class AbstractSchemaExporter : SchemaExporter {
     protected fun mapCommands(
         app: CliApp,
         transform: (CommandGroup, Command) -> Map<String, Any?>,
-    ): List<Map<String, Any?>> = app.groups.flatMap { group ->
+    ): List<Map<String, Any?>> = app.groups.visible().flatMap { group ->
         group.commands.map { command -> transform(group, command) }
     }
 }

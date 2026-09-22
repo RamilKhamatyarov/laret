@@ -5,6 +5,7 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.github.laretframework.core.CliApp
 import io.github.laretframework.model.Command
 import io.github.laretframework.model.CommandGroup
+import io.github.laretframework.model.visible
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 
@@ -14,7 +15,8 @@ class McpAdapter(
     private val executor: (Array<String>) -> McpCommandResult = { args -> executeApp(app, args) },
 ) {
     private val json = jacksonObjectMapper()
-    private val commands = app.groups.flatMap { group -> group.commands.map { command -> ToolCommand(group, command) } }
+    private val commands =
+        app.groups.visible().flatMap { group -> group.commands.map { command -> ToolCommand(group, command) } }
     private val tools: List<McpTool> = commands.map { mapper.mapCommand(it.command, "${app.name}.${it.group.name}") }
 
     fun handleRequest(request: String): String = try {

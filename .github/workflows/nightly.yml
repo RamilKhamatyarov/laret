@@ -4,7 +4,8 @@
 # current majors. Audit the pins with:
 #   grep -rhoE 'uses: [^@]+@v[0-9]+' .github/workflows/ | sort -u
 #
-# Nightly GraalVM native builds for macOS and Windows. These are too slow to run
+# Nightly GraalVM native builds for macOS and Windows, plus the full
+# concurrency benchmark suite. These are too slow to run
 # on every pull request, so ci.yml covers JVM on all three platforms plus Linux
 # native, release.yml covers native on all three for tags, and this workflow
 # keeps macOS and Windows native honest in between.
@@ -87,3 +88,77 @@ jobs:
           name: laret-native-${{ matrix.os }}
           path: ${{ steps.binary.outputs.path }}
           retention-days: 7
+
+  benchmarks:
+    name: Concurrency benchmark suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v6
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Set up GraalVM 25
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '25'
+          distribution: 'graalvm'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.23'
+          cache-dependency-path: benchmarks/cobra/go.sum
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            benchmarks/clap/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('benchmarks/clap/Cargo.toml') }}
+
+      - name: Make scripts executable
+        run: chmod +x ./gradlew benchmarks/harness/build.sh benchmarks/picocli/gradlew
+
+      - name: Resolve Go dependencies
+        working-directory: benchmarks/cobra
+        run: go mod tidy
+
+      - name: Build every benchmark target
+        env:
+          GRAALVM_HOME: ${{ env.JAVA_HOME }}
+        run: ./benchmarks/harness/build.sh
+
+      - name: Run the full suite
+        run: |
+          set -euo pipefail
+          python3 benchmarks/harness/harness.py --out results.json --cpus 0-3
+
+      - name: Render the comparison table
+        if: always()
+        run: |
+          set -euo pipefail
+          python3 benchmarks/harness/render.py results.json > benchmarks-table.md
+          cat benchmarks-table.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: concurrency-benchmarks
+          path: |
+            results.json
+            benchmarks-table.md
+          retention-days: 30

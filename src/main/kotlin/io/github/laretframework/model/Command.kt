@@ -43,8 +43,6 @@ data class Command(
         var i = 0
         while (i < args.size) {
             val token = args[i]
-            // A bare `--` ends option parsing (POSIX); everything after it is a
-            // positional or a nested command's own flag — never "unknown" here.
             if (token == "--") {
                 sawSeparator = true
                 i++

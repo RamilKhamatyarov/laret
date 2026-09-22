@@ -4,6 +4,7 @@ import io.github.laretframework.core.CliApp
 import io.github.laretframework.model.Command
 import io.github.laretframework.model.fs.LaretFileSystem
 import io.github.laretframework.model.fs.RealFileSystem
+import io.github.laretframework.model.visible
 import java.nio.file.Path
 
 /**
@@ -28,20 +29,21 @@ class DocScaffoldCommand(private val app: CliApp, private val fs: LaretFileSyste
      * @param includeHidden When `true`, hidden commands get skeletons too.
      * @return The paths of the files actually created (existing files are skipped).
      */
-    fun run(lang: String, outputDir: Path, includeHidden: Boolean = false): List<Path> = app.groups.flatMap { group ->
-        group.commands
-            .filter { includeHidden || !it.hidden }
-            .mapNotNull { command ->
-                val target = outputDir.resolve("$lang/${group.name}/${command.name}.md")
-                if (fs.exists(target)) {
-                    null
-                } else {
-                    target.parent?.let { fs.createDirectories(it) }
-                    fs.writeText(target, skeletonFor(command, usageFor(group.name, command)))
-                    target
+    fun run(lang: String, outputDir: Path, includeHidden: Boolean = false): List<Path> =
+        app.groups.visible(includeHidden).flatMap { group ->
+            group.commands
+                .filter { includeHidden || !it.hidden }
+                .mapNotNull { command ->
+                    val target = outputDir.resolve("$lang/${group.name}/${command.name}.md")
+                    if (fs.exists(target)) {
+                        null
+                    } else {
+                        target.parent?.let { fs.createDirectories(it) }
+                        fs.writeText(target, skeletonFor(command, usageFor(group.name, command)))
+                        target
+                    }
                 }
-            }
-    }
+        }
 
     /**
      * Builds the Markdown skeleton for [command], pre-filling `synopsis` with the

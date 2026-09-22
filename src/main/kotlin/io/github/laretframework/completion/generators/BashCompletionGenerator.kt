@@ -4,6 +4,7 @@ import io.github.laretframework.completion.CompletionGenerator
 import io.github.laretframework.completion.template.TemplateContext
 import io.github.laretframework.completion.template.TemplateEngine
 import io.github.laretframework.core.CliApp
+import io.github.laretframework.model.visible
 
 class BashCompletionGenerator(val templateEngine: TemplateEngine = TemplateEngine()) : CompletionGenerator {
     override fun generate(app: CliApp, dynamic: Boolean): String {
@@ -12,11 +13,11 @@ class BashCompletionGenerator(val templateEngine: TemplateEngine = TemplateEngin
         val contextMap = baseContext.toMap().toMutableMap()
         val items = mutableListOf<Map<String, String>>()
 
-        app.groups.forEach { group ->
+        app.groups.visible().forEach { group ->
             items.add(mapOf("name" to group.name, "type" to "group"))
         }
 
-        app.groups.forEach { group ->
+        app.groups.visible().forEach { group ->
             group.commands.forEach { cmd ->
                 items.add(mapOf("name" to cmd.name, "type" to "command"))
             }
@@ -27,7 +28,7 @@ class BashCompletionGenerator(val templateEngine: TemplateEngine = TemplateEngin
 
     private fun buildContext(app: CliApp): TemplateContext = TemplateContext(
         appName = app.name,
-        groups = app.groups.map { group ->
+        groups = app.groups.visible().map { group ->
             TemplateContext.GroupContext(
                 name = group.name,
                 commands = group.commands.map { cmd ->

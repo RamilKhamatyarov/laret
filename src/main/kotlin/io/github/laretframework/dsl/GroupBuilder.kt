@@ -18,6 +18,7 @@ import io.github.laretframework.model.CommandGroup
 class GroupBuilder(val name: String, val description: String = "") {
     private val commands = mutableListOf<Command>()
     private val aliases = mutableListOf<String>()
+    private var hidden = false
 
     /** Middleware registered at GROUP scope, and per-command registrations collected from nested `command { }` blocks. */
     internal val middlewares = mutableListOf<Middleware>()
@@ -52,5 +53,10 @@ class GroupBuilder(val name: String, val description: String = "") {
         }
     }
 
-    fun build(): CommandGroup = CommandGroup(name, description, commands.toList(), aliases.toList())
+    /** Marks the whole group as hidden: invocable, but absent from every user-facing listing. */
+    fun hidden() {
+        hidden = true
+    }
+
+    fun build(): CommandGroup = CommandGroup(name, description, commands.toList(), aliases.toList(), hidden)
 }

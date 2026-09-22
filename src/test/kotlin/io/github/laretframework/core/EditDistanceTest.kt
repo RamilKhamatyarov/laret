@@ -27,7 +27,6 @@ class EditDistanceTest {
 
     @Test
     fun `adjacent transposition costs one`() {
-        // Plain Levenshtein would score this 2.
         assertEquals(1, EditDistance.damerau("craete", "create"))
     }
 

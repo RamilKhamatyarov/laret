@@ -6,6 +6,7 @@ import io.github.laretframework.doc.DocFile
 import io.github.laretframework.doc.DocFormat
 import io.github.laretframework.doc.prose.ProseProvider
 import io.github.laretframework.doc.prose.ResourceProseProvider
+import io.github.laretframework.model.visible
 
 /**
  * Generates Groff man(7) pages into a flat `man1/` tree, one file per command
@@ -28,7 +29,7 @@ class GroffDocGenerator(
     override val format: DocFormat = DocFormat.MAN
 
     override fun generate(app: CliApp, lang: String, includeHidden: Boolean): List<DocFile> =
-        app.groups.flatMap { group ->
+        app.groups.visible(includeHidden).flatMap { group ->
             group.commands.filter { includeHidden || !it.hidden }.map { command ->
                 val resolved = prose.resolve(group.name, command, lang)
                 val content = manPageGenerator.generate(

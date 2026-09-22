@@ -9,6 +9,7 @@ import io.github.laretframework.completion.SchemaExportCommand
 import io.github.laretframework.completion.SchemaFormat
 import io.github.laretframework.completion.ShellType
 import io.github.laretframework.completion.completers.StaticCompleter
+import io.github.laretframework.core.CliApp
 import io.github.laretframework.core.CommandContext
 import io.github.laretframework.core.CommandHistory
 import io.github.laretframework.core.CommandPipeline
@@ -80,1443 +81,1452 @@ internal fun listDirEntries(dir: File, includeHidden: Boolean, maxSize: Int): Li
         .filter { maxSize <= 0 || it.length() <= maxSize }
         .sortedBy { it.name }
 
-fun main(args: Array<String>) {
-    val app =
-        cli(
-            name = "laret",
-            version = BuildInfo.VERSION,
-            description = "Laret - A Cobra-like CLI framework for Kotlin",
-        ) {
-            use(LoggingMiddleware())
-            use(StatsMiddleware())
+/**
+ * The demo application, built once so `main` and the tests that drive the
+ * benchmark payloads exercise exactly the same command tree.
+ */
+fun buildLaretApp(): CliApp = cli(
+    name = "laret",
+    version = BuildInfo.VERSION,
+    description = "Laret - A Cobra-like CLI framework for Kotlin",
+) {
+    use(LoggingMiddleware())
+    use(StatsMiddleware())
 
-            onAppShutdown = { System.err.println(Localization.t("app.shutting.down")) }
+    onAppShutdown = { System.err.println(Localization.t("app.shutting.down")) }
 
-            group(name = "completion", description = "Shell completion") {
-                command(name = "bash", description = "Generate bash completion script") {
-                    option("d", "dynamic", "Emit a dynamic script backed by the hidden __complete command", "", false)
-                    action { ctx ->
-                        val command = CompletionCommand(ctx.app!!)
-                        print(command.generate(ShellType.BASH, dynamic = ctx.optionBool("dynamic")))
-                    }
-                }
-                command(name = "zsh", description = "Generate zsh completion script") {
-                    option("d", "dynamic", "Emit a dynamic script backed by the hidden __complete command", "", false)
-                    action { ctx ->
-                        val command = CompletionCommand(ctx.app!!)
-                        print(command.generate(ShellType.ZSH, dynamic = ctx.optionBool("dynamic")))
-                    }
-                }
-                command(name = "powershell", description = "Generate PowerShell completion script") {
-                    option("d", "dynamic", "Emit a dynamic script backed by the hidden __complete command", "", false)
-                    action { ctx ->
-                        val command = CompletionCommand(ctx.app!!)
-                        print(command.generate(ShellType.POWERSHELL, dynamic = ctx.optionBool("dynamic")))
-                    }
-                }
-                command(name = "install", description = "Install completion script") {
-                    argument("shell", "Shell type (bash, zsh, powershell)", required = true)
-                    action { ctx ->
-                        val shellName = ctx.argument("shell")
-                        try {
-                            val shellType = ShellType.valueOf(shellName.uppercase())
-                            val command = CompletionCommand(ctx.app!!)
-                            command.generate(shellType, File(getCompletionPath(shellType, ctx.app.name)))
-                            println("Completion installed for $shellName")
-                        } catch (e: IllegalArgumentException) {
-                            println("Error: Unsupported shell '$shellName' $e. Supported: bash, zsh, powershell")
-                        }
-                    }
-                }
-                command(name = "man", description = "Generate man page (Groff format)") {
-                    option(
-                        "o",
-                        "output",
-                        "Write to file instead of stdout (e.g. /usr/share/man/man1/laret.1)",
-                        "",
-                        true,
-                    )
-                    option(
-                        "g",
-                        "group",
-                        "Generate for specific group (e.g. file, dir). Omit for overview page.",
-                        "",
-                        true,
-                    )
-                    option("c", "command", "Generate for specific command within --group", "", true)
-                    action { ctx ->
-                        val outputPath = ctx.option("output")
-                        val groupFilter = ctx.option("group")
-                        val commandFilter = ctx.option("command")
-                        val app = ctx.app ?: return@action
-                        val generator = ManPageGenerator()
-
-                        val content = when {
-                            groupFilter.isNotBlank() && commandFilter.isNotBlank() -> {
-                                val grp = app.groups.find { it.matches(groupFilter) }
-                                    ?: run {
-                                        println("Error: group '$groupFilter' not found")
-                                        return@action
-                                    }
-                                val cmd = grp.commands.find { it.matches(commandFilter) }
-                                    ?: run {
-                                        println("Error: command '$commandFilter' not found in group '$groupFilter'")
-                                        return@action
-                                    }
-                                generator.generate(cmd, app.name, app.version, grp.name)
-                            }
-
-                            else -> {
-                                buildString {
-                                    app.groups.forEach { grp ->
-                                        grp.commands.forEach { cmd ->
-                                            append(generator.generate(cmd, app.name, app.version, grp.name))
-                                            append("\n")
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        if (outputPath.isNotBlank()) {
-                            File(outputPath).parentFile?.let { parent ->
-                                if (!ctx.fs.exists(parent.path)) ctx.fs.createDirectories(parent.path)
-                            }
-                            ctx.fs.writeText(outputPath, content)
-                            println("Man page written to $outputPath")
-                        } else {
-                            print(content)
-                        }
-                    }
-                }
-
-                command(name = "interactive", description = "Start interactive shell") {
-                    action { ctx ->
-                        val terminal = TerminalBuilder.builder().system(true).build()
-                        val reader =
-                            LineReaderBuilder
-                                .builder()
-                                .terminal(terminal)
-                                .appName("laret")
-                                .build()
-
-                        println("Laret Interactive Shell. Type 'exit' to quit.")
-
-                        while (true) {
-                            try {
-                                val line = reader.readLine("laret > ") ?: break
-                                if (line.trim() == "exit" || line.trim() == "quit") break
-                                if (line.isBlank()) continue
-
-                                val args = line.trim().split("\\s+".toRegex()).toTypedArray()
-                                ctx.app?.run(args)
-                            } catch (e: UserInterruptException) {
-                                println("\nInterrupted ${e.message}")
-                                break
-                            } catch (e: EndOfFileException) {
-                                println("\nEnd of input ${e.message}")
-                                break
-                            } catch (e: Exception) {
-                                println("Error: ${e.message}")
-                            }
-                        }
-                    }
+    group(name = "completion", description = "Shell completion") {
+        command(name = "bash", description = "Generate bash completion script") {
+            option("d", "dynamic", "Emit a dynamic script backed by the hidden __complete command", "", false)
+            action { ctx ->
+                val command = CompletionCommand(ctx.app!!)
+                print(command.generate(ShellType.BASH, dynamic = ctx.optionBool("dynamic")))
+            }
+        }
+        command(name = "zsh", description = "Generate zsh completion script") {
+            option("d", "dynamic", "Emit a dynamic script backed by the hidden __complete command", "", false)
+            action { ctx ->
+                val command = CompletionCommand(ctx.app!!)
+                print(command.generate(ShellType.ZSH, dynamic = ctx.optionBool("dynamic")))
+            }
+        }
+        command(name = "powershell", description = "Generate PowerShell completion script") {
+            option("d", "dynamic", "Emit a dynamic script backed by the hidden __complete command", "", false)
+            action { ctx ->
+                val command = CompletionCommand(ctx.app!!)
+                print(command.generate(ShellType.POWERSHELL, dynamic = ctx.optionBool("dynamic")))
+            }
+        }
+        command(name = "install", description = "Install completion script") {
+            argument("shell", "Shell type (bash, zsh, powershell)", required = true)
+            action { ctx ->
+                val shellName = ctx.argument("shell")
+                try {
+                    val shellType = ShellType.valueOf(shellName.uppercase())
+                    val command = CompletionCommand(ctx.app!!)
+                    command.generate(shellType, File(getCompletionPath(shellType, ctx.app.name)))
+                    println("Completion installed for $shellName")
+                } catch (e: IllegalArgumentException) {
+                    println("Error: Unsupported shell '$shellName' $e. Supported: bash, zsh, powershell")
                 }
             }
+        }
+        command(name = "man", description = "Generate man page (Groff format)") {
+            option(
+                "o",
+                "output",
+                "Write to file instead of stdout (e.g. /usr/share/man/man1/laret.1)",
+                "",
+                true,
+            )
+            option(
+                "g",
+                "group",
+                "Generate for specific group (e.g. file, dir). Omit for overview page.",
+                "",
+                true,
+            )
+            option("c", "command", "Generate for specific command within --group", "", true)
+            action { ctx ->
+                val outputPath = ctx.option("output")
+                val groupFilter = ctx.option("group")
+                val commandFilter = ctx.option("command")
+                val app = ctx.app ?: return@action
+                val generator = ManPageGenerator()
 
-            group(name = "plugin", description = "Install and manage sidecar plugins") {
-                command(name = "install", description = "Install a verified HTTPS sidecar plugin") {
-                    argument("name", "Plugin name")
-                    option("u", "url", "HTTPS plugin URL")
-                    option("s", "sha256", "Expected SHA-256 digest")
-                    option("d", "plugin-dir", "Plugin directory override")
-                    option("f", "force", "Replace an existing plugin", takesValue = false)
-                    action { ctx ->
-                        val app = ctx.app ?: return@action
-                        val directory = Path.of(
-                            ctx.option("plugin-dir").ifBlank { app.pluginDirectories().first().toString() },
-                        )
-                        val result = app.installSidecarPlugin(
-                            ctx.argument("name"),
-                            ctx.option("url"),
-                            ctx.option("sha256"),
-                            directory,
-                            ctx.optionBool("force"),
-                        )
-                        result.fold(
-                            onSuccess = {
-                                app.refreshSidecarPlugins()
-                                println("Plugin installed: ${ctx.argument("name")}")
-                            },
-                            onFailure = { error ->
-                                throw IllegalStateException(
-                                    "Plugin install failed: ${error.message}",
-                                    error,
-                                )
-                            },
-                        )
-                    }
-                }
-
-                command(name = "list", description = "List installed sidecar plugins") {
-                    option("d", "plugin-dir", "Plugin directory override")
-                    action { ctx ->
-                        val app = ctx.app ?: return@action
-                        val entries = io.github.laretframework.plugin.runtime.PluginCatalog(
-                            app.pluginDirectories(ctx.option("plugin-dir").takeIf { it.isNotBlank() }?.let(Path::of)),
-                            app.getPluginConfig(),
-                        ).refresh()
-                        if (entries.isEmpty()) {
-                            println("No plugins installed")
-                        } else {
-                            entries.forEach { entry ->
-                                val reason = entry.reason?.let { " ($it)" }.orEmpty()
-                                println("${entry.name}\t${entry.status.name.lowercase()}$reason")
-                            }
-                        }
-                    }
-                }
-
-                command(name = "remove", description = "Remove an installed sidecar plugin") {
-                    argument("name", "Plugin name")
-                    option("d", "plugin-dir", "Plugin directory override")
-                    option("f", "force", "Remove without confirmation", takesValue = false)
-                    action { ctx ->
-                        val app = ctx.app ?: return@action
-                        val name = ctx.argument("name")
-                        val force = ctx.optionBool("force")
-                        val confirmed = force ||
-                            (ctx.isInteractive() && ctx.prompt().confirm("Remove plugin '$name'?", false))
-                        if (!confirmed) {
-                            System.err.println("Removal not confirmed; use --force for non-interactive removal")
-                            return@action
-                        }
-                        val catalog = io.github.laretframework.plugin.runtime.PluginCatalog(
-                            app.pluginDirectories(ctx.option("plugin-dir").takeIf { it.isNotBlank() }?.let(Path::of)),
-                            app.getPluginConfig(),
-                        )
-                        catalog.refresh()
-                        catalog.remove(name, force).fold(
-                            onSuccess = {
-                                app.refreshSidecarPlugins()
-                                println("Plugin removed: $name")
-                            },
-                            onFailure = { error ->
-                                throw IllegalStateException(
-                                    "Plugin remove failed: ${error.message}",
-                                    error,
-                                )
-                            },
-                        )
-                    }
-                }
-            }
-            group(name = "schema", description = "LLM schema export") {
-                command(name = "export", description = "Export commands as an LLM function-calling schema") {
-                    option("f", "format", "Schema dialect: openai or anthropic", "openai", true)
-                    option("o", "output", "Write schema to file instead of stdout", "", true)
-
-                    action { ctx ->
-                        val formatId = ctx.option("format").ifBlank { "openai" }
-                        val format = SchemaFormat.fromId(formatId)
+                val content = when {
+                    groupFilter.isNotBlank() && commandFilter.isNotBlank() -> {
+                        val grp = app.groups.find { it.matches(groupFilter) }
                             ?: run {
-                                System.err.println("Unsupported schema format: $formatId")
+                                println("Error: group '$groupFilter' not found")
                                 return@action
                             }
-                        val output = ctx.option("output").takeIf { it.isNotBlank() }?.let { File(it) }
-                        val schema = SchemaExportCommand(ctx.app!!).export(format, output)
-                        if (output == null) print(schema)
-                    }
-                }
-            }
-
-            group(name = "mcp", description = "Model Context Protocol server") {
-                McpServeCommand.register(this)
-            }
-
-            group(name = "doc", description = "Documentation generation") {
-                command(name = "generate", description = "Generate command docs (Markdown or man pages)") {
-                    option(
-                        "f",
-                        "format",
-                        "Output format: md or man",
-                        "md",
-                        true,
-                        completer = StaticCompleter("md", "man"),
-                    )
-                    option(
-                        "l",
-                        "lang",
-                        "Language: en, es, or all",
-                        "en",
-                        true,
-                        completer = StaticCompleter("en", "es", "all"),
-                    )
-                    option("o", "output-dir", "Output directory", "docs", true)
-                    option("s", "strict", "Fail on missing files, broken see_also links, or orphans", "", false)
-                    option("H", "include-hidden", "Document hidden commands with an [INTERNAL] badge", "", false)
-
-                    action { ctx ->
-                        val app = ctx.app ?: return@action
-                        val formatId = ctx.option("format").ifBlank { "md" }
-                        val format = DocFormat.fromId(formatId)
+                        val cmd = grp.commands.find { it.matches(commandFilter) }
                             ?: run {
-                                System.err.println("Unsupported format: $formatId (use md or man)")
+                                println("Error: command '$commandFilter' not found in group '$groupFilter'")
                                 return@action
                             }
-                        val lang = ctx.option("lang").ifBlank { "en" }
-                        val outputDir = File(ctx.option("output-dir").ifBlank { "docs" }).toPath()
-
-                        try {
-                            val written = DocGenerateCommand(app).run(
-                                format = format,
-                                lang = lang,
-                                outputDir = outputDir,
-                                strict = ctx.optionBool("strict"),
-                                includeHidden = ctx.optionBool("include-hidden"),
-                            )
-                            written.forEach { println("created: $it") }
-                            println("Generated ${written.size} doc file(s) in $outputDir")
-                        } catch (e: DocValidationException) {
-                            System.err.println(e.message)
-                            exitProcess(1)
-                        }
+                        generator.generate(cmd, app.name, app.version, grp.name)
                     }
-                }
 
-                command(name = "scaffold", description = "Create missing prose skeletons for every command") {
-                    option("l", "lang", "Language directory to scaffold", "en", true)
-                    option("o", "output-dir", "Output directory", "src/main/resources/docs", true)
-                    option("H", "include-hidden", "Scaffold hidden commands too", "", false)
-
-                    action { ctx ->
-                        val app = ctx.app ?: return@action
-                        val lang = ctx.option("lang").ifBlank { "en" }
-                        val outputDir = File(ctx.option("output-dir").ifBlank { "src/main/resources/docs" }).toPath()
-
-                        val created = DocScaffoldCommand(app, ctx.fs).run(
-                            lang = lang,
-                            outputDir = outputDir,
-                            includeHidden = ctx.optionBool("include-hidden"),
-                        )
-                        created.forEach { println("scaffolded: $it") }
-                        println("Created ${created.size} skeleton(s) in $outputDir")
-                    }
-                }
-
-                command(name = "guide", description = "Scaffold a standalone guide page (e.g. installation)") {
-                    argument("name", "Guide name/slug (e.g. quick-start)", required = true)
-                    option("l", "lang", "Language directory (blank for language-neutral)", "en", true)
-                    option("o", "output-dir", "Docs directory", "docs", true)
-
-                    action { ctx ->
-                        val name = ctx.argument("name")
-                        if (name.isBlank()) {
-                            System.err.println("Usage: laret doc guide <name>")
-                            return@action
-                        }
-                        val lang = ctx.option("lang").takeIf { it.isNotBlank() }
-                        val outputDir = File(ctx.option("output-dir").ifBlank { "docs" }).toPath()
-                        val guide = DocGuideCommand(ctx.fs)
-
-                        if (guide.exists(name, outputDir, lang)) {
-                            println("Guide already exists; leaving it untouched.")
-                            return@action
-                        }
-                        val written = guide.create(name, outputDir, lang)
-                        println("created: $written")
-                    }
-                }
-
-                command(name = "index", description = "Generate docs/index.md landing page from README.md") {
-                    option("r", "readme", "Path to the source README", "README.md", true)
-                    option("l", "lang", "Language directory (blank for a language-neutral index)", "", true)
-                    option("o", "output-dir", "Docs directory", "docs", true)
-                    option("t", "title", "Landing-page title", "Laret", true)
-
-                    action { ctx ->
-                        val readme = File(ctx.option("readme").ifBlank { "README.md" }).toPath()
-                        if (!ctx.fs.exists(readme)) {
-                            System.err.println("README not found: $readme")
-                            return@action
-                        }
-                        val lang = ctx.option("lang").takeIf { it.isNotBlank() }
-                        val outputDir = File(ctx.option("output-dir").ifBlank { "docs" }).toPath()
-                        val title = ctx.option("title").ifBlank { "Laret" }
-
-                        val written = DocIndexCommand(ctx.fs).fromReadme(readme, outputDir, lang, title)
-                        println("created: $written")
-                    }
-                }
-            }
-
-            group(name = "update", description = "Self-update the laret binary") {
-                command(name = "check", description = "Check whether a newer release is available") {
-                    action { ctx ->
-                        val result = UpdateCommand(ctx.app!!).check()
-                        result.fold(
-                            onSuccess = { info ->
-                                println("Current version: ${info.currentVersion}")
-                                println("Latest release : ${info.latestVersion}")
-                                if (info.updateAvailable) {
-                                    println("Update available. Run: laret update run")
-                                } else {
-                                    println("Already up to date.")
-                                }
-                            },
-                            onFailure = { e ->
-                                System.err.println("Update check failed: ${e.message}")
-                                throw RuntimeException("Update check failed", e)
-                            },
-                        )
-                    }
-                }
-
-                command(name = "run", description = "Download and install the latest release") {
-                    option("f", "force", "Install even when not newer than current", "", false)
-                    action { ctx ->
-                        val result = UpdateCommand(ctx.app!!).execute(force = ctx.optionBool("force"))
-                        result.fold(
-                            onSuccess = { path ->
-                                println("Updated binary installed at $path")
-                                println("The new version takes effect on next launch.")
-                            },
-                            onFailure = { e ->
-                                System.err.println("Update failed: ${e.message}")
-                                throw RuntimeException("Update failed", e)
-                            },
-                        )
-                    }
-                }
-            }
-
-            group(name = "new", description = "Scaffold a new Laret CLI project") {
-                command(name = "project", description = "Run interactive wizard and write project files") {
-                    option("d", "dir", "Target directory (default: ./<project-name>)", "", true)
-                    option("y", "yes", "Skip wizard and use defaults", "", false)
-                    option("n", "name", "Project name (used with --yes)", "my-cli", true)
-                    option("p", "package", "Package name (used with --yes)", "com.example.mycli", true)
-
-                    action { ctx ->
-                        val config = if (ctx.optionBool("yes")) {
-                            ScaffoldConfig(
-                                projectName = ctx.option("name"),
-                                packageName = ctx.option("package"),
-                                appName = ctx.option("name"),
-                                laretVersion = InteractiveWizard.DEFAULT_LARET_VERSION,
-                                modules = Module.entries.toSet(),
-                                shellTests = ShellTarget.entries.toSet(),
-                                graalvm = false,
-                            )
-                        } else {
-                            InteractiveWizard().runWizard()
-                        }
-
-                        val targetDir = ctx.option("dir").ifBlank { config.projectName }
-                        val root = File(targetDir).toPath()
-
-                        System.err.println("Generating ${config.projectName} in $root")
-                        val result = runBlocking { ProjectGenerator().generate(config, root) }
-                        result.written.forEach { println("created: $it") }
-                        if (result.failures.isNotEmpty()) {
-                            result.failures.forEach { System.err.println("error: ${it.message}") }
-                            throw RuntimeException("Scaffold completed with ${result.failures.size} failure(s)")
-                        }
-                        println("Done. Next: cd $targetDir && ./gradlew run")
-                    }
-                }
-            }
-
-            group(name = "echo", description = "Echo text to stdout (pipe demo)") {
-                command(name = "print", description = "Print text") {
-                    argument("text", "Text to print", required = false, optional = true, default = "")
-                    action { ctx -> print(ctx.argument("text")) }
-                }
-            }
-
-            group(name = "upper", description = "Text transformation (pipe demo)") {
-                command(name = "convert", description = "Convert text to uppercase") {
-                    argument(
-                        "text",
-                        "Text to convert (use - to read from previous stage)",
-                        required = false,
-                        optional = true,
-                        default = "",
-                    )
-                    action { ctx ->
-                        val input = ctx.argument("text").ifEmpty { CommandPipeline.captureStdin() }
-                        print(input.uppercase())
-                    }
-                }
-            }
-
-            group(name = "pipe", description = "Command piping") {
-                command(name = "run", description = "Run a pipeline of laret commands separated by --- or |") {
-                    action { ctx ->
-                        val app = ctx.app ?: return@action
-
-                        val rawArgs = pipeCommandArgs.get() ?: emptyArray()
-                        if (rawArgs.isEmpty()) {
-                            println(Localization.t("pipe.empty"))
-                            return@action
-                        }
-                        val pipeline = CommandPipeline(app)
-                        val stages = pipeline.splitStages(rawArgs)
-                        if (stages.isEmpty()) {
-                            println(Localization.t("pipe.empty"))
-                            return@action
-                        }
-                        System.err.println(Localization.t("pipe.started", stages.size))
-                        val result = pipeline.executeResult(stages, dryRun = ctx.isDryRun)
-                        result.failedStage?.let { stageIndex ->
-                            val commandLine = stages[stageIndex - 1].joinToString(" ")
-                            System.err.println(
-                                "Pipeline stage $stageIndex failed with exit code ${result.exitCode}: $commandLine",
-                            )
-                        }
-                        ctx.exit(result.exitCode)
-                    }
-                }
-            }
-
-            group(name = "parallel", description = "Execute commands concurrently") {
-                command(name = "run", description = "Run multiple commands in parallel") {
-                    argument("stages", "Commands separated by ---", required = false, optional = true)
-                    option("j", "jobs", "Maximum concurrent commands (1..16)", "4", true)
-                    option("q", "quiet", "Suppress per-task output", "", false)
-
-                    action { ctx ->
-                        val rawArgs = parallelCommandArgs.get() ?: emptyArray()
-                        val (tokens, jobsFromRaw, quietFromRaw) = parseParallelRunArgs(rawArgs)
-                        val jobs = (jobsFromRaw ?: ctx.optionInt("jobs").takeIf { it > 0 } ?: 4).coerceIn(1, 16)
-                        val quiet = quietFromRaw || ctx.optionBool("quiet")
-                        val tasks = parseParallelTasks(tokens)
-
-                        if (tasks.isEmpty()) {
-                            println("No parallel tasks provided")
-                            return@action
-                        }
-
-                        val results = runBlocking {
-                            ParallelDispatcher.execute(tasks, jobs) { task, line, isStderr ->
-                                if (!quiet) {
-                                    val stream = if (isStderr) System.err else System.out
-                                    stream.println("[${task.command}] $line")
+                    else -> {
+                        buildString {
+                            app.groups.forEach { grp ->
+                                grp.commands.forEach { cmd ->
+                                    append(generator.generate(cmd, app.name, app.version, grp.name))
+                                    append("\n")
                                 }
                             }
                         }
+                    }
+                }
 
-                        val failed = results.filter { it.exitCode != 0 }
-                        println("Parallel summary: ${results.size} task(s), ${failed.size} failed")
-                        results.forEachIndexed { index, result ->
-                            val commandLine = (listOf(result.task.command) + result.task.args).joinToString(" ")
-                            println(
-                                "${index + 1}. exit=${result.exitCode} " +
-                                    "stdout=${result.stdout.size} stderr=${result.stderr.size} :: $commandLine",
-                            )
-                        }
-                        failed.firstOrNull()?.let {
-                            System.err.println("First failure: ${it.task.command} exited with ${it.exitCode}")
-                        }
+                if (outputPath.isNotBlank()) {
+                    File(outputPath).parentFile?.let { parent ->
+                        if (!ctx.fs.exists(parent.path)) ctx.fs.createDirectories(parent.path)
+                    }
+                    ctx.fs.writeText(outputPath, content)
+                    println("Man page written to $outputPath")
+                } else {
+                    print(content)
+                }
+            }
+        }
+
+        command(name = "interactive", description = "Start interactive shell") {
+            action { ctx ->
+                val terminal = TerminalBuilder.builder().system(true).build()
+                val reader =
+                    LineReaderBuilder
+                        .builder()
+                        .terminal(terminal)
+                        .appName("laret")
+                        .build()
+
+                println("Laret Interactive Shell. Type 'exit' to quit.")
+
+                while (true) {
+                    try {
+                        val line = reader.readLine("laret > ") ?: break
+                        if (line.trim() == "exit" || line.trim() == "quit") break
+                        if (line.isBlank()) continue
+
+                        val args = line.trim().split("\\s+".toRegex()).toTypedArray()
+                        ctx.app?.run(args)
+                    } catch (e: UserInterruptException) {
+                        println("\nInterrupted ${e.message}")
+                        break
+                    } catch (e: EndOfFileException) {
+                        println("\nEnd of input ${e.message}")
+                        break
+                    } catch (e: Exception) {
+                        println("Error: ${e.message}")
                     }
                 }
             }
+        }
+    }
 
-            group(name = "watch", description = "Watch a directory for filesystem changes") {
-                command(name = "run", description = "Watch <path> and emit CREATE/MODIFY/DELETE events to stdout") {
-                    argument("path", "Directory to watch", required = false, optional = true)
-                    option("d", "duration", "Stop after N seconds (0 = run until interrupted)", "0", true)
-                    option("r", "recursive", "Watch subdirectories", "", false)
-                    option("n", "max-events", "Stop after N events (0 = unlimited)", "0", true)
-                    option(
-                        "e",
-                        "events",
-                        "Comma-separated event filter (create,modify,delete). Default: all",
-                        "",
-                        true,
-                    )
-
-                    action { ctx ->
-                        val rawArgs = watchCommandArgs.get() ?: emptyArray()
-                        val parsed = parseWatchRunArgs(rawArgs)
-
-                        val path = parsed.path ?: run {
-                            System.err.println(Localization.t("watch.path.required"))
-                            return@action
-                        }
-
-                        val dir = File(path)
-                        if (!dir.isDirectory) {
-                            System.err.println(Localization.t("watch.not.a.directory", path))
-                            return@action
-                        }
-
-                        val duration = parsed.duration ?: ctx.optionLong("duration").coerceAtLeast(0)
-                        val recursive = parsed.recursive || ctx.optionBool("recursive")
-                        val maxEvents = parsed.maxEvents ?: ctx.optionInt("max-events").coerceAtLeast(0)
-                        val accepted = parseEventFilter(parsed.events ?: ctx.option("events"))
-
-                        val options = WatchOptions(
-                            recursive = recursive,
-                            durationSeconds = duration,
-                            maxEvents = maxEvents,
-                            acceptedTypes = accepted,
+    group(name = "plugin", description = "Install and manage sidecar plugins") {
+        command(name = "install", description = "Install a verified HTTPS sidecar plugin") {
+            argument("name", "Plugin name")
+            option("u", "url", "HTTPS plugin URL")
+            option("s", "sha256", "Expected SHA-256 digest")
+            option("d", "plugin-dir", "Plugin directory override")
+            option("f", "force", "Replace an existing plugin", takesValue = false)
+            action { ctx ->
+                val app = ctx.app ?: return@action
+                val directory = Path.of(
+                    ctx.option("plugin-dir").ifBlank { app.pluginDirectories().first().toString() },
+                )
+                val result = app.installSidecarPlugin(
+                    ctx.argument("name"),
+                    ctx.option("url"),
+                    ctx.option("sha256"),
+                    directory,
+                    ctx.optionBool("force"),
+                )
+                result.fold(
+                    onSuccess = {
+                        app.refreshSidecarPlugins()
+                        println("Plugin installed: ${ctx.argument("name")}")
+                    },
+                    onFailure = { error ->
+                        throw IllegalStateException(
+                            "Plugin install failed: ${error.message}",
+                            error,
                         )
-
-                        System.err.println(
-                            Localization.t("watch.started", dir.absolutePath, recursive, duration, maxEvents),
-                        )
-
-                        val watcher = DirectoryWatcher(dir.toPath(), options)
-                        val summary = watcher.watch { event ->
-                            println("${event.type}\t${event.path.toAbsolutePath()}")
-                        }
-
-                        System.err.println(
-                            Localization.t("watch.stopped", summary.emittedEvents, summary.stopReason.name),
-                        )
-                    }
-                }
-
-                command(
-                    name = "live",
-                    description = "Watch <path> for glob-matched changes and re-run a command after `--`",
-                ) {
-                    argument("path", "Directory to watch", required = false, optional = true)
-                    option("p", "pattern", "Glob to watch; repeatable; '!' prefix excludes (e.g. '**/*.kt')", "", true)
-                    option("b", "debounce", "Debounce window in milliseconds", "", true)
-                    option("m", "max-restarts", "Stop after N total runs (0 = unlimited)", "", true)
-                    option("x", "max-consecutive-failures", "Stop after N back-to-back failures (0 = off)", "", true)
-
-                    action { ctx -> runWatchLive(ctx) }
-                }
+                    },
+                )
             }
-
-            group(name = "diff", description = "Compare files line by line") {
-                command(name = "run", description = "Show differences between two text files") {
-                    argument("old-file", "Original file path", required = true)
-                    argument("new-file", "Modified file path", required = true)
-                    option("f", "format", "Output format (unified, plain, json)", "unified", true)
-                    option("w", "ignore-whitespace", "Ignore leading/trailing whitespace differences", "", false)
-                    option("c", "context", "Lines of context around each change", "3", true)
-
-                    action { ctx ->
-                        val oldFile = File(ctx.argument("old-file"))
-                        val newFile = File(ctx.argument("new-file"))
-
-                        if (!oldFile.exists()) {
-                            System.err.println(Localization.t("diff.file.not.found", oldFile.path))
-                            return@action
-                        }
-                        if (!newFile.exists()) {
-                            System.err.println(Localization.t("diff.file.not.found", newFile.path))
-                            return@action
-                        }
-
-                        val formatId = ctx.option("format").ifBlank { "unified" }
-                        val format = DiffFormat.fromId(formatId) ?: run {
-                            System.err.println(Localization.t("diff.format.unknown", formatId))
-                            return@action
-                        }
-
-                        val result = diffFiles(
-                            oldFile.toPath(),
-                            newFile.toPath(),
-                            ignoreWhitespace = ctx.optionBool("ignore-whitespace"),
-                            contextLines = ctx.optionInt("context").coerceAtLeast(0),
-                        )
-
-                        val rendered = when (format) {
-                            DiffFormat.UNIFIED -> UnifiedFormatter().render(result)
-                            DiffFormat.PLAIN -> PlainFormatter().render(result)
-                            DiffFormat.JSON -> JsonDiffFormatter().render(result)
-                        }
-                        if (rendered.isNotEmpty()) {
-                            print(rendered)
-                            if (!rendered.endsWith("\n")) println()
-                        }
-                    }
-                }
-            }
-
-            group(name = "stats", description = "Command-execution metrics") {
-                command(
-                    name = "show",
-                    description = "Print collected metrics (default format: prometheus)",
-                ) {
-                    option(
-                        "f",
-                        "format",
-                        "Output format (prometheus, json, plain)",
-                        "prometheus",
-                        true,
-                    )
-                    option("r", "reset", "Reset metrics after printing", "", false)
-
-                    action { ctx ->
-                        val formatId = ctx.option("format").ifBlank { "prometheus" }
-                        val format = StatsFormat.fromId(formatId) ?: run {
-                            System.err.println(
-                                Localization.t("stats.format.unknown", formatId),
-                            )
-                            return@action
-                        }
-
-                        val snapshot = StatsCollector.snapshot()
-                        val rendered = when (format) {
-                            StatsFormat.PROMETHEUS -> PrometheusFormatter().render(snapshot)
-                            StatsFormat.JSON -> JsonStatsFormatter().render(snapshot)
-                            StatsFormat.PLAIN -> PlainStatsFormatter().render(snapshot)
-                        }
-                        print(rendered)
-                        if (!rendered.endsWith("\n")) println()
-
-                        if (ctx.optionBool("reset")) {
-                            StatsCollector.reset()
-                            System.err.println(Localization.t("stats.reset.done"))
-                        }
-                    }
-                }
-
-                command(name = "reset", description = "Reset all collected metrics") {
-                    action { _ ->
-                        StatsCollector.reset()
-                        println(Localization.t("stats.reset.done"))
-                    }
-                }
-            }
-
-            group(name = "locale", description = "Manage interface locale") {
-                command(name = "show", description = "Print the active locale tag") {
-                    option("v", "verbose", "Also show the source of the active locale", "", false)
-                    action { ctx ->
-                        println(Localization.getLocale().toString())
-                        if (ctx.optionBool("verbose")) {
-                            println("Source: ${Localization.localeSource()}")
-                        }
-                    }
-                }
-                command(name = "set", description = "Set and persist locale for all future sessions") {
-                    argument("tag", "Locale tag (e.g. es, en_US, fr_FR)", required = true)
-                    action { ctx ->
-                        val tag = ctx.argument("tag")
-                        if (!Localization.isValidLocaleTag(tag)) {
-                            System.err.println(Localization.t("locale.invalid.tag", tag))
-                            return@action
-                        }
-                        Localization.saveLocale(tag)
-                        if (Localization.isLocaleOverriddenByEnv()) {
-                            System.err.println(
-                                Localization.t("locale.env.override.warning", System.getenv("LARET_LOCALE")),
-                            )
-                        }
-                        println(Localization.t("locale.set.done", tag))
-                    }
-                }
-                command(name = "reset", description = "Reset locale to system default") {
-                    action { _ ->
-                        val futureTag = Localization.resolveAfterClear().toString()
-                        val message = Localization.t("locale.reset.done", futureTag)
-                        Localization.clearLocale()
-                        println(message)
-                    }
-                }
-            }
-
-            group(name = "i18n", description = "Localization test commands") {
-                command(name = "hello", description = "Print a localized greeting") {
-                    action { _ ->
-                        println(Localization.t("app.greeting"))
-                    }
-                }
-                command(name = "locale", description = "Print the active locale tag") {
-                    action { _ ->
-                        println(Localization.getLocale().toString())
-                    }
-                }
-            }
-
-            group(name = "prompt", description = "Interactive prompt commands") {
-                command(name = "text", description = "Ask for text input") {
-                    argument("question", "Prompt text", required = true)
-                    option("d", "default", "Default value", "", true)
-                    action { ctx ->
-                        val question = ctx.argument("question")
-                        val default = ctx.option("default")
-                        val result = ctx.prompt().text(question, default)
-                        println(result)
-                    }
-                }
-
-                command(name = "confirm", description = "Ask a yes/no question") {
-                    argument("question", "Prompt text", required = true)
-                    option("d", "default", "Default answer (true/false)", "true", true)
-                    action { ctx ->
-                        val question = ctx.argument("question")
-                        val default = ctx.option("default").toBooleanStrictOrNull() ?: true
-                        val result = ctx.prompt().confirm(question, default)
-                        println(result)
-                    }
-                }
-
-                command(name = "select", description = "Select one option from a list") {
-                    argument("question", "Prompt text", required = true)
-                    option("o", "options", "Comma-separated list of options", "", true)
-                    action { ctx ->
-                        val question = ctx.argument("question")
-                        val options =
-                            ctx
-                                .option("options")
-                                .split(",")
-                                .map { it.trim() }
-                                .filter { it.isNotEmpty() }
-                        if (options.isEmpty()) {
-                            println("Error: --options must not be empty")
-                            return@action
-                        }
-                        val result = ctx.prompt().select(question, options)
-                        println(result)
-                    }
-                }
-
-                command(name = "multiselect", description = "Select multiple options from a list") {
-                    argument("question", "Prompt text", required = true)
-                    option("o", "options", "Comma-separated list of options", "", true)
-                    action { ctx ->
-                        val question = ctx.argument("question")
-                        val options =
-                            ctx
-                                .option("options")
-                                .split(",")
-                                .map { it.trim() }
-                                .filter { it.isNotEmpty() }
-                        if (options.isEmpty()) {
-                            println("Error: --options must not be empty")
-                            return@action
-                        }
-                        val results = ctx.prompt().multiSelect(question, options)
-                        results.forEach { println(it) }
-                    }
-                }
-
-                command(name = "password", description = "Ask for a password") {
-                    argument("question", "Prompt text", required = true)
-                    action { ctx ->
-                        val question = ctx.argument("question")
-                        val result = ctx.prompt().password(question)
-                        println(result)
-                    }
-                }
-            }
-
-            group(name = "history", description = "Command history and replay") {
-                command(name = "show", description = "List recent commands") {
-                    option("n", "limit", "Max entries to show", "20", true)
-                    action { ctx ->
-                        val limit = ctx.optionInt("limit").coerceAtLeast(1)
-                        val all = CommandHistory.list()
-                        if (all.isEmpty()) {
-                            println("No command history.")
-                            return@action
-                        }
-                        val start = (all.size - limit).coerceAtLeast(0)
-                        val shown = all.subList(start, all.size)
-                        shown.forEachIndexed { i, e ->
-                            println("  ${start + i + 1}. ${e.args.joinToString(" ")}")
-                        }
-                    }
-                }
-                command(
-                    name = "replay",
-                    description = "Replay a command (default: last). Use index from 'history show'.",
-                ) {
-                    argument(
-                        "index",
-                        "Entry index to replay (0 = last)",
-                        required = false,
-                        optional = true,
-                        default = "0",
-                    )
-                    action { ctx ->
-                        val index = ctx.argument("index").toIntOrNull() ?: 0
-                        val entry = if (index <= 0) CommandHistory.last() else CommandHistory.get(index)
-                        if (entry == null) {
-                            println("No command history.")
-                            return@action
-                        }
-                        val app = ctx.app ?: return@action
-                        println("Replaying: ${entry.args.joinToString(" ")}")
-                        val replayArgs = CommandHistory.replayArgs(entry).toTypedArray()
-                        if (replayArgs.size >= 2 && replayArgs[0] == "pipe" && replayArgs[1] == "run") {
-                            pipeCommandArgs.set(replayArgs.copyOfRange(2, replayArgs.size))
-                        }
-                        if (replayArgs.size >= 2 && replayArgs[0] == "parallel" && replayArgs[1] == "run") {
-                            parallelCommandArgs.set(replayArgs.copyOfRange(2, replayArgs.size))
-                        }
-                        if (replayArgs.size >= 2 && replayArgs[0] == "watch" && replayArgs[1] == "run") {
-                            watchCommandArgs.set(replayArgs.copyOfRange(2, replayArgs.size))
-                        }
-                        val exitCode = CommandHistory.withSuppressedRecording {
-                            app.runForTest(replayArgs)
-                        }
-                        if (exitCode != 0) {
-                            System.err.println("Replay failed (exit $exitCode)")
-                            throw RuntimeException("Replay failed (exit $exitCode)")
-                        }
-                    }
-                }
-                command(name = "clear", description = "Clear command history") {
-                    action { _ ->
-                        CommandHistory.clear()
-                        println("Command history cleared.")
-                    }
-                }
-            }
-
-            group(name = "undo", description = "Undo last recorded action") {
-                command(name = "run", description = "Undo the most recent undoable command") {
-                    action { ctx ->
-                        val entry = UndoManager.peekUndo()
-                        if (entry == null) {
-                            println("Nothing to undo.")
-                            return@action
-                        }
-                        println("Undoing: ${entry.description}")
-                        val app = ctx.app ?: return@action
-                        val exitCode = UndoManager.withSuppressedRecording {
-                            app.runForTest(entry.undoArgs.toTypedArray())
-                        }
-                        if (exitCode == 0) {
-                            UndoManager.popUndo()
-                            println("Undo complete.")
-                        } else {
-                            System.err.println("Undo failed (exit $exitCode) — action was not undone.")
-                        }
-                    }
-                }
-                command(name = "history", description = "Show undo/redo history") {
-                    action { _ ->
-                        val undos = UndoManager.undoHistory()
-                        val redos = UndoManager.redoHistory()
-                        if (undos.isEmpty() && redos.isEmpty()) {
-                            println("No history recorded.")
-                            return@action
-                        }
-                        if (undos.isNotEmpty()) {
-                            println("Undo stack (oldest → newest):")
-                            undos.forEachIndexed { i, e -> println("  ${i + 1}. ${e.description}") }
-                        }
-                        if (redos.isNotEmpty()) {
-                            println("Redo stack:")
-                            redos.asReversed().forEachIndexed { i, e -> println("  ${i + 1}. ${e.description}") }
-                        }
-                    }
-                }
-            }
-
-            group(name = "redo", description = "Redo last undone action") {
-                command(name = "run", description = "Redo the most recently undone command") {
-                    action { ctx ->
-                        val entry = UndoManager.peekRedo()
-                        if (entry == null) {
-                            println("Nothing to redo.")
-                            return@action
-                        }
-                        println("Redoing: ${entry.description}")
-                        val app = ctx.app ?: return@action
-                        val exitCode = UndoManager.withSuppressedRecording {
-                            app.runForTest(entry.redoArgs.toTypedArray())
-                        }
-                        if (exitCode == 0) {
-                            UndoManager.popRedo()
-                            println("Redo complete.")
-                        } else {
-                            System.err.println("Redo failed (exit $exitCode) — action was not redone.")
-                        }
-                    }
-                }
-            }
-
-            group(name = "file", description = "File operations") {
-                aliases("f")
-                use(AuditMiddleware())
-                command(name = "create", description = "Create a new file") {
-                    aliases("c")
-                    argument("path", "File path", required = true)
-                    option("c", "content", "File content", "", true)
-                    option("f", "force", "Overwrite if exists", "", true, persistent = true)
-
-                    preExecute = { ctx ->
-                        val path = ctx.argument("path")
-                        require(path.isNotBlank()) { "Path cannot be empty" }
-                    }
-
-                    postExecute = { ctx ->
-                        System.err.println("File operation completed for ${ctx.argument("path")}")
-                    }
-
-                    action { ctx ->
-                        val path = ctx.argument("path")
-                        val force = ctx.optionBool("force")
-
-                        if (ctx.fs.exists(path) && !force) {
-                            System.err.println("Error: File already exists: $path (use --force to overwrite)")
-                            throw RuntimeException("File already exists")
-                        }
-
-                        val spinner = ctx.spinner("Creating $path")
-                        try {
-                            spinner.tick()
-
-                            var content = ctx.option("content")
-                            if (content.isBlank()) {
-                                content = System.`in`.bufferedReader().readText()
-                            }
-
-                            File(path).parentFile?.let { parent ->
-                                if (!ctx.fs.exists(parent.path)) ctx.fs.createDirectories(parent.path)
-                            }
-                            spinner.tick()
-                            ctx.fs.writeText(path, content)
-                            spinner.finish()
-                            ctx.registerUndo(
-                                "file create $path",
-                                undoArgs = arrayOf("file", "delete", path),
-                                redoArgs = arrayOf("file", "create", path, "-c", content, "-f", "true"),
-                            )
-                        } catch (e: Exception) {
-                            spinner.fail("Failed to create file: ${e.message}")
-                            throw e
-                        }
-                    }
-                }
-
-                command(name = "delete", description = "Delete a file") {
-                    aliases("rm")
-                    use(DeleteGuardMiddleware())
-                    argument("path", "File path", required = true)
-                    action { ctx ->
-                        val path = ctx.argument("path")
-
-                        if (!ctx.fs.exists(path)) {
-                            println("Error: File not found: $path")
-                            return@action
-                        }
-
-                        val originalContent = ctx.fs.readText(path)
-                        val spinner = ctx.spinner("Deleting $path")
-                        spinner.tick()
-                        if (ctx.fs.delete(path)) {
-                            spinner.finish()
-                            ctx.registerUndo(
-                                "file delete $path",
-                                undoArgs = arrayOf("file", "create", path, "-c", originalContent),
-                                redoArgs = arrayOf("file", "delete", path),
-                            )
-                        } else {
-                            spinner.fail("Failed to delete file: $path")
-                        }
-                    }
-                }
-
-                command(name = "read", description = "Read file contents") {
-                    argument("path", "File path", required = true)
-                    action { ctx ->
-                        val path = ctx.argument("path")
-                        val file = File(path)
-
-                        if (!file.exists()) {
-                            println("Error: File not found: $path")
-                            return@action
-                        }
-
-                        val content = file.readText()
-                        println(ctx.render(content))
-                    }
-                }
-            }
-
-            group(name = "dir", description = "Directory operations") {
-                aliases("d")
-                command(name = "list", description = "List directory contents") {
-                    aliases("ls")
-                    argument("path", "Directory path", required = false, optional = true, default = ".")
-                    option("l", "long", "Long format", "", false)
-                    option("a", "all", "Show hidden files", "", false)
-                    option("f", "format", "Output format (plain, json, yaml, toml)", "plain", true, persistent = true)
-                    option("m", "max-size", "Max file size in bytes", "0", true)
-
-                    postExecute = { ctx ->
-                        val path = ctx.argument("path")
-                        val dir = File(path)
-                        val count =
-                            if (dir.isDirectory) {
-                                listDirEntries(dir, ctx.optionBool("all"), ctx.optionInt("max-size")).size
-                            } else {
-                                0
-                            }
-                        System.err.println("listed $count entries in $path")
-                    }
-
-                    action { ctx ->
-                        val path = ctx.argument("path")
-                        val long = ctx.optionBool("long")
-                        val all = ctx.optionBool("all")
-                        val format = ctx.option("format")
-                        val maxSize = ctx.optionInt("max-size")
-                        val dir = File(path)
-
-                        if (!dir.isDirectory) {
-                            println("Error: Not a directory: $path")
-                            return@action
-                        }
-
-                        val files = listDirEntries(dir, all, maxSize)
-
-                        val bar = ctx.progressBar(total = files.size, label = "Scanning")
-                        val entries =
-                            files.map { file ->
-                                bar.increment()
-                                mapOf(
-                                    "name" to file.name,
-                                    "size" to file.length(),
-                                    "isDirectory" to file.isDirectory,
-                                )
-                            }
-                        bar.finish()
-
-                        if (format == "plain") {
-                            if (long) {
-                                println("Directory: $path")
-                                entries.forEach { entry ->
-                                    val size = if (entry["isDirectory"] == true) " " else "${entry["size"]} B"
-                                    val type = if (entry["isDirectory"] == true) "d" else "-"
-                                    println("$type $size ${entry["name"]} ")
-                                }
-                            } else {
-                                println("Directory: $path")
-                                entries.forEach { entry -> println(" ${entry["name"]} ") }
-                            }
-                        } else {
-                            val strategy = OutputStrategy.byName(format)
-                            println(strategy.render(entries))
-                        }
-                    }
-                }
-
-                command(name = "create", description = "Create a new directory") {
-                    argument("path", "Directory path", required = true)
-                    option("p", "parents", "Create parent directories", "", false)
-                    action { ctx ->
-                        val path = ctx.argument("path")
-
-                        if (ctx.fs.exists(path)) {
-                            println("Error: Directory already exists: $path")
-                            return@action
-                        }
-
-                        val spinner = ctx.spinner("Creating directory $path")
-                        try {
-                            spinner.tick()
-                            ctx.fs.createDirectories(path)
-                            spinner.finish()
-                        } catch (e: Exception) {
-                            spinner.fail("Failed to create directory: ${e.message}")
-                        }
-                    }
-                }
-            }
-
-            group(name = "proc", description = "Process monitoring and control") {
-                command(name = "list", description = "List running processes") {
-                    aliases("ls", "ps")
-                    option("n", "name", "Filter by process name", "", true)
-                    option("m", "min-cpu-ms", "Min CPU time in ms", "0", true)
-                    option("f", "format", "Output format (plain,json)", "plain", true)
-
-                    action { ctx ->
-                        val nameFilter = ctx.option("name")
-                        val minCpuMs = ctx.optionLong("min-cpu-ms")
-                        val format = ctx.option("format")
-
-                        fun shortName(full: String): String =
-                            full.substringAfterLast('\\').substringAfterLast('/').ifBlank { "unknown" }
-
-                        val processes = ProcessHandle.allProcesses().asSequence()
-                            .map {
-                                val info = it.info()
-                                val commandLine = info.commandLine().orElse(info.command().orElse(""))
-                                mapOf(
-                                    "pid" to it.pid(),
-                                    "name" to shortName(info.command().orElse("") ?: ""),
-                                    "commandLine" to commandLine,
-                                    "cpuMs" to info.totalCpuDuration().map { d -> d.toMillis() }.orElse(0L),
-                                )
-                            }
-                            .filter { entry ->
-                                nameFilter.isBlank() ||
-                                    (entry["name"] as String).contains(nameFilter, ignoreCase = true) ||
-                                    (entry["commandLine"] as String).contains(nameFilter, ignoreCase = true)
-                            }
-                            .filter { (it["cpuMs"] as Long) >= minCpuMs }
-                            .sortedByDescending { it["cpuMs"] as Long }
-                            .toList()
-
-                        if (format == "json") {
-                            println(ctx.render(processes))
-                        } else {
-                            println("PID      NAME                    CPU(ms)")
-                            processes.forEach { p ->
-                                println("${p["pid"]}".padEnd(8) + "${p["name"]}".padEnd(24) + "${p["cpuMs"]}")
-                            }
-                        }
-                    }
-                }
-
-                command(name = "kill", description = "Terminate a process by PID or name") {
-                    argument("target", "PID or process name", required = true)
-                    option("f", "force", "Force kill (SIGKILL)", "", false)
-
-                    action { ctx ->
-                        val target = ctx.argument("target")
-                        val force = ctx.optionBool("force")
-
-                        val process = if (target.all { it.isDigit() }) {
-                            ProcessHandle.of(target.toLong()).orElse(null)
-                        } else {
-                            ProcessHandle.allProcesses().asSequence().firstOrNull {
-                                (it.info().commandLine().orElse("") ?: "").contains(target, ignoreCase = true)
-                            }
-                        }
-
-                        if (process == null) {
-                            println("Error: Process not found: $target")
-                            return@action
-                        }
-
-                        val spinner = ctx.spinner("Terminating ${process.info().command().orElse("unknown")}")
-                        spinner.tick()
-                        val killed = if (force) process.destroyForcibly() else process.destroy()
-                        if (killed) {
-                            spinner.finish("Process terminated: ${process.pid()}")
-                        } else {
-                            spinner.fail("Failed to terminate: ${process.pid()}")
-                        }
-                    }
-                }
-            }
-
-            group(name = "net", description = "Network diagnostics and utilities") {
-                command(name = "ping", description = "Test connectivity to host") {
-                    argument("host", "Hostname or IP", required = true)
-                    option("c", "count", "Number of pings", "4", true)
-                    option("t", "timeout", "Timeout ms", "1000", true)
-
-                    action { ctx ->
-                        val host = ctx.argument("host")
-                        val count = ctx.optionInt("count")
-                        val timeout = ctx.optionInt("timeout")
-
-                        val spinner = ctx.spinner("Pinging $host")
-                        val results = mutableListOf<Map<String, Any>>()
-
-                        repeat(count) { i ->
-                            spinner.tick()
-                            val reachable = InetAddress.getByName(host).isReachable(timeout)
-                            results.add(
-                                mapOf(
-                                    "seq" to (i + 1),
-                                    "reachable" to reachable,
-                                    "time_ms" to (if (reachable) (10..200).random() else -1),
-                                ),
-                            )
-                            Thread.sleep(200)
-                        }
-
-                        spinner.finish()
-                        println("Host: $host")
-                        results.forEach { r ->
-                            val status = if (r["reachable"] as Boolean) "OK" else "TIMEOUT"
-                            println("  ${r["seq"]}: $status (${r["time_ms"]}ms)")
-                        }
-                    }
-                }
-
-                command(name = "port", description = "Check if port is open on host") {
-                    argument("host", "Hostname or IP", required = true)
-                    argument("port", "Port number", required = true)
-                    option("t", "timeout", "Timeout ms", "1000", true)
-
-                    action { ctx ->
-                        val host = ctx.argument("host")
-                        val port = ctx.argumentInt("port")
-
-                        val spinner = ctx.spinner("Checking $host:$port")
-                        spinner.tick()
-
-                        val reachable = try {
-                            Socket(host, port).use { true }
-                        } catch (_: Exception) {
-                            false
-                        }
-
-                        if (reachable) {
-                            spinner.finish("Port OPEN: $host:$port")
-                        } else {
-                            spinner.fail("Port CLOSED: $host:$port")
-                        }
-                    }
-                }
-            }
-
-            group(name = "env", description = "Environment variable management") {
-                command(name = "list", description = "List environment variables") {
-                    option("n", "name", "Filter by variable name", "", true)
-                    option("s", "scope", "Scope: user, machine, process", "process", true)
-
-                    action { ctx ->
-                        val nameFilter = ctx.option("name")
-                        val scope = ctx.option("scope")
-
-                        val vars = when (scope) {
-                            "user" -> System.getenv()
-                            "machine" -> System.getenv()
-                            else -> System.getenv()
-                        }.filter { nameFilter.isBlank() || it.key.contains(nameFilter, ignoreCase = true) }
-
-                        println("Scope: $scope")
-                        vars.entries.sortedBy { it.key }.forEach { (k, v) ->
-                            println("  $k=$v")
-                        }
-                    }
-                }
-
-                command(name = "set", description = "Set environment variable") {
-                    argument("name", "Variable name", required = true)
-                    argument("value", "Variable value", required = true)
-                    option("s", "scope", "Scope: user, machine, process", "process", true)
-                    option("p", "permanent", "Make permanent (requires admin for machine)", "", false)
-
-                    action { ctx ->
-                        val name = ctx.argument("name")
-                        val value = ctx.argument("value")
-                        val scope = ctx.option("scope")
-
-                        if (scope == "process") {
-                            System.setProperty(name, value)
-                            println("Set (process): $name=$value")
-                        } else {
-                            println("Note: Permanent env vars require PowerShell interop or native calls")
-                            println("Suggestion: laret env set --scope process for current session")
-                        }
-                    }
-                }
-            }
-
-            group(name = "sys", description = "System information and metrics") {
-                command(name = "info", description = "Show system overview") {
-                    action { _ ->
-                        val os = System.getProperty("os.name")
-                        val arch = System.getProperty("os.arch")
-                        val javaVer = System.getProperty("java.version")
-                        val cpus = Runtime.getRuntime().availableProcessors()
-                        val maxMem = Runtime.getRuntime().maxMemory() / 1024 / 1024
-                        val usedMem =
-                            (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) /
-                                1024 /
-                                1024
-
-                        println("OS: $os ($arch)")
-                        println("Java: $javaVer")
-                        println("CPUs: $cpus")
-                        println("Memory: ${usedMem}MB / ${maxMem}MB used")
-
-                        val percent = (usedMem.toDouble() / maxMem * 100).toInt().coerceIn(0, 100)
-                        val filled = percent / 5
-                        val fillChar = UnicodeSupport.pick("█", "#")
-                        val emptyChar = UnicodeSupport.pick("░", "-")
-                        val bar = fillChar.repeat(filled) + emptyChar.repeat(20 - filled)
-                        println("Usage: [$bar] $percent%")
-                    }
-                }
-
-                command(
-                    name = "sleep",
-                    description = "Sleep N seconds; demonstrates graceful shutdown cleanup on SIGINT/SIGTERM",
-                ) {
-                    option("s", "seconds", "Seconds to sleep", "30", true)
-                    option("m", "marker", "File to write when shutdown cleanup runs", "", true)
-                    action { ctx ->
-                        val seconds = ctx.optionInt("seconds").coerceAtLeast(1)
-                        val marker = ctx.option("marker")
-                        val stopped = java.util.concurrent.CountDownLatch(1)
-
-                        ctx.onShutdown {
-                            if (marker.isNotBlank()) File(marker).writeText("cleaned\n")
-                            System.err.println("sys sleep: shutdown cleanup ran")
-                            stopped.countDown()
-                        }
-
-                        println("Sleeping ${seconds}s (pid ${ProcessHandle.current().pid()})")
-                        System.out.flush()
-
-                        val interrupted = stopped.await(seconds.toLong(), java.util.concurrent.TimeUnit.SECONDS)
-                        if (interrupted) {
-                            System.err.println("sys sleep: interrupted before ${seconds}s")
-                            ctx.exit(130)
-                        } else {
-                            println("sys sleep: completed after ${seconds}s")
-                        }
-                    }
-                }
-            }
-
-            group(name = "check", description = "Argument and option validation demo") {
-                command(
-                    name = "run",
-                    description = "Validate inputs against the validation DSL and echo them when all rules pass",
-                ) {
-                    argument("port", "Port number (1-65535)", required = true) { range(1, 65535) }
-                    option("e", "email", "Contact email", "", true) { regex("^[^@]+@[^@]+\\.[^@]+$") }
-                    option("f", "format", "Output format (json, yaml, text)", "", true) {
-                        oneOf("json", "yaml", "text")
-                    }
-                    option("i", "input", "Path to an existing input file", "", true) { fileExists() }
-                    option("j", "json", "JSON output", "", false)
-                    option("y", "yaml", "YAML output", "", false)
-                    mutuallyExclusive("json", "yaml")
-
-                    action { ctx ->
-                        println("check ok: port=${ctx.argument("port")}")
-                    }
-                }
-            }
-
-            group(name = "fmt", description = "Data transformation and formatting") {
-                command(name = "json", description = "Parse and format JSON from stdin") {
-                    option("q", "query", "JQ-like path query (simple: .items[0].name)", "", true)
-                    option("c", "compact", "Compact output", "", false)
-
-                    action { ctx ->
-                        val compact = ctx.optionBool("compact")
-
-                        val input = System.`in`.bufferedReader().readText()
-                        if (input.isBlank()) {
-                            println("Error: No input provided via stdin")
-                            return@action
-                        }
-
-                        try {
-                            val formatted = if (compact) input else input
-                            println(formatted)
-                        } catch (e: Exception) {
-                            println("Error parsing JSON: ${e.message}")
-                        }
+        }
+
+        command(name = "list", description = "List installed sidecar plugins") {
+            option("d", "plugin-dir", "Plugin directory override")
+            action { ctx ->
+                val app = ctx.app ?: return@action
+                val entries = io.github.laretframework.plugin.runtime.PluginCatalog(
+                    app.pluginDirectories(ctx.option("plugin-dir").takeIf { it.isNotBlank() }?.let(Path::of)),
+                    app.getPluginConfig(),
+                ).refresh()
+                if (entries.isEmpty()) {
+                    println("No plugins installed")
+                } else {
+                    entries.forEach { entry ->
+                        val reason = entry.reason?.let { " ($it)" }.orEmpty()
+                        println("${entry.name}\t${entry.status.name.lowercase()}$reason")
                     }
                 }
             }
         }
 
+        command(name = "remove", description = "Remove an installed sidecar plugin") {
+            argument("name", "Plugin name")
+            option("d", "plugin-dir", "Plugin directory override")
+            option("f", "force", "Remove without confirmation", takesValue = false)
+            action { ctx ->
+                val app = ctx.app ?: return@action
+                val name = ctx.argument("name")
+                val force = ctx.optionBool("force")
+                val confirmed = force ||
+                    (ctx.isInteractive() && ctx.prompt().confirm("Remove plugin '$name'?", false))
+                if (!confirmed) {
+                    System.err.println("Removal not confirmed; use --force for non-interactive removal")
+                    return@action
+                }
+                val catalog = io.github.laretframework.plugin.runtime.PluginCatalog(
+                    app.pluginDirectories(ctx.option("plugin-dir").takeIf { it.isNotBlank() }?.let(Path::of)),
+                    app.getPluginConfig(),
+                )
+                catalog.refresh()
+                catalog.remove(name, force).fold(
+                    onSuccess = {
+                        app.refreshSidecarPlugins()
+                        println("Plugin removed: $name")
+                    },
+                    onFailure = { error ->
+                        throw IllegalStateException(
+                            "Plugin remove failed: ${error.message}",
+                            error,
+                        )
+                    },
+                )
+            }
+        }
+    }
+    group(name = "schema", description = "LLM schema export") {
+        command(name = "export", description = "Export commands as an LLM function-calling schema") {
+            option("f", "format", "Schema dialect: openai or anthropic", "openai", true)
+            option("o", "output", "Write schema to file instead of stdout", "", true)
+
+            action { ctx ->
+                val formatId = ctx.option("format").ifBlank { "openai" }
+                val format = SchemaFormat.fromId(formatId)
+                    ?: run {
+                        System.err.println("Unsupported schema format: $formatId")
+                        return@action
+                    }
+                val output = ctx.option("output").takeIf { it.isNotBlank() }?.let { File(it) }
+                val schema = SchemaExportCommand(ctx.app!!).export(format, output)
+                if (output == null) print(schema)
+            }
+        }
+    }
+
+    group(name = "mcp", description = "Model Context Protocol server") {
+        McpServeCommand.register(this)
+    }
+
+    group(name = "bench", description = "Concurrency benchmark payloads") {
+        hidden()
+        BenchCommands.register(this)
+    }
+
+    group(name = "doc", description = "Documentation generation") {
+        command(name = "generate", description = "Generate command docs (Markdown or man pages)") {
+            option(
+                "f",
+                "format",
+                "Output format: md or man",
+                "md",
+                true,
+                completer = StaticCompleter("md", "man"),
+            )
+            option(
+                "l",
+                "lang",
+                "Language: en, es, or all",
+                "en",
+                true,
+                completer = StaticCompleter("en", "es", "all"),
+            )
+            option("o", "output-dir", "Output directory", "docs", true)
+            option("s", "strict", "Fail on missing files, broken see_also links, or orphans", "", false)
+            option("H", "include-hidden", "Document hidden commands with an [INTERNAL] badge", "", false)
+
+            action { ctx ->
+                val app = ctx.app ?: return@action
+                val formatId = ctx.option("format").ifBlank { "md" }
+                val format = DocFormat.fromId(formatId)
+                    ?: run {
+                        System.err.println("Unsupported format: $formatId (use md or man)")
+                        return@action
+                    }
+                val lang = ctx.option("lang").ifBlank { "en" }
+                val outputDir = File(ctx.option("output-dir").ifBlank { "docs" }).toPath()
+
+                try {
+                    val written = DocGenerateCommand(app).run(
+                        format = format,
+                        lang = lang,
+                        outputDir = outputDir,
+                        strict = ctx.optionBool("strict"),
+                        includeHidden = ctx.optionBool("include-hidden"),
+                    )
+                    written.forEach { println("created: $it") }
+                    println("Generated ${written.size} doc file(s) in $outputDir")
+                } catch (e: DocValidationException) {
+                    System.err.println(e.message)
+                    exitProcess(1)
+                }
+            }
+        }
+
+        command(name = "scaffold", description = "Create missing prose skeletons for every command") {
+            option("l", "lang", "Language directory to scaffold", "en", true)
+            option("o", "output-dir", "Output directory", "src/main/resources/docs", true)
+            option("H", "include-hidden", "Scaffold hidden commands too", "", false)
+
+            action { ctx ->
+                val app = ctx.app ?: return@action
+                val lang = ctx.option("lang").ifBlank { "en" }
+                val outputDir = File(ctx.option("output-dir").ifBlank { "src/main/resources/docs" }).toPath()
+
+                val created = DocScaffoldCommand(app, ctx.fs).run(
+                    lang = lang,
+                    outputDir = outputDir,
+                    includeHidden = ctx.optionBool("include-hidden"),
+                )
+                created.forEach { println("scaffolded: $it") }
+                println("Created ${created.size} skeleton(s) in $outputDir")
+            }
+        }
+
+        command(name = "guide", description = "Scaffold a standalone guide page (e.g. installation)") {
+            argument("name", "Guide name/slug (e.g. quick-start)", required = true)
+            option("l", "lang", "Language directory (blank for language-neutral)", "en", true)
+            option("o", "output-dir", "Docs directory", "docs", true)
+
+            action { ctx ->
+                val name = ctx.argument("name")
+                if (name.isBlank()) {
+                    System.err.println("Usage: laret doc guide <name>")
+                    return@action
+                }
+                val lang = ctx.option("lang").takeIf { it.isNotBlank() }
+                val outputDir = File(ctx.option("output-dir").ifBlank { "docs" }).toPath()
+                val guide = DocGuideCommand(ctx.fs)
+
+                if (guide.exists(name, outputDir, lang)) {
+                    println("Guide already exists; leaving it untouched.")
+                    return@action
+                }
+                val written = guide.create(name, outputDir, lang)
+                println("created: $written")
+            }
+        }
+
+        command(name = "index", description = "Generate docs/index.md landing page from README.md") {
+            option("r", "readme", "Path to the source README", "README.md", true)
+            option("l", "lang", "Language directory (blank for a language-neutral index)", "", true)
+            option("o", "output-dir", "Docs directory", "docs", true)
+            option("t", "title", "Landing-page title", "Laret", true)
+
+            action { ctx ->
+                val readme = File(ctx.option("readme").ifBlank { "README.md" }).toPath()
+                if (!ctx.fs.exists(readme)) {
+                    System.err.println("README not found: $readme")
+                    return@action
+                }
+                val lang = ctx.option("lang").takeIf { it.isNotBlank() }
+                val outputDir = File(ctx.option("output-dir").ifBlank { "docs" }).toPath()
+                val title = ctx.option("title").ifBlank { "Laret" }
+
+                val written = DocIndexCommand(ctx.fs).fromReadme(readme, outputDir, lang, title)
+                println("created: $written")
+            }
+        }
+    }
+
+    group(name = "update", description = "Self-update the laret binary") {
+        command(name = "check", description = "Check whether a newer release is available") {
+            action { ctx ->
+                val result = UpdateCommand(ctx.app!!).check()
+                result.fold(
+                    onSuccess = { info ->
+                        println("Current version: ${info.currentVersion}")
+                        println("Latest release : ${info.latestVersion}")
+                        if (info.updateAvailable) {
+                            println("Update available. Run: laret update run")
+                        } else {
+                            println("Already up to date.")
+                        }
+                    },
+                    onFailure = { e ->
+                        System.err.println("Update check failed: ${e.message}")
+                        throw RuntimeException("Update check failed", e)
+                    },
+                )
+            }
+        }
+
+        command(name = "run", description = "Download and install the latest release") {
+            option("f", "force", "Install even when not newer than current", "", false)
+            action { ctx ->
+                val result = UpdateCommand(ctx.app!!).execute(force = ctx.optionBool("force"))
+                result.fold(
+                    onSuccess = { path ->
+                        println("Updated binary installed at $path")
+                        println("The new version takes effect on next launch.")
+                    },
+                    onFailure = { e ->
+                        System.err.println("Update failed: ${e.message}")
+                        throw RuntimeException("Update failed", e)
+                    },
+                )
+            }
+        }
+    }
+
+    group(name = "new", description = "Scaffold a new Laret CLI project") {
+        command(name = "project", description = "Run interactive wizard and write project files") {
+            option("d", "dir", "Target directory (default: ./<project-name>)", "", true)
+            option("y", "yes", "Skip wizard and use defaults", "", false)
+            option("n", "name", "Project name (used with --yes)", "my-cli", true)
+            option("p", "package", "Package name (used with --yes)", "com.example.mycli", true)
+
+            action { ctx ->
+                val config = if (ctx.optionBool("yes")) {
+                    ScaffoldConfig(
+                        projectName = ctx.option("name"),
+                        packageName = ctx.option("package"),
+                        appName = ctx.option("name"),
+                        laretVersion = InteractiveWizard.DEFAULT_LARET_VERSION,
+                        modules = Module.entries.toSet(),
+                        shellTests = ShellTarget.entries.toSet(),
+                        graalvm = false,
+                    )
+                } else {
+                    InteractiveWizard().runWizard()
+                }
+
+                val targetDir = ctx.option("dir").ifBlank { config.projectName }
+                val root = File(targetDir).toPath()
+
+                System.err.println("Generating ${config.projectName} in $root")
+                val result = runBlocking { ProjectGenerator().generate(config, root) }
+                result.written.forEach { println("created: $it") }
+                if (result.failures.isNotEmpty()) {
+                    result.failures.forEach { System.err.println("error: ${it.message}") }
+                    throw RuntimeException("Scaffold completed with ${result.failures.size} failure(s)")
+                }
+                println("Done. Next: cd $targetDir && ./gradlew run")
+            }
+        }
+    }
+
+    group(name = "echo", description = "Echo text to stdout (pipe demo)") {
+        command(name = "print", description = "Print text") {
+            argument("text", "Text to print", required = false, optional = true, default = "")
+            action { ctx -> print(ctx.argument("text")) }
+        }
+    }
+
+    group(name = "upper", description = "Text transformation (pipe demo)") {
+        command(name = "convert", description = "Convert text to uppercase") {
+            argument(
+                "text",
+                "Text to convert (use - to read from previous stage)",
+                required = false,
+                optional = true,
+                default = "",
+            )
+            action { ctx ->
+                val input = ctx.argument("text").ifEmpty { CommandPipeline.captureStdin() }
+                print(input.uppercase())
+            }
+        }
+    }
+
+    group(name = "pipe", description = "Command piping") {
+        command(name = "run", description = "Run a pipeline of laret commands separated by --- or |") {
+            action { ctx ->
+                val app = ctx.app ?: return@action
+
+                val rawArgs = pipeCommandArgs.get() ?: emptyArray()
+                if (rawArgs.isEmpty()) {
+                    println(Localization.t("pipe.empty"))
+                    return@action
+                }
+                val pipeline = CommandPipeline(app)
+                val stages = pipeline.splitStages(rawArgs)
+                if (stages.isEmpty()) {
+                    println(Localization.t("pipe.empty"))
+                    return@action
+                }
+                System.err.println(Localization.t("pipe.started", stages.size))
+                val result = pipeline.executeResult(stages, dryRun = ctx.isDryRun)
+                result.failedStage?.let { stageIndex ->
+                    val commandLine = stages[stageIndex - 1].joinToString(" ")
+                    System.err.println(
+                        "Pipeline stage $stageIndex failed with exit code ${result.exitCode}: $commandLine",
+                    )
+                }
+                ctx.exit(result.exitCode)
+            }
+        }
+    }
+
+    group(name = "parallel", description = "Execute commands concurrently") {
+        command(name = "run", description = "Run multiple commands in parallel") {
+            argument("stages", "Commands separated by ---", required = false, optional = true)
+            option("j", "jobs", "Maximum concurrent commands (1..16)", "4", true)
+            option("q", "quiet", "Suppress per-task output", "", false)
+
+            action { ctx ->
+                val rawArgs = parallelCommandArgs.get() ?: emptyArray()
+                val (tokens, jobsFromRaw, quietFromRaw) = parseParallelRunArgs(rawArgs)
+                val jobs = (jobsFromRaw ?: ctx.optionInt("jobs").takeIf { it > 0 } ?: 4).coerceIn(1, 16)
+                val quiet = quietFromRaw || ctx.optionBool("quiet")
+                val tasks = parseParallelTasks(tokens)
+
+                if (tasks.isEmpty()) {
+                    println("No parallel tasks provided")
+                    return@action
+                }
+
+                val results = runBlocking {
+                    ParallelDispatcher.execute(tasks, jobs) { task, line, isStderr ->
+                        if (!quiet) {
+                            val stream = if (isStderr) System.err else System.out
+                            stream.println("[${task.command}] $line")
+                        }
+                    }
+                }
+
+                val failed = results.filter { it.exitCode != 0 }
+                println("Parallel summary: ${results.size} task(s), ${failed.size} failed")
+                results.forEachIndexed { index, result ->
+                    val commandLine = (listOf(result.task.command) + result.task.args).joinToString(" ")
+                    println(
+                        "${index + 1}. exit=${result.exitCode} " +
+                            "stdout=${result.stdout.size} stderr=${result.stderr.size} :: $commandLine",
+                    )
+                }
+                failed.firstOrNull()?.let {
+                    System.err.println("First failure: ${it.task.command} exited with ${it.exitCode}")
+                }
+            }
+        }
+    }
+
+    group(name = "watch", description = "Watch a directory for filesystem changes") {
+        command(name = "run", description = "Watch <path> and emit CREATE/MODIFY/DELETE events to stdout") {
+            argument("path", "Directory to watch", required = false, optional = true)
+            option("d", "duration", "Stop after N seconds (0 = run until interrupted)", "0", true)
+            option("r", "recursive", "Watch subdirectories", "", false)
+            option("n", "max-events", "Stop after N events (0 = unlimited)", "0", true)
+            option(
+                "e",
+                "events",
+                "Comma-separated event filter (create,modify,delete). Default: all",
+                "",
+                true,
+            )
+
+            action { ctx ->
+                val rawArgs = watchCommandArgs.get() ?: emptyArray()
+                val parsed = parseWatchRunArgs(rawArgs)
+
+                val path = parsed.path ?: run {
+                    System.err.println(Localization.t("watch.path.required"))
+                    return@action
+                }
+
+                val dir = File(path)
+                if (!dir.isDirectory) {
+                    System.err.println(Localization.t("watch.not.a.directory", path))
+                    return@action
+                }
+
+                val duration = parsed.duration ?: ctx.optionLong("duration").coerceAtLeast(0)
+                val recursive = parsed.recursive || ctx.optionBool("recursive")
+                val maxEvents = parsed.maxEvents ?: ctx.optionInt("max-events").coerceAtLeast(0)
+                val accepted = parseEventFilter(parsed.events ?: ctx.option("events"))
+
+                val options = WatchOptions(
+                    recursive = recursive,
+                    durationSeconds = duration,
+                    maxEvents = maxEvents,
+                    acceptedTypes = accepted,
+                )
+
+                System.err.println(
+                    Localization.t("watch.started", dir.absolutePath, recursive, duration, maxEvents),
+                )
+
+                val watcher = DirectoryWatcher(dir.toPath(), options)
+                val summary = watcher.watch { event ->
+                    println("${event.type}\t${event.path.toAbsolutePath()}")
+                }
+
+                System.err.println(
+                    Localization.t("watch.stopped", summary.emittedEvents, summary.stopReason.name),
+                )
+            }
+        }
+
+        command(
+            name = "live",
+            description = "Watch <path> for glob-matched changes and re-run a command after `--`",
+        ) {
+            argument("path", "Directory to watch", required = false, optional = true)
+            option("p", "pattern", "Glob to watch; repeatable; '!' prefix excludes (e.g. '**/*.kt')", "", true)
+            option("b", "debounce", "Debounce window in milliseconds", "", true)
+            option("m", "max-restarts", "Stop after N total runs (0 = unlimited)", "", true)
+            option("x", "max-consecutive-failures", "Stop after N back-to-back failures (0 = off)", "", true)
+
+            action { ctx -> runWatchLive(ctx) }
+        }
+    }
+
+    group(name = "diff", description = "Compare files line by line") {
+        command(name = "run", description = "Show differences between two text files") {
+            argument("old-file", "Original file path", required = true)
+            argument("new-file", "Modified file path", required = true)
+            option("f", "format", "Output format (unified, plain, json)", "unified", true)
+            option("w", "ignore-whitespace", "Ignore leading/trailing whitespace differences", "", false)
+            option("c", "context", "Lines of context around each change", "3", true)
+
+            action { ctx ->
+                val oldFile = File(ctx.argument("old-file"))
+                val newFile = File(ctx.argument("new-file"))
+
+                if (!oldFile.exists()) {
+                    System.err.println(Localization.t("diff.file.not.found", oldFile.path))
+                    return@action
+                }
+                if (!newFile.exists()) {
+                    System.err.println(Localization.t("diff.file.not.found", newFile.path))
+                    return@action
+                }
+
+                val formatId = ctx.option("format").ifBlank { "unified" }
+                val format = DiffFormat.fromId(formatId) ?: run {
+                    System.err.println(Localization.t("diff.format.unknown", formatId))
+                    return@action
+                }
+
+                val result = diffFiles(
+                    oldFile.toPath(),
+                    newFile.toPath(),
+                    ignoreWhitespace = ctx.optionBool("ignore-whitespace"),
+                    contextLines = ctx.optionInt("context").coerceAtLeast(0),
+                )
+
+                val rendered = when (format) {
+                    DiffFormat.UNIFIED -> UnifiedFormatter().render(result)
+                    DiffFormat.PLAIN -> PlainFormatter().render(result)
+                    DiffFormat.JSON -> JsonDiffFormatter().render(result)
+                }
+                if (rendered.isNotEmpty()) {
+                    print(rendered)
+                    if (!rendered.endsWith("\n")) println()
+                }
+            }
+        }
+    }
+
+    group(name = "stats", description = "Command-execution metrics") {
+        command(
+            name = "show",
+            description = "Print collected metrics (default format: prometheus)",
+        ) {
+            option(
+                "f",
+                "format",
+                "Output format (prometheus, json, plain)",
+                "prometheus",
+                true,
+            )
+            option("r", "reset", "Reset metrics after printing", "", false)
+
+            action { ctx ->
+                val formatId = ctx.option("format").ifBlank { "prometheus" }
+                val format = StatsFormat.fromId(formatId) ?: run {
+                    System.err.println(
+                        Localization.t("stats.format.unknown", formatId),
+                    )
+                    return@action
+                }
+
+                val snapshot = StatsCollector.snapshot()
+                val rendered = when (format) {
+                    StatsFormat.PROMETHEUS -> PrometheusFormatter().render(snapshot)
+                    StatsFormat.JSON -> JsonStatsFormatter().render(snapshot)
+                    StatsFormat.PLAIN -> PlainStatsFormatter().render(snapshot)
+                }
+                print(rendered)
+                if (!rendered.endsWith("\n")) println()
+
+                if (ctx.optionBool("reset")) {
+                    StatsCollector.reset()
+                    System.err.println(Localization.t("stats.reset.done"))
+                }
+            }
+        }
+
+        command(name = "reset", description = "Reset all collected metrics") {
+            action { _ ->
+                StatsCollector.reset()
+                println(Localization.t("stats.reset.done"))
+            }
+        }
+    }
+
+    group(name = "locale", description = "Manage interface locale") {
+        command(name = "show", description = "Print the active locale tag") {
+            option("v", "verbose", "Also show the source of the active locale", "", false)
+            action { ctx ->
+                println(Localization.getLocale().toString())
+                if (ctx.optionBool("verbose")) {
+                    println("Source: ${Localization.localeSource()}")
+                }
+            }
+        }
+        command(name = "set", description = "Set and persist locale for all future sessions") {
+            argument("tag", "Locale tag (e.g. es, en_US, fr_FR)", required = true)
+            action { ctx ->
+                val tag = ctx.argument("tag")
+                if (!Localization.isValidLocaleTag(tag)) {
+                    System.err.println(Localization.t("locale.invalid.tag", tag))
+                    return@action
+                }
+                Localization.saveLocale(tag)
+                if (Localization.isLocaleOverriddenByEnv()) {
+                    System.err.println(
+                        Localization.t("locale.env.override.warning", System.getenv("LARET_LOCALE")),
+                    )
+                }
+                println(Localization.t("locale.set.done", tag))
+            }
+        }
+        command(name = "reset", description = "Reset locale to system default") {
+            action { _ ->
+                val futureTag = Localization.resolveAfterClear().toString()
+                val message = Localization.t("locale.reset.done", futureTag)
+                Localization.clearLocale()
+                println(message)
+            }
+        }
+    }
+
+    group(name = "i18n", description = "Localization test commands") {
+        command(name = "hello", description = "Print a localized greeting") {
+            action { _ ->
+                println(Localization.t("app.greeting"))
+            }
+        }
+        command(name = "locale", description = "Print the active locale tag") {
+            action { _ ->
+                println(Localization.getLocale().toString())
+            }
+        }
+    }
+
+    group(name = "prompt", description = "Interactive prompt commands") {
+        command(name = "text", description = "Ask for text input") {
+            argument("question", "Prompt text", required = true)
+            option("d", "default", "Default value", "", true)
+            action { ctx ->
+                val question = ctx.argument("question")
+                val default = ctx.option("default")
+                val result = ctx.prompt().text(question, default)
+                println(result)
+            }
+        }
+
+        command(name = "confirm", description = "Ask a yes/no question") {
+            argument("question", "Prompt text", required = true)
+            option("d", "default", "Default answer (true/false)", "true", true)
+            action { ctx ->
+                val question = ctx.argument("question")
+                val default = ctx.option("default").toBooleanStrictOrNull() ?: true
+                val result = ctx.prompt().confirm(question, default)
+                println(result)
+            }
+        }
+
+        command(name = "select", description = "Select one option from a list") {
+            argument("question", "Prompt text", required = true)
+            option("o", "options", "Comma-separated list of options", "", true)
+            action { ctx ->
+                val question = ctx.argument("question")
+                val options =
+                    ctx
+                        .option("options")
+                        .split(",")
+                        .map { it.trim() }
+                        .filter { it.isNotEmpty() }
+                if (options.isEmpty()) {
+                    println("Error: --options must not be empty")
+                    return@action
+                }
+                val result = ctx.prompt().select(question, options)
+                println(result)
+            }
+        }
+
+        command(name = "multiselect", description = "Select multiple options from a list") {
+            argument("question", "Prompt text", required = true)
+            option("o", "options", "Comma-separated list of options", "", true)
+            action { ctx ->
+                val question = ctx.argument("question")
+                val options =
+                    ctx
+                        .option("options")
+                        .split(",")
+                        .map { it.trim() }
+                        .filter { it.isNotEmpty() }
+                if (options.isEmpty()) {
+                    println("Error: --options must not be empty")
+                    return@action
+                }
+                val results = ctx.prompt().multiSelect(question, options)
+                results.forEach { println(it) }
+            }
+        }
+
+        command(name = "password", description = "Ask for a password") {
+            argument("question", "Prompt text", required = true)
+            action { ctx ->
+                val question = ctx.argument("question")
+                val result = ctx.prompt().password(question)
+                println(result)
+            }
+        }
+    }
+
+    group(name = "history", description = "Command history and replay") {
+        command(name = "show", description = "List recent commands") {
+            option("n", "limit", "Max entries to show", "20", true)
+            action { ctx ->
+                val limit = ctx.optionInt("limit").coerceAtLeast(1)
+                val all = CommandHistory.list()
+                if (all.isEmpty()) {
+                    println("No command history.")
+                    return@action
+                }
+                val start = (all.size - limit).coerceAtLeast(0)
+                val shown = all.subList(start, all.size)
+                shown.forEachIndexed { i, e ->
+                    println("  ${start + i + 1}. ${e.args.joinToString(" ")}")
+                }
+            }
+        }
+        command(
+            name = "replay",
+            description = "Replay a command (default: last). Use index from 'history show'.",
+        ) {
+            argument(
+                "index",
+                "Entry index to replay (0 = last)",
+                required = false,
+                optional = true,
+                default = "0",
+            )
+            action { ctx ->
+                val index = ctx.argument("index").toIntOrNull() ?: 0
+                val entry = if (index <= 0) CommandHistory.last() else CommandHistory.get(index)
+                if (entry == null) {
+                    println("No command history.")
+                    return@action
+                }
+                val app = ctx.app ?: return@action
+                println("Replaying: ${entry.args.joinToString(" ")}")
+                val replayArgs = CommandHistory.replayArgs(entry).toTypedArray()
+                if (replayArgs.size >= 2 && replayArgs[0] == "pipe" && replayArgs[1] == "run") {
+                    pipeCommandArgs.set(replayArgs.copyOfRange(2, replayArgs.size))
+                }
+                if (replayArgs.size >= 2 && replayArgs[0] == "parallel" && replayArgs[1] == "run") {
+                    parallelCommandArgs.set(replayArgs.copyOfRange(2, replayArgs.size))
+                }
+                if (replayArgs.size >= 2 && replayArgs[0] == "watch" && replayArgs[1] == "run") {
+                    watchCommandArgs.set(replayArgs.copyOfRange(2, replayArgs.size))
+                }
+                val exitCode = CommandHistory.withSuppressedRecording {
+                    app.runForTest(replayArgs)
+                }
+                if (exitCode != 0) {
+                    System.err.println("Replay failed (exit $exitCode)")
+                    throw RuntimeException("Replay failed (exit $exitCode)")
+                }
+            }
+        }
+        command(name = "clear", description = "Clear command history") {
+            action { _ ->
+                CommandHistory.clear()
+                println("Command history cleared.")
+            }
+        }
+    }
+
+    group(name = "undo", description = "Undo last recorded action") {
+        command(name = "run", description = "Undo the most recent undoable command") {
+            action { ctx ->
+                val entry = UndoManager.peekUndo()
+                if (entry == null) {
+                    println("Nothing to undo.")
+                    return@action
+                }
+                println("Undoing: ${entry.description}")
+                val app = ctx.app ?: return@action
+                val exitCode = UndoManager.withSuppressedRecording {
+                    app.runForTest(entry.undoArgs.toTypedArray())
+                }
+                if (exitCode == 0) {
+                    UndoManager.popUndo()
+                    println("Undo complete.")
+                } else {
+                    System.err.println("Undo failed (exit $exitCode) — action was not undone.")
+                }
+            }
+        }
+        command(name = "history", description = "Show undo/redo history") {
+            action { _ ->
+                val undos = UndoManager.undoHistory()
+                val redos = UndoManager.redoHistory()
+                if (undos.isEmpty() && redos.isEmpty()) {
+                    println("No history recorded.")
+                    return@action
+                }
+                if (undos.isNotEmpty()) {
+                    println("Undo stack (oldest → newest):")
+                    undos.forEachIndexed { i, e -> println("  ${i + 1}. ${e.description}") }
+                }
+                if (redos.isNotEmpty()) {
+                    println("Redo stack:")
+                    redos.asReversed().forEachIndexed { i, e -> println("  ${i + 1}. ${e.description}") }
+                }
+            }
+        }
+    }
+
+    group(name = "redo", description = "Redo last undone action") {
+        command(name = "run", description = "Redo the most recently undone command") {
+            action { ctx ->
+                val entry = UndoManager.peekRedo()
+                if (entry == null) {
+                    println("Nothing to redo.")
+                    return@action
+                }
+                println("Redoing: ${entry.description}")
+                val app = ctx.app ?: return@action
+                val exitCode = UndoManager.withSuppressedRecording {
+                    app.runForTest(entry.redoArgs.toTypedArray())
+                }
+                if (exitCode == 0) {
+                    UndoManager.popRedo()
+                    println("Redo complete.")
+                } else {
+                    System.err.println("Redo failed (exit $exitCode) — action was not redone.")
+                }
+            }
+        }
+    }
+
+    group(name = "file", description = "File operations") {
+        aliases("f")
+        use(AuditMiddleware())
+        command(name = "create", description = "Create a new file") {
+            aliases("c")
+            argument("path", "File path", required = true)
+            option("c", "content", "File content", "", true)
+            option("f", "force", "Overwrite if exists", "", true, persistent = true)
+
+            preExecute = { ctx ->
+                val path = ctx.argument("path")
+                require(path.isNotBlank()) { "Path cannot be empty" }
+            }
+
+            postExecute = { ctx ->
+                System.err.println("File operation completed for ${ctx.argument("path")}")
+            }
+
+            action { ctx ->
+                val path = ctx.argument("path")
+                val force = ctx.optionBool("force")
+
+                if (ctx.fs.exists(path) && !force) {
+                    System.err.println("Error: File already exists: $path (use --force to overwrite)")
+                    throw RuntimeException("File already exists")
+                }
+
+                val spinner = ctx.spinner("Creating $path")
+                try {
+                    spinner.tick()
+
+                    var content = ctx.option("content")
+                    if (content.isBlank()) {
+                        content = System.`in`.bufferedReader().readText()
+                    }
+
+                    File(path).parentFile?.let { parent ->
+                        if (!ctx.fs.exists(parent.path)) ctx.fs.createDirectories(parent.path)
+                    }
+                    spinner.tick()
+                    ctx.fs.writeText(path, content)
+                    spinner.finish()
+                    ctx.registerUndo(
+                        "file create $path",
+                        undoArgs = arrayOf("file", "delete", path),
+                        redoArgs = arrayOf("file", "create", path, "-c", content, "-f", "true"),
+                    )
+                } catch (e: Exception) {
+                    spinner.fail("Failed to create file: ${e.message}")
+                    throw e
+                }
+            }
+        }
+
+        command(name = "delete", description = "Delete a file") {
+            aliases("rm")
+            use(DeleteGuardMiddleware())
+            argument("path", "File path", required = true)
+            action { ctx ->
+                val path = ctx.argument("path")
+
+                if (!ctx.fs.exists(path)) {
+                    println("Error: File not found: $path")
+                    return@action
+                }
+
+                val originalContent = ctx.fs.readText(path)
+                val spinner = ctx.spinner("Deleting $path")
+                spinner.tick()
+                if (ctx.fs.delete(path)) {
+                    spinner.finish()
+                    ctx.registerUndo(
+                        "file delete $path",
+                        undoArgs = arrayOf("file", "create", path, "-c", originalContent),
+                        redoArgs = arrayOf("file", "delete", path),
+                    )
+                } else {
+                    spinner.fail("Failed to delete file: $path")
+                }
+            }
+        }
+
+        command(name = "read", description = "Read file contents") {
+            argument("path", "File path", required = true)
+            action { ctx ->
+                val path = ctx.argument("path")
+                val file = File(path)
+
+                if (!file.exists()) {
+                    println("Error: File not found: $path")
+                    return@action
+                }
+
+                val content = file.readText()
+                println(ctx.render(content))
+            }
+        }
+    }
+
+    group(name = "dir", description = "Directory operations") {
+        aliases("d")
+        command(name = "list", description = "List directory contents") {
+            aliases("ls")
+            argument("path", "Directory path", required = false, optional = true, default = ".")
+            option("l", "long", "Long format", "", false)
+            option("a", "all", "Show hidden files", "", false)
+            option("f", "format", "Output format (plain, json, yaml, toml)", "plain", true, persistent = true)
+            option("m", "max-size", "Max file size in bytes", "0", true)
+
+            postExecute = { ctx ->
+                val path = ctx.argument("path")
+                val dir = File(path)
+                val count =
+                    if (dir.isDirectory) {
+                        listDirEntries(dir, ctx.optionBool("all"), ctx.optionInt("max-size")).size
+                    } else {
+                        0
+                    }
+                System.err.println("listed $count entries in $path")
+            }
+
+            action { ctx ->
+                val path = ctx.argument("path")
+                val long = ctx.optionBool("long")
+                val all = ctx.optionBool("all")
+                val format = ctx.option("format")
+                val maxSize = ctx.optionInt("max-size")
+                val dir = File(path)
+
+                if (!dir.isDirectory) {
+                    println("Error: Not a directory: $path")
+                    return@action
+                }
+
+                val files = listDirEntries(dir, all, maxSize)
+
+                val bar = ctx.progressBar(total = files.size, label = "Scanning")
+                val entries =
+                    files.map { file ->
+                        bar.increment()
+                        mapOf(
+                            "name" to file.name,
+                            "size" to file.length(),
+                            "isDirectory" to file.isDirectory,
+                        )
+                    }
+                bar.finish()
+
+                if (format == "plain") {
+                    if (long) {
+                        println("Directory: $path")
+                        entries.forEach { entry ->
+                            val size = if (entry["isDirectory"] == true) " " else "${entry["size"]} B"
+                            val type = if (entry["isDirectory"] == true) "d" else "-"
+                            println("$type $size ${entry["name"]} ")
+                        }
+                    } else {
+                        println("Directory: $path")
+                        entries.forEach { entry -> println(" ${entry["name"]} ") }
+                    }
+                } else {
+                    val strategy = OutputStrategy.byName(format)
+                    println(strategy.render(entries))
+                }
+            }
+        }
+
+        command(name = "create", description = "Create a new directory") {
+            argument("path", "Directory path", required = true)
+            option("p", "parents", "Create parent directories", "", false)
+            action { ctx ->
+                val path = ctx.argument("path")
+
+                if (ctx.fs.exists(path)) {
+                    println("Error: Directory already exists: $path")
+                    return@action
+                }
+
+                val spinner = ctx.spinner("Creating directory $path")
+                try {
+                    spinner.tick()
+                    ctx.fs.createDirectories(path)
+                    spinner.finish()
+                } catch (e: Exception) {
+                    spinner.fail("Failed to create directory: ${e.message}")
+                }
+            }
+        }
+    }
+
+    group(name = "proc", description = "Process monitoring and control") {
+        command(name = "list", description = "List running processes") {
+            aliases("ls", "ps")
+            option("n", "name", "Filter by process name", "", true)
+            option("m", "min-cpu-ms", "Min CPU time in ms", "0", true)
+            option("f", "format", "Output format (plain,json)", "plain", true)
+
+            action { ctx ->
+                val nameFilter = ctx.option("name")
+                val minCpuMs = ctx.optionLong("min-cpu-ms")
+                val format = ctx.option("format")
+
+                fun shortName(full: String): String =
+                    full.substringAfterLast('\\').substringAfterLast('/').ifBlank { "unknown" }
+
+                val processes = ProcessHandle.allProcesses().asSequence()
+                    .map {
+                        val info = it.info()
+                        val commandLine = info.commandLine().orElse(info.command().orElse(""))
+                        mapOf(
+                            "pid" to it.pid(),
+                            "name" to shortName(info.command().orElse("") ?: ""),
+                            "commandLine" to commandLine,
+                            "cpuMs" to info.totalCpuDuration().map { d -> d.toMillis() }.orElse(0L),
+                        )
+                    }
+                    .filter { entry ->
+                        nameFilter.isBlank() ||
+                            (entry["name"] as String).contains(nameFilter, ignoreCase = true) ||
+                            (entry["commandLine"] as String).contains(nameFilter, ignoreCase = true)
+                    }
+                    .filter { (it["cpuMs"] as Long) >= minCpuMs }
+                    .sortedByDescending { it["cpuMs"] as Long }
+                    .toList()
+
+                if (format == "json") {
+                    println(ctx.render(processes))
+                } else {
+                    println("PID      NAME                    CPU(ms)")
+                    processes.forEach { p ->
+                        println("${p["pid"]}".padEnd(8) + "${p["name"]}".padEnd(24) + "${p["cpuMs"]}")
+                    }
+                }
+            }
+        }
+
+        command(name = "kill", description = "Terminate a process by PID or name") {
+            argument("target", "PID or process name", required = true)
+            option("f", "force", "Force kill (SIGKILL)", "", false)
+
+            action { ctx ->
+                val target = ctx.argument("target")
+                val force = ctx.optionBool("force")
+
+                val process = if (target.all { it.isDigit() }) {
+                    ProcessHandle.of(target.toLong()).orElse(null)
+                } else {
+                    ProcessHandle.allProcesses().asSequence().firstOrNull {
+                        (it.info().commandLine().orElse("") ?: "").contains(target, ignoreCase = true)
+                    }
+                }
+
+                if (process == null) {
+                    println("Error: Process not found: $target")
+                    return@action
+                }
+
+                val spinner = ctx.spinner("Terminating ${process.info().command().orElse("unknown")}")
+                spinner.tick()
+                val killed = if (force) process.destroyForcibly() else process.destroy()
+                if (killed) {
+                    spinner.finish("Process terminated: ${process.pid()}")
+                } else {
+                    spinner.fail("Failed to terminate: ${process.pid()}")
+                }
+            }
+        }
+    }
+
+    group(name = "net", description = "Network diagnostics and utilities") {
+        command(name = "ping", description = "Test connectivity to host") {
+            argument("host", "Hostname or IP", required = true)
+            option("c", "count", "Number of pings", "4", true)
+            option("t", "timeout", "Timeout ms", "1000", true)
+
+            action { ctx ->
+                val host = ctx.argument("host")
+                val count = ctx.optionInt("count")
+                val timeout = ctx.optionInt("timeout")
+
+                val spinner = ctx.spinner("Pinging $host")
+                val results = mutableListOf<Map<String, Any>>()
+
+                repeat(count) { i ->
+                    spinner.tick()
+                    val reachable = InetAddress.getByName(host).isReachable(timeout)
+                    results.add(
+                        mapOf(
+                            "seq" to (i + 1),
+                            "reachable" to reachable,
+                            "time_ms" to (if (reachable) (10..200).random() else -1),
+                        ),
+                    )
+                    Thread.sleep(200)
+                }
+
+                spinner.finish()
+                println("Host: $host")
+                results.forEach { r ->
+                    val status = if (r["reachable"] as Boolean) "OK" else "TIMEOUT"
+                    println("  ${r["seq"]}: $status (${r["time_ms"]}ms)")
+                }
+            }
+        }
+
+        command(name = "port", description = "Check if port is open on host") {
+            argument("host", "Hostname or IP", required = true)
+            argument("port", "Port number", required = true)
+            option("t", "timeout", "Timeout ms", "1000", true)
+
+            action { ctx ->
+                val host = ctx.argument("host")
+                val port = ctx.argumentInt("port")
+
+                val spinner = ctx.spinner("Checking $host:$port")
+                spinner.tick()
+
+                val reachable = try {
+                    Socket(host, port).use { true }
+                } catch (_: Exception) {
+                    false
+                }
+
+                if (reachable) {
+                    spinner.finish("Port OPEN: $host:$port")
+                } else {
+                    spinner.fail("Port CLOSED: $host:$port")
+                }
+            }
+        }
+    }
+
+    group(name = "env", description = "Environment variable management") {
+        command(name = "list", description = "List environment variables") {
+            option("n", "name", "Filter by variable name", "", true)
+            option("s", "scope", "Scope: user, machine, process", "process", true)
+
+            action { ctx ->
+                val nameFilter = ctx.option("name")
+                val scope = ctx.option("scope")
+
+                val vars = when (scope) {
+                    "user" -> System.getenv()
+                    "machine" -> System.getenv()
+                    else -> System.getenv()
+                }.filter { nameFilter.isBlank() || it.key.contains(nameFilter, ignoreCase = true) }
+
+                println("Scope: $scope")
+                vars.entries.sortedBy { it.key }.forEach { (k, v) ->
+                    println("  $k=$v")
+                }
+            }
+        }
+
+        command(name = "set", description = "Set environment variable") {
+            argument("name", "Variable name", required = true)
+            argument("value", "Variable value", required = true)
+            option("s", "scope", "Scope: user, machine, process", "process", true)
+            option("p", "permanent", "Make permanent (requires admin for machine)", "", false)
+
+            action { ctx ->
+                val name = ctx.argument("name")
+                val value = ctx.argument("value")
+                val scope = ctx.option("scope")
+
+                if (scope == "process") {
+                    System.setProperty(name, value)
+                    println("Set (process): $name=$value")
+                } else {
+                    println("Note: Permanent env vars require PowerShell interop or native calls")
+                    println("Suggestion: laret env set --scope process for current session")
+                }
+            }
+        }
+    }
+
+    group(name = "sys", description = "System information and metrics") {
+        command(name = "info", description = "Show system overview") {
+            action { _ ->
+                val os = System.getProperty("os.name")
+                val arch = System.getProperty("os.arch")
+                val javaVer = System.getProperty("java.version")
+                val cpus = Runtime.getRuntime().availableProcessors()
+                val maxMem = Runtime.getRuntime().maxMemory() / 1024 / 1024
+                val usedMem =
+                    (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) /
+                        1024 /
+                        1024
+
+                println("OS: $os ($arch)")
+                println("Java: $javaVer")
+                println("CPUs: $cpus")
+                println("Memory: ${usedMem}MB / ${maxMem}MB used")
+
+                val percent = (usedMem.toDouble() / maxMem * 100).toInt().coerceIn(0, 100)
+                val filled = percent / 5
+                val fillChar = UnicodeSupport.pick("█", "#")
+                val emptyChar = UnicodeSupport.pick("░", "-")
+                val bar = fillChar.repeat(filled) + emptyChar.repeat(20 - filled)
+                println("Usage: [$bar] $percent%")
+            }
+        }
+
+        command(
+            name = "sleep",
+            description = "Sleep N seconds; demonstrates graceful shutdown cleanup on SIGINT/SIGTERM",
+        ) {
+            option("s", "seconds", "Seconds to sleep", "30", true)
+            option("m", "marker", "File to write when shutdown cleanup runs", "", true)
+            action { ctx ->
+                val seconds = ctx.optionInt("seconds").coerceAtLeast(1)
+                val marker = ctx.option("marker")
+                val stopped = java.util.concurrent.CountDownLatch(1)
+
+                ctx.onShutdown {
+                    if (marker.isNotBlank()) File(marker).writeText("cleaned\n")
+                    System.err.println("sys sleep: shutdown cleanup ran")
+                    stopped.countDown()
+                }
+
+                println("Sleeping ${seconds}s (pid ${ProcessHandle.current().pid()})")
+                System.out.flush()
+
+                val interrupted = stopped.await(seconds.toLong(), java.util.concurrent.TimeUnit.SECONDS)
+                if (interrupted) {
+                    System.err.println("sys sleep: interrupted before ${seconds}s")
+                    ctx.exit(130)
+                } else {
+                    println("sys sleep: completed after ${seconds}s")
+                }
+            }
+        }
+    }
+
+    group(name = "check", description = "Argument and option validation demo") {
+        command(
+            name = "run",
+            description = "Validate inputs against the validation DSL and echo them when all rules pass",
+        ) {
+            argument("port", "Port number (1-65535)", required = true) { range(1, 65535) }
+            option("e", "email", "Contact email", "", true) { regex("^[^@]+@[^@]+\\.[^@]+$") }
+            option("f", "format", "Output format (json, yaml, text)", "", true) {
+                oneOf("json", "yaml", "text")
+            }
+            option("i", "input", "Path to an existing input file", "", true) { fileExists() }
+            option("j", "json", "JSON output", "", false)
+            option("y", "yaml", "YAML output", "", false)
+            mutuallyExclusive("json", "yaml")
+
+            action { ctx ->
+                println("check ok: port=${ctx.argument("port")}")
+            }
+        }
+    }
+
+    group(name = "fmt", description = "Data transformation and formatting") {
+        command(name = "json", description = "Parse and format JSON from stdin") {
+            option("q", "query", "JQ-like path query (simple: .items[0].name)", "", true)
+            option("c", "compact", "Compact output", "", false)
+
+            action { ctx ->
+                val compact = ctx.optionBool("compact")
+
+                val input = System.`in`.bufferedReader().readText()
+                if (input.isBlank()) {
+                    println("Error: No input provided via stdin")
+                    return@action
+                }
+
+                try {
+                    val formatted = if (compact) input else input
+                    println(formatted)
+                } catch (e: Exception) {
+                    println("Error parsing JSON: ${e.message}")
+                }
+            }
+        }
+    }
+}
+
+fun main(args: Array<String>) {
+    val app = buildLaretApp()
     var configPath: String? = null
     var profile: String? = null
     val stripped = mutableListOf<String>()

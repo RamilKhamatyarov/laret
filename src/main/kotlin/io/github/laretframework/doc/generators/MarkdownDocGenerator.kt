@@ -9,6 +9,7 @@ import io.github.laretframework.doc.prose.ProseProvider
 import io.github.laretframework.doc.prose.ResourceProseProvider
 import io.github.laretframework.model.Command
 import io.github.laretframework.model.CommandGroup
+import io.github.laretframework.model.visible
 
 /**
  * Generates a hierarchical Markdown tree suitable for MkDocs:
@@ -32,7 +33,7 @@ class MarkdownDocGenerator(private val prose: ProseProvider = ResourceProseProvi
     override val format: DocFormat = DocFormat.MARKDOWN
 
     override fun generate(app: CliApp, lang: String, includeHidden: Boolean): List<DocFile> = buildList {
-        app.groups.forEach { group ->
+        app.groups.visible(includeHidden).forEach { group ->
             documentedCommands(group, includeHidden).forEach { command ->
                 val resolved = prose.resolve(group.name, command, lang)
                 add(
@@ -60,7 +61,7 @@ class MarkdownDocGenerator(private val prose: ProseProvider = ResourceProseProvi
             languages.forEach { lang ->
                 appendLine("  - $lang:")
                 appendLine("      - Home: $lang/index.md")
-                app.groups.forEach { group ->
+                app.groups.visible().forEach { group ->
                     appendLine("      - ${group.name}:")
                     appendLine("          - Overview: $lang/${group.name}/index.md")
                     documentedCommands(group, includeHidden = false).forEach { command ->
@@ -151,7 +152,7 @@ class MarkdownDocGenerator(private val prose: ProseProvider = ResourceProseProvi
         appendLine()
         appendLine("## Command Groups")
         appendLine()
-        app.groups.forEach { group ->
+        app.groups.visible().forEach { group ->
             val desc = group.description.ifBlank { "No description." }
             appendLine("- [${group.name}](${group.name}/index.md) — $desc")
         }

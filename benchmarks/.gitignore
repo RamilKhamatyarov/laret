@@ -1,0 +1,8 @@
+# Build outputs of the benchmark targets.
+cobra/bench-cobra
+clap/target/
+picocli/build/
+picocli/.gradle/
+harness/cleanup-order.txt
+results.json
+__pycache__/

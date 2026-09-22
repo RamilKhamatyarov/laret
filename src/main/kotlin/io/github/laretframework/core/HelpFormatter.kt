@@ -2,6 +2,7 @@ package io.github.laretframework.core
 
 import io.github.laretframework.model.Command
 import io.github.laretframework.model.CommandGroup
+import io.github.laretframework.model.visible
 import io.github.laretframework.ui.blue
 import io.github.laretframework.ui.bold
 import io.github.laretframework.ui.cyanBold
@@ -25,7 +26,7 @@ object HelpFormatter {
             ${app.name} [COMMAND] [SUBCOMMAND] [OPTIONS]
 
             ${bold("COMMANDS:")}
-            ${formatCommandGroups(app.groups)}
+            ${formatCommandGroups(app.groups.visible())}
             ${formatPlugins(app)}
 
             ${bold("GLOBAL OPTIONS:")}

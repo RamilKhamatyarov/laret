@@ -30,7 +30,6 @@ class GlobMatcherTest {
 
     @Test
     fun `double-star exclude also matches a top-level directory`() {
-        // Regression: NIO's `**/gen/**` alone misses a root-level `gen/`.
         val m = GlobMatcher(listOf("**/*.kt", "!**/gen/**"))
         assertTrue(m.matches("src/app/Main.kt"))
         assertFalse(m.matches("gen/Z.kt"))
