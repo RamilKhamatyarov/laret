@@ -1,7 +1,6 @@
 package io.github.laretframework.dsl
 
 import io.github.laretframework.core.CliApp
-import io.github.laretframework.core.CommandRunner
 import io.github.laretframework.core.Middleware
 import io.github.laretframework.core.MiddlewareListCommand
 import io.github.laretframework.core.MiddlewareRegistration
@@ -62,8 +61,6 @@ class CliBuilder(val name: String, val version: String, val description: String)
             MiddlewareRegistration(it, MiddlewareScope.GLOBAL, "*")
         }
         val registry = MiddlewareRegistry.of(globalRegistrations, groupRegistrations, commandRegistrations)
-
-        CommandRunner.globalMiddlewares = middlewares.toList()
 
         if (groups.none { it.name == MIDDLEWARE_GROUP }) {
             groups.add(buildMiddlewareGroup())

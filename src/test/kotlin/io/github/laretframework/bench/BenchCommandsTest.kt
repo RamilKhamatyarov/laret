@@ -1,5 +1,6 @@
-package io.github.laretframework.example
+package io.github.laretframework.bench
 
+import io.github.laretframework.example.buildLaretApp
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -15,7 +16,7 @@ class BenchCommandsTest {
         val originalOut = System.out
         return try {
             System.setOut(PrintStream(captured, true, Charsets.UTF_8))
-            buildLaretApp().runForTest(arrayOf(*args))
+            buildBenchApp().runForTest(arrayOf(*args))
             captured.toString(Charsets.UTF_8)
         } finally {
             System.setOut(originalOut)
@@ -32,10 +33,8 @@ class BenchCommandsTest {
         fields(output.lines().first { it.startsWith(prefix) })
 
     @Test
-    fun benchCommandsAreHiddenFromHelp() {
-        val help = run("--help")
-
-        assertThat(help).doesNotContain("bench")
+    fun theDemoCliCarriesNoBenchmarkPayloads() {
+        assertThat(buildLaretApp().groups.map { it.name }).doesNotContain("bench")
     }
 
     @Test

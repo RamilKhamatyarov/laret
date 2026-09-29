@@ -1,4 +1,4 @@
-package io.github.laretframework.example
+package io.github.laretframework.bench
 
 import io.github.laretframework.core.CommandPipeline
 import io.github.laretframework.core.ParallelDispatcher
@@ -22,11 +22,12 @@ import kotlin.time.toDuration
  * Payloads for the concurrency benchmark suite. See the
  * `concurrency-benchmark-suite` ADR.
  *
- * Every command is [hidden], so none of this appears in help, completions or
- * generated docs. They are real commands all the same: they run through
- * `CommandRunner`, the middleware chain and the per-run `CancellationScope`,
- * which is precisely what the benchmark is measuring. A harness that called
- * the primitives directly would measure the primitives, not the framework.
+ * They live in the `bench` source set with [buildBenchApp], so none of this
+ * ships in the published library jar. They are real commands all the same:
+ * they run through `CommandRunner`, the middleware chain and the per-run
+ * `CancellationScope`, which is precisely what the benchmark is measuring. A
+ * harness that called the primitives directly would measure the primitives,
+ * not the framework.
  *
  * Each command prints one machine-readable summary line of `key=value` pairs,
  * identical in shape across all five benchmark targets.

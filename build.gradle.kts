@@ -45,7 +45,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-params:6.1.3")
 }
 
-val generateBuildInfo by tasks.registering {
+val generateBuildInfo = tasks.register("generateBuildInfo") {
     val outputDir = layout.buildDirectory.dir("generated/buildinfo")
     val projectVersion = version.toString()
     inputs.property("version", projectVersion)
@@ -71,9 +71,16 @@ kotlin {
     sourceSets["main"].kotlin.srcDir(generateBuildInfo)
 }
 
-val bench: SourceSet by sourceSets.creating {
+val bench: SourceSet = sourceSets.create("bench") {
     compileClasspath += sourceSets["main"].output + sourceSets["main"].compileClasspath
     runtimeClasspath += sourceSets["main"].output + sourceSets["main"].runtimeClasspath
+}
+
+// The bench payloads are tested like any other code, so the unit tests see
+// the bench source set; nothing in main depends on it.
+sourceSets.named("test") {
+    compileClasspath += bench.output
+    runtimeClasspath += bench.output
 }
 
 pmd {
