@@ -71,6 +71,11 @@ kotlin {
     sourceSets["main"].kotlin.srcDir(generateBuildInfo)
 }
 
+val bench: SourceSet by sourceSets.creating {
+    compileClasspath += sourceSets["main"].output + sourceSets["main"].compileClasspath
+    runtimeClasspath += sourceSets["main"].output + sourceSets["main"].runtimeClasspath
+}
+
 pmd {
     toolVersion = "7.16.0"
     isConsoleOutput = true
@@ -141,6 +146,14 @@ graalvmNative {
                 "-Ob",
                 "--enable-native-access=ALL-UNNAMED",
                 "--install-exit-handlers",
+                // Serial GC with an 8 MiB young generation. Measured on the
+                // concurrency benchmark: peak RSS falls from 46 to 29 MiB in the
+                // event storm and from 66 to 29 MiB in the 100k-line pipeline,
+                // and the pipeline gets faster. A 10,000-coroutine fan-out burst
+                // pays a few milliseconds for the extra young collections. See
+                // the laret-native-performance-targets ADR.
+                "--gc=serial",
+                "-R:MaxNewSize=8m",
                 "-H:+ReportExceptionStackTraces",
                 "-H:ReflectionConfigurationFiles=$reflectConfig",
                 "-H:ResourceConfigurationFiles=$resourceConfig",
@@ -161,15 +174,35 @@ graalvmNative {
             mainClass.set("io.github.laretframework.example.MainKt")
             buildArgs.addAll(commonArgs)
         }
+        // nativeBenchCompile -> build/native/nativeBenchCompile/laret-bench
+        create("bench") {
+            imageName.set("laret-bench")
+            mainClass.set("io.github.laretframework.bench.BenchMainKt")
+            classpath.from(bench.runtimeClasspath)
+            buildArgs.addAll(commonArgs)
+        }
     }
 }
 
 tasks {
-    withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {
+    named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
         archiveClassifier.set("")
         archiveFileName.set("laret-fat.jar")
         manifest {
             attributes["Main-Class"] = "io.github.laretframework.example.MainKt"
+        }
+    }
+
+    // build/libs/laret-bench-fat.jar: the Laret JVM benchmark target.
+    register<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("benchShadowJar") {
+        group = "benchmark"
+        description = "Builds the minimal Laret benchmark app as a fat jar"
+        archiveFileName.set("laret-bench-fat.jar")
+        from(bench.output)
+        configurations.set(listOf(project.configurations["runtimeClasspath"]))
+        from(sourceSets["main"].output)
+        manifest {
+            attributes["Main-Class"] = "io.github.laretframework.bench.BenchMainKt"
         }
     }
 

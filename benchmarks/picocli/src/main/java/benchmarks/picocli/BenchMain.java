@@ -106,6 +106,9 @@ public final class BenchMain {
             AtomicLong emitted = new AtomicLong();
             AtomicInteger runs = new AtomicInteger();
 
+            AtomicLong lastEmitNanos = new AtomicLong();
+            AtomicLong firstRunNanos = new AtomicLong();
+
             Thread producer = Thread.ofVirtual().start(() -> {
                 try {
                     long started = System.nanoTime();
@@ -113,6 +116,7 @@ public final class BenchMain {
                         changes.put("storm-" + index + ".txt");
                         emitted.incrementAndGet();
                     }
+                    lastEmitNanos.set(System.nanoTime());
                     long spentMillis = (System.nanoTime() - started) / 1_000_000L;
                     if (spentMillis < window) {
                         Thread.sleep(window - spentMillis);
@@ -131,12 +135,14 @@ public final class BenchMain {
                             ? changes.poll(debounce, TimeUnit.MILLISECONDS)
                             : changes.take();
                     if (path == null) {
+                        firstRunNanos.compareAndSet(0L, System.nanoTime());
                         runs.incrementAndGet();
                         pending = false;
                         continue;
                     }
                     if (POISON.equals(path)) {
                         if (pending) {
+                            firstRunNanos.compareAndSet(0L, System.nanoTime());
                             runs.incrementAndGet();
                         }
                         break;
@@ -150,9 +156,13 @@ public final class BenchMain {
                 Thread.currentThread().interrupt();
             }
 
+            double settleMillis = firstRunNanos.get() == 0L
+                    ? -1.0
+                    : (firstRunNanos.get() - lastEmitNanos.get()) / 1_000_000.0;
             System.out.printf(
-                    "storm events=%d window=%d debounce=%d runs=%d restarts=%d%n",
-                    emitted.get(), window, debounce, runs.get(), runs.get());
+                    java.util.Locale.ROOT,
+                    "storm events=%d window=%d debounce=%d runs=%d restarts=%d settle_ms=%.3f%n",
+                    emitted.get(), window, debounce, runs.get(), runs.get(), settleMillis);
         }
     }
 

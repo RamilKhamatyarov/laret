@@ -76,6 +76,85 @@ def targets_present(measurements: list[dict]) -> list[str]:
     return ordered + sorted(seen - set(ordered))
 
 
+WALL_TARGET = 2.0
+RSS_TARGET = 5.0
+
+
+def target_metrics(measurements: list[dict]) -> list[tuple[str, str, callable]]:
+    """(label, kind, value-of-measurement-set) for every metric the ADR targets."""
+    rows = []
+    for tasks in sorted({m["parameters"].get("tasks") for m in measurements if m["scenario"] == "A-fanout"} - {None}):
+        rows.append((f"A fan-out N={tasks:,} wall", "wall",
+                     lambda target, n=tasks: (find(measurements, target, "A-fanout", tasks=n) or {}).get("wall_clock_ms")))
+
+    def settle_excess(target: str) -> float | None:
+        m = find(measurements, target, "B-storm")
+        if not m or m.get("settle_ms") is None:
+            return None
+        return max(m["settle_ms"] - m["parameters"]["debounce_ms"], 0.0)
+
+    rows.append(("B settle above debounce", "wall", settle_excess))
+    rows.append(("C pipeline wall", "wall",
+                 lambda target: (find(measurements, target, "C-pipeline") or {}).get("wall_clock_ms")))
+    for signal_name in ("SIGTERM", "SIGINT"):
+        rows.append((f"D {signal_name} latency", "wall",
+                     lambda target, s=signal_name: (find(measurements, target, f"D-cancel-{s}") or {}).get("cancellation_latency_ms")))
+    for scenario, label in (("A-fanout", "A"), ("B-storm", "B"), ("C-pipeline", "C"), ("D-cancel-SIGTERM", "D")):
+        def rss(target: str, sc=scenario) -> float | None:
+            values = [m["peak_rss_kb"] for m in measurements
+                      if m["target"] == target and m["scenario"] == sc and m.get("peak_rss_kb")]
+            return max(values) / 1024 if values else None
+        rows.append((f"{label} peak RSS", "rss", rss))
+    return rows
+
+
+def render_targets(document: dict) -> list[str]:
+    measurements = document["measurements"]
+    out = ["## Laret native against its targets", ""]
+    if document.get("quick"):
+        out += ["Targets are evaluated on full-scale runs only. This run was `--quick`.", ""]
+        return out
+    present = {m["target"] for m in measurements}
+    if "Laret native" not in present:
+        out += ["Laret native was not measured in this run.", ""]
+        return out
+    out += [
+        f"Wall clock and latency within {WALL_TARGET:g}x of Cobra and of clap, peak RSS within",
+        f"{RSS_TARGET:g}x of each, and ahead of picocli on every row. Reported, never enforced.",
+        "",
+    ]
+    rows = []
+    for label, kind, value in target_metrics(measurements):
+        laret = value("Laret native")
+        if laret is None:
+            continue
+        limit = WALL_TARGET if kind == "wall" else RSS_TARGET
+        unit = (lambda v: f"{v:.1f} MiB") if kind == "rss" else (lambda v: f"{v:.2f} ms")
+        cells = [label, unit(laret)]
+        verdicts = []
+        for reference in ("Cobra", "clap"):
+            ref = value(reference) if reference in present else None
+            if ref is None:
+                cells.append(NOT_MEASURED)
+                continue
+            ratio = laret / ref if ref > 0 else float("inf")
+            ok = ratio <= limit
+            verdicts.append(ok)
+            cells.append(f"{unit(ref)} ({ratio:.1f}x {'met' if ok else '**missed**'})")
+        pico = value("picocli") if "picocli" in present else None
+        if pico is None:
+            cells.append(NOT_MEASURED)
+        else:
+            cells.append("ahead" if laret < pico else "**behind**")
+        rows.append(cells)
+    out.append(table(
+        ["Metric", "Laret native", f"vs Cobra (≤{WALL_TARGET:g}x / ≤{RSS_TARGET:g}x)", "vs clap", "vs picocli"],
+        rows,
+    ))
+    out.append("")
+    return out
+
+
 def render(document: dict) -> str:
     measurements = document["measurements"]
     targets = targets_present(measurements)
@@ -107,6 +186,8 @@ def render(document: dict) -> str:
     add("## Provenance")
     add("")
     add("Numbers are only meaningful next to the machine that produced them.")
+    if document.get("repeats", 1) > 1:
+        add(f"Every figure is the median of {document['repeats']} runs.")
     add("")
     add(table(
         ["Field", "Value"],
@@ -167,6 +248,8 @@ def render(document: dict) -> str:
         )
         add("")
 
+    out.extend(render_targets(document))
+
     add("## Rules")
     add("")
     add("- **No external I/O.** Payloads are CPU or memory bound.")
@@ -212,16 +295,26 @@ def render(document: dict) -> str:
         "command. Coalescing is strict pass/fail."
     )
     add("")
+    add(
+        "Wall clock is mostly the storm's own designed quiet period, identical for every\n"
+        "target. *Settle* is the time from the last event to the coalesced run, and\n"
+        "*above debounce* is the part of it the framework adds on top of the window."
+    )
+    add("")
     rows = []
     for target in targets:
         m = find(measurements, target, "B-storm")
+        settle = m.get("settle_ms") if m else None
+        debounce = m["parameters"].get("debounce_ms") if m else None
         rows.append([
             target,
+            ms(settle),
+            ms(settle - debounce) if settle is not None and debounce is not None else NOT_MEASURED,
             ms(m["wall_clock_ms"]) if m else NOT_MEASURED,
             mib(m["peak_rss_kb"]) if m else NOT_MEASURED,
             verdict(m, "coalesced_to_one_run") if m else NOT_MEASURED,
         ])
-    add(table(["Target", "Wall clock", "Peak RSS", "Coalescing"], rows))
+    add(table(["Target", "Settle", "Above debounce", "Wall clock", "Peak RSS", "Coalescing"], rows))
     add("")
 
     add("## Scenario C - Concurrent streaming pipeline")
@@ -293,8 +386,15 @@ def main() -> int:
     args = parser.parse_args()
 
     document = json.loads(Path(args.results).read_text())
-    if document.get("schema_version") != 1:
-        sys.exit(f"Unsupported schema_version: {document.get('schema_version')!r}")
+    version = document.get("schema_version")
+    if version == 1:
+        sys.exit(
+            "schema_version 1 results predate the wait4 harness: every sub-10 ms wall clock\n"
+            "was quantised to the polling interval and fast runs reported taskset's RSS.\n"
+            "They are not comparable with current results; rerun the harness."
+        )
+    if version != 2:
+        sys.exit(f"Unsupported schema_version: {version!r}")
     sys.stdout.write(render(document))
     return 0
 

@@ -1,5 +1,6 @@
 package io.github.laretframework.core
 
+import java.io.BufferedOutputStream
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
@@ -98,7 +99,12 @@ class CommandPipeline(private val app: CliApp) {
      * capture it in a test.
      *
      * @param sink where the last stage's output goes; defaults to the real stdout.
-     * @param capacityChunks writes a producer may run ahead before it blocks.
+     * Output between stages is batched: a line reaches the next stage when the
+     * producer's buffer fills or the producer exits, which suits throughput
+     * but not interactive stages that expect line-by-line hand-off.
+     *
+     * @param capacityChunks buffered chunks a producer may run ahead before it
+     *   blocks; with the default this is a budget of about 256 KiB per pipe.
      */
     fun executeStreamingResult(
         stages: List<Array<String>>,
@@ -152,8 +158,15 @@ class CommandPipeline(private val app: CliApp) {
         exitCodes: MutableList<Int>,
     ) {
         val isLast = index == exitCodes.lastIndex
-        val out = if (isLast) target else pipes[index].sink
-        router.bind(PrintStream(out, true, Charsets.UTF_8))
+
+        val stageOut = if (isLast) {
+            PrintStream(target, true, Charsets.UTF_8)
+        } else {
+            PrintStream(BufferedOutputStream(pipes[index].sink, STAGE_BUFFER_BYTES), false, Charsets.UTF_8)
+        }
+
+        router.bind(stageOut)
+
         if (index > 0) inputRouter.bind(pipes[index - 1].source)
 
         try {
@@ -185,6 +198,9 @@ class CommandPipeline(private val app: CliApp) {
 
     companion object {
         const val STAGE_SEPARATOR: String = "---"
+
+        /** Chunk size for output passed between streaming stages. */
+        internal const val STAGE_BUFFER_BYTES = 8 * 1024
         const val PIPE_SEPARATOR: String = "|"
 
         /** Both separators are active by default; quote `|` in shells to pass it as a token. */

@@ -50,6 +50,15 @@ data class CliApp(
     /** Whether the global `--fix` flag enabled opt-in interactive typo correction. */
     private var fixMode: Boolean = false
 
+    /**
+     * Whether this app deletes `.old` binaries left by a previous self-update
+     * at start-up. Off unless the app opts in, because the check locates the
+     * executable and lists its directory on every invocation, which an app
+     * without a self-update feature has no reason to pay for.
+     */
+    var cleansUpAfterSelfUpdate: Boolean = false
+        internal set
+
     internal var onInitHook: suspend (CliApp) -> Unit = {}
     internal var onShutdownHook: suspend (CliApp) -> Unit = {}
 
@@ -154,7 +163,7 @@ data class CliApp(
      */
     fun run(args: Array<String>): Int {
         logManager.disableLogging()
-        OldBinaryCleaner.cleanupSilently()
+        if (cleansUpAfterSelfUpdate) OldBinaryCleaner.cleanupSilently()
         val scope = startScope(includeAppHooks = true)
         val hook = Thread({ scope.shutdown(CancellationScope.INTERRUPT_EXIT_CODE) }, "laret-signal")
         Runtime.getRuntime().addShutdownHook(hook)

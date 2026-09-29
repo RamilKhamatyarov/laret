@@ -133,8 +133,11 @@ async fn fanout(tasks: usize, jobs: usize) {
 async fn storm(events: usize, window: u64, debounce: u64) {
     let (tx, mut rx) = mpsc::channel::<String>(1024);
     let emitted = Arc::new(AtomicI64::new(0));
+    let last_emit: Arc<Mutex<Option<Instant>>> = Arc::new(Mutex::new(None));
+    let mut first_run: Option<Instant> = None;
 
     let producer_emitted = Arc::clone(&emitted);
+    let producer_last_emit = Arc::clone(&last_emit);
     let producer = tokio::spawn(async move {
         let started = Instant::now();
         for index in 0..events {
@@ -143,6 +146,7 @@ async fn storm(events: usize, window: u64, debounce: u64) {
             }
             producer_emitted.fetch_add(1, Ordering::SeqCst);
         }
+        *producer_last_emit.lock().expect("last emit poisoned") = Some(Instant::now());
         let spent = started.elapsed();
         if spent < Duration::from_millis(window) {
             tokio::time::sleep(Duration::from_millis(window) - spent).await;
@@ -162,11 +166,13 @@ async fn storm(events: usize, window: u64, debounce: u64) {
                     Some(_) => {}
                     None => {
                         tokio::time::sleep(Duration::from_millis(debounce)).await;
+                        first_run.get_or_insert_with(Instant::now);
                         runs += 1;
                         break;
                     }
                 },
                 _ = tokio::time::sleep(Duration::from_millis(debounce)) => {
+                    first_run.get_or_insert_with(Instant::now);
                     runs += 1;
                     pending = false;
                 }
@@ -181,13 +187,18 @@ async fn storm(events: usize, window: u64, debounce: u64) {
     }
     let _ = producer.await;
 
+    let settle_ms = match (first_run, *last_emit.lock().expect("last emit poisoned")) {
+        (Some(run), Some(last)) => run.saturating_duration_since(last).as_secs_f64() * 1000.0,
+        _ => -1.0,
+    };
     println!(
-        "storm events={} window={} debounce={} runs={} restarts={}",
+        "storm events={} window={} debounce={} runs={} restarts={} settle_ms={:.3}",
         emitted.load(Ordering::SeqCst),
         window,
         debounce,
         runs,
-        runs
+        runs,
+        settle_ms
     );
 }
 

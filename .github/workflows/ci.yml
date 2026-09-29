@@ -3111,12 +3111,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Java 25
-        uses: actions/setup-java@v6
+      - name: Set up GraalVM
+        uses: graalvm/setup-graalvm@v1
         with:
           java-version: '25'
-          distribution: 'temurin'
-          cache: gradle
+          distribution: 'graalvm-community'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -3136,21 +3136,13 @@ jobs:
             benchmarks/clap/target
           key: cargo-${{ runner.os }}-${{ hashFiles('benchmarks/clap/Cargo.toml') }}
 
-      - name: Download native binary
-        uses: actions/download-artifact@v8
-        with:
-          name: laret-native
-          path: ./bin
-
-      - name: Place the native binary where the harness looks for it
+      - name: Build the Laret bench targets
         run: |
           set -euo pipefail
-          mkdir -p build/native/nativeCompile
-          cp ./bin/laret build/native/nativeCompile/laret
-          chmod +x build/native/nativeCompile/laret
-
-      - name: Build the Laret fat JAR
-        run: ./gradlew shadowJar --console=plain
+          chmod +x ./gradlew
+          ./gradlew benchShadowJar nativeBenchCompile --console=plain
+          java -jar build/libs/laret-bench-fat.jar bench runtime
+          ./build/native/nativeBenchCompile/laret-bench bench runtime
 
       - name: Build the Cobra target
         working-directory: benchmarks/cobra
@@ -3175,12 +3167,12 @@ jobs:
           ./gradlew --quiet --no-daemon shadowJar
           java -jar build/libs/bench-picocli.jar bench fanout --tasks 10 --jobs 0
 
-      - name: Harness refuses to run without pinning support
+      - name: Harness prerequisites
         run: |
           set -euo pipefail
-          command -v taskset > /dev/null \
-            || { echo "ERROR: taskset missing; the pinning contract cannot be met"; exit 1; }
-          echo "taskset available"
+          command -v cc > /dev/null \
+            || { echo "ERROR: no C compiler; the harness cannot build rusage_exec"; exit 1; }
+          echo "cc available"
 
       - name: All five targets at reduced scale
         run: |
@@ -3196,7 +3188,7 @@ jobs:
           python3 - << 'PYEOF'
           import json
           document = json.load(open('/tmp/bench-results.json'))
-          assert document['schema_version'] == 1, document['schema_version']
+          assert document['schema_version'] == 2, document['schema_version']
           measurements = document['measurements']
           assert measurements, 'harness produced no measurements'
 
