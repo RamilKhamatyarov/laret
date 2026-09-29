@@ -95,6 +95,13 @@ func stormCmd() *cobra.Command {
 			var emitted int64
 			var runs int64
 
+			var lastEmit int64
+			var firstRun int64
+			markRun := func() {
+				atomic.CompareAndSwapInt64(&firstRun, 0, time.Now().UnixNano())
+				atomic.AddInt64(&runs, 1)
+			}
+
 			go func() {
 				defer close(changes)
 				started := time.Now()
@@ -102,6 +109,7 @@ func stormCmd() *cobra.Command {
 					changes <- fmt.Sprintf("storm-%d.txt", i)
 					atomic.AddInt64(&emitted, 1)
 				}
+				atomic.StoreInt64(&lastEmit, time.Now().UnixNano())
 				if spent := time.Since(started); spent < time.Duration(window)*time.Millisecond {
 					time.Sleep(time.Duration(window)*time.Millisecond - spent)
 				}
@@ -134,17 +142,21 @@ func stormCmd() *cobra.Command {
 					timer.Reset(time.Duration(debounce) * time.Millisecond)
 					pending = true
 				case <-timer.C:
-					atomic.AddInt64(&runs, 1)
+					markRun()
 					pending = false
 				}
 			}
 			if pending {
 				<-timer.C
-				atomic.AddInt64(&runs, 1)
+				markRun()
 			}
 
-			fmt.Printf("storm events=%d window=%d debounce=%d runs=%d restarts=%d\n",
-				atomic.LoadInt64(&emitted), window, debounce, atomic.LoadInt64(&runs), atomic.LoadInt64(&runs))
+			settle := -1.0
+			if first := atomic.LoadInt64(&firstRun); first != 0 {
+				settle = float64(first-atomic.LoadInt64(&lastEmit)) / 1e6
+			}
+			fmt.Printf("storm events=%d window=%d debounce=%d runs=%d restarts=%d settle_ms=%.3f\n",
+				atomic.LoadInt64(&emitted), window, debounce, atomic.LoadInt64(&runs), atomic.LoadInt64(&runs), settle)
 			return nil
 		},
 	}

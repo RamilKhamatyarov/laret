@@ -76,6 +76,27 @@ class BenchCommandsTest {
     }
 
     @Test
+    fun stormReportsSettleTimeFromTheLastEventToTheRun() {
+        val result = summary(
+            run("bench", "storm", "--events", "1000", "--window", "20", "--debounce", "100"),
+            "storm",
+        )
+
+        val settle = checkNotNull(result["settle_ms"]).toDouble()
+        assertThat(settle).isGreaterThanOrEqualTo(100.0)
+        assertThat(settle).isLessThan(5_000.0)
+    }
+
+    @Test
+    fun runtimeReportsTheVmTheBinaryRunsOn() {
+        val result = summary(run("bench", "runtime"), "runtime")
+
+        assertThat(result["vm"]).isNotBlank()
+        assertThat(result["java"]).isEqualTo(System.getProperty("java.version"))
+        assertThat(result["vm"]).doesNotContain(" ")
+    }
+
+    @Test
     fun pipelineStreamsAndCountsCorrectly() {
         val result = summary(run("bench", "pipeline", "--lines", "1000", "--pattern", "7"), "pipeline")
 

@@ -20,6 +20,14 @@ class CliBuilder(val name: String, val version: String, val description: String)
     var onAppInit: suspend (CliApp) -> Unit = {}
     var onAppShutdown: suspend (CliApp) -> Unit = {}
 
+    /**
+     * Set when the application updates its own binary. The previous binary is
+     * left behind as `<name>.old` because a running executable cannot be
+     * deleted, and enabling this removes it on the next start. Leave it off
+     * otherwise: the cleanup touches the filesystem on every invocation.
+     */
+    var selfUpdate: Boolean = false
+
     fun group(name: String, description: String = "", block: GroupBuilder.() -> Unit) {
         val groupBuilder = GroupBuilder(name, description)
         groupBuilder.block()
@@ -64,6 +72,7 @@ class CliBuilder(val name: String, val version: String, val description: String)
         val app = CliApp(name, version, description, groups, registry)
         app.onInitHook = onAppInit
         app.onShutdownHook = onAppShutdown
+        app.cleansUpAfterSelfUpdate = selfUpdate
         return app
     }
 

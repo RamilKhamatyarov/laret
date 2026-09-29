@@ -34,6 +34,7 @@ import kotlin.time.toDuration
 object BenchCommands {
 
     fun register(group: GroupBuilder) {
+        runtime(group)
         fanout(group)
         storm(group)
         pipeline(group)
@@ -41,6 +42,23 @@ object BenchCommands {
         emit(group)
         filter(group)
         count(group)
+    }
+
+    /**
+     * Reports what the binary runs on. A native image answers with the GraalVM
+     * that built it, which the harness records as provenance because the binary
+     * is often built in a different job from the one that measures it.
+     */
+    private fun runtime(group: GroupBuilder) {
+        group.command(name = "runtime", description = "Report the runtime this binary runs on") {
+            hidden()
+            action {
+                val vm = System.getProperty("java.vm.name").orEmpty().replace(' ', '_')
+                val vendorVersion = System.getProperty("java.vendor.version").orEmpty().replace(' ', '_')
+                val version = System.getProperty("java.version").orEmpty()
+                println("runtime vm=$vm vendor_version=$vendorVersion java=$version")
+            }
+        }
     }
 
     /** Scenario A: fan out N independent units of work, join them, aggregate. */
@@ -82,10 +100,13 @@ object BenchCommands {
 
                 val runs = AtomicInteger(0)
                 val emitted = AtomicLong(0)
+                val lastEmitNanos = AtomicLong(0)
+                val firstRunNanos = AtomicLong(0)
 
                 val session = LiveWatchSession(
                     matcher = GlobMatcher(listOf("*.txt")),
                     runner = {
+                        firstRunNanos.compareAndSet(0, System.nanoTime())
                         runs.incrementAndGet()
                         0
                     },
@@ -93,12 +114,20 @@ object BenchCommands {
                     runOnStart = false,
                 )
                 val summary = runBlocking {
-                    session.run(stormFlow(events, windowMillis, debounceMillis, emitted))
+                    session.run(stormFlow(events, windowMillis, debounceMillis, emitted, lastEmitNanos))
                 }
 
+                // From the last event to the coalesced run: at least the debounce
+                // window, plus whatever the framework adds on top of it.
+                val settleMillis = if (firstRunNanos.get() == 0L) {
+                    -1.0
+                } else {
+                    (firstRunNanos.get() - lastEmitNanos.get()) / NANOS_PER_MILLI
+                }
                 println(
                     "storm events=${emitted.get()} window=$windowMillis debounce=$debounceMillis " +
-                        "runs=${runs.get()} restarts=${summary.restarts}",
+                        "runs=${runs.get()} restarts=${summary.restarts} " +
+                        "settle_ms=${"%.3f".format(java.util.Locale.ROOT, settleMillis)}",
                 )
             }
         }
@@ -109,23 +138,29 @@ object BenchCommands {
      * open long enough for the debounce to fire, so the coalesced run is
      * observed rather than being forced out by the flow completing.
      */
-    private fun stormFlow(events: Int, windowMillis: Long, debounceMillis: Long, emitted: AtomicLong): Flow<Path> =
-        flow {
-            val started = System.nanoTime()
-            repeat(events) { index ->
-                emit(Path.of("storm-$index.txt"))
-                emitted.incrementAndGet()
-            }
-            val spentMillis = (System.nanoTime() - started) / 1_000_000
-            if (spentMillis < windowMillis) {
-                delay(
-                    windowMillis.toDuration(
-                        DurationUnit.MILLISECONDS,
-                    ) - spentMillis.toDuration(DurationUnit.MILLISECONDS),
-                )
-            }
-            delay(debounceMillis.toDuration(DurationUnit.MILLISECONDS) * 2 + QUIET_TAIL_MILLIS)
+    private fun stormFlow(
+        events: Int,
+        windowMillis: Long,
+        debounceMillis: Long,
+        emitted: AtomicLong,
+        lastEmitNanos: AtomicLong,
+    ): Flow<Path> = flow {
+        val started = System.nanoTime()
+        repeat(events) { index ->
+            emit(Path.of("storm-$index.txt"))
+            emitted.incrementAndGet()
         }
+        lastEmitNanos.set(System.nanoTime())
+        val spentMillis = (System.nanoTime() - started) / 1_000_000
+        if (spentMillis < windowMillis) {
+            delay(
+                windowMillis.toDuration(
+                    DurationUnit.MILLISECONDS,
+                ) - spentMillis.toDuration(DurationUnit.MILLISECONDS),
+            )
+        }
+        delay(debounceMillis.toDuration(DurationUnit.MILLISECONDS) * 2 + QUIET_TAIL_MILLIS)
+    }
 
     /** Scenario C: three concurrent stages over a bounded pipe. */
     private fun pipeline(group: GroupBuilder) {
@@ -249,4 +284,6 @@ object BenchCommands {
 
     /** Quiet time after the storm, so the debounce fires before the flow closes. */
     private val QUIET_TAIL_MILLIS = 100.toDuration(DurationUnit.MILLISECONDS)
+
+    private const val NANOS_PER_MILLI = 1_000_000.0
 }

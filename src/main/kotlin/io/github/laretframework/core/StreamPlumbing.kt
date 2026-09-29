@@ -86,7 +86,12 @@ internal class BoundedPipe(capacityChunks: Int = DEFAULT_CAPACITY_CHUNKS) {
         /** An empty chunk is never written by a caller, so it is unambiguous as a sentinel. */
         private val END_OF_STREAM = ByteArray(0)
 
-        const val DEFAULT_CAPACITY_CHUNKS = 256
+        /**
+         * Stages write in 8 KiB chunks, so 32 chunks bound each pipe at about
+         * 256 KiB in flight. Counted in writes rather than bytes, it is exact
+         * for buffered stages and generous for anything writing smaller pieces.
+         */
+        const val DEFAULT_CAPACITY_CHUNKS = 32
     }
 }
 

@@ -6,3 +6,4 @@ picocli/.gradle/
 harness/cleanup-order.txt
 results.json
 __pycache__/
+harness/.bin/

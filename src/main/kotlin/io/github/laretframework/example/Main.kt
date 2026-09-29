@@ -90,6 +90,10 @@ fun buildLaretApp(): CliApp = cli(
     version = BuildInfo.VERSION,
     description = "Laret - A Cobra-like CLI framework for Kotlin",
 ) {
+    // The demo ships `update check` / `update apply`, so it owns the cleanup
+    // of the binary a previous self-update left behind.
+    selfUpdate = true
+
     use(LoggingMiddleware())
     use(StatsMiddleware())
 

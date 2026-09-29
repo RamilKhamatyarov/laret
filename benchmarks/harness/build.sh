@@ -41,12 +41,12 @@ else
 fi
 
 echo "== Laret JVM"
-(cd "$REPO" && ./gradlew --quiet --console=plain shadowJar)
+(cd "$REPO" && ./gradlew --quiet --console=plain benchShadowJar)
 built+=("Laret JVM")
 
 echo "== Laret native"
 if [ -n "${GRAALVM_HOME:-}" ] && [ -x "${GRAALVM_HOME}/bin/native-image" ]; then
-  (cd "$REPO" && ./gradlew --quiet --console=plain nativeCompile)
+  (cd "$REPO" && ./gradlew --quiet --console=plain nativeBenchCompile)
   built+=("Laret native")
 else
   note_skip "Laret native" "GRAALVM_HOME is unset or has no native-image"

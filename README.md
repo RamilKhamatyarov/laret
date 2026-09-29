@@ -948,6 +948,45 @@ val stages = pipeline.splitStages(
 val result = pipeline.execute(stages)  // returns "HELLO"
 ```
 
+## Sidecar Plugins
+
+Laret can install verified external executables as top-level commands. Plugins are stored in `~/.laret/plugins` by default; use `--plugin-dir` or `LARET_PLUGIN_DIR` to select additional directories.
+
+```bash
+laret plugin install formatter \
+  --url https://example.org/formatter \
+  --sha256 <64-hex-character-sha256>
+laret plugin list
+laret formatter input.txt
+laret plugin remove formatter --force
+```
+
+Installation accepts HTTPS URLs only, follows HTTPS redirects, verifies the required SHA-256 digest, and writes executable and TOML metadata files transactionally. Existing names require `--force` for replacement. Built-in commands always take precedence over plugins.
+
+Each installed plugin has a `<name>.toml` metadata file containing its name, source URL, digest, and installation timestamp. Laret verifies the executable digest before every run. Invalid and shadowed entries are shown by `laret plugin list` and are not executed.
+
+Sidecars inherit the parent environment. Laret overrides `LARET_PLUGIN_NAME`, `LARET_DRY_RUN`, and `LARET_PROFILE`. The sidecar receives standard input, output, and error streams directly and its exit code is returned by Laret.
+
+## Benchmarks
+
+Laret is measured against Cobra (Go), clap (Rust) and picocli (Java) on the work
+a CLI framework does after start-up: fanning out thousands of concurrent tasks,
+coalescing an event storm into one run, streaming 100,000 lines through a
+three-stage pipeline, and shutting 500 busy workers down cleanly on a signal.
+Every target implements the same four commands with the same flags, and the
+harness pins each process to the same cores and reads exact wall clock and peak
+memory from the kernel.
+
+- **Laret native is ahead of picocli on every scenario.**
+- **Against Cobra and clap**, Laret native coalesces the event storm as fast as
+  either, and stays within 5x of Cobra's peak memory on three of the four
+  scenarios. It is slower on start-up-bound runs and uses more memory than clap,
+  because a GraalVM native image carries a runtime that a Go or Rust binary does
+  not.
+
+The full tables, the targets Laret native is held to, and how to reproduce every
+number are in [docs/benchmarks.md](docs/benchmarks.md).
+
 ## Project Structure
 
 ```
@@ -1264,22 +1303,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgments
 
 - Inspired by [Cobra](https://github.com/spf13/cobra) (Go)
-
-## Sidecar Plugins
-
-Laret can install verified external executables as top-level commands. Plugins are stored in `~/.laret/plugins` by default; use `--plugin-dir` or `LARET_PLUGIN_DIR` to select additional directories.
-
-```bash
-laret plugin install formatter \
-  --url https://example.org/formatter \
-  --sha256 <64-hex-character-sha256>
-laret plugin list
-laret formatter input.txt
-laret plugin remove formatter --force
-```
-
-Installation accepts HTTPS URLs only, follows HTTPS redirects, verifies the required SHA-256 digest, and writes executable and TOML metadata files transactionally. Existing names require `--force` for replacement. Built-in commands always take precedence over plugins.
-
-Each installed plugin has a `<name>.toml` metadata file containing its name, source URL, digest, and installation timestamp. Laret verifies the executable digest before every run. Invalid and shadowed entries are shown by `laret plugin list` and are not executed.
-
-Sidecars inherit the parent environment. Laret overrides `LARET_PLUGIN_NAME`, `LARET_DRY_RUN`, and `LARET_PROFILE`. The sidecar receives standard input, output, and error streams directly and its exit code is returned by Laret.
