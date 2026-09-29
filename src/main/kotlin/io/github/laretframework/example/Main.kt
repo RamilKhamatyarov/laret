@@ -82,8 +82,8 @@ internal fun listDirEntries(dir: File, includeHidden: Boolean, maxSize: Int): Li
         .sortedBy { it.name }
 
 /**
- * The demo application, built once so `main` and the tests that drive the
- * benchmark payloads exercise exactly the same command tree.
+ * The demo application, built once so `main` and the tests exercise exactly
+ * the same command tree.
  */
 fun buildLaretApp(): CliApp = cli(
     name = "laret",
@@ -339,11 +339,6 @@ fun buildLaretApp(): CliApp = cli(
 
     group(name = "mcp", description = "Model Context Protocol server") {
         McpServeCommand.register(this)
-    }
-
-    group(name = "bench", description = "Concurrency benchmark payloads") {
-        hidden()
-        BenchCommands.register(this)
     }
 
     group(name = "doc", description = "Documentation generation") {

@@ -349,8 +349,6 @@ data class CliApp(
         if (pluginManager.getPlugins().isNotEmpty()) pluginManager.shutdown()
     }
 
-    internal fun getPluginManager(): PluginManager = pluginManager
-
     fun hasPlugins(): Boolean = pluginManager.getPlugins().isNotEmpty()
 
     fun getPlugins(): List<LaretPlugin> = pluginManager.getPlugins()

@@ -37,6 +37,7 @@ import threading
 import time
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
+from typing import Callable, Optional
 
 # 2: timing and RSS from wait4, settle_ms in Scenario B, target_runtime in
 #    provenance. Version 1 results were quantised and are not comparable.
@@ -73,15 +74,15 @@ class Measurement:
     target: str
     scenario: str
     parameters: dict
-    wall_clock_ms: float | None = None
-    overhead_us_per_unit: float | None = None
-    peak_rss_kb: int | None = None
-    cancellation_latency_ms: float | None = None
-    settle_ms: float | None = None
-    exit_code: int | None = None
+    wall_clock_ms: Optional[float] = None
+    overhead_us_per_unit: Optional[float] = None
+    peak_rss_kb: Optional[int] = None
+    cancellation_latency_ms: Optional[float] = None
+    settle_ms: Optional[float] = None
+    exit_code: Optional[int] = None
     checks: dict = field(default_factory=dict)
     passed: bool = True
-    error: str | None = None
+    error: Optional[str] = None
 
 
 def require_linux() -> None:
@@ -397,7 +398,7 @@ def combine(runs: list[Measurement]) -> Measurement:
     )
 
 
-def target_runtime(target: Target) -> str | None:
+def target_runtime(target: Target) -> Optional[str]:
     """What a Laret target actually runs on, as reported by the binary itself.
 
     A native image reports the GraalVM that built it through
@@ -415,7 +416,7 @@ def target_runtime(target: Target) -> str | None:
 
 
 def provenance(cpus: str, targets: list[Target]) -> dict:
-    def capture(*argv: str) -> str | None:
+    def capture(*argv: str) -> Optional[str]:
         try:
             return subprocess.run(argv, capture_output=True, text=True, timeout=30).stdout.strip().splitlines()[0]
         except (OSError, subprocess.SubprocessError, IndexError):
@@ -517,7 +518,7 @@ def main() -> int:
     # its own. Rotating keeps a scenario's samples for every target close
     # together in time and spreads every target across every position. Each
     # run is still its own process, so no scenario's memory leaks into another.
-    scenarios: list[tuple[str, callable]] = []
+    scenarios: list[tuple[str, Callable[[Target], Measurement]]] = []
     for tasks in args.tasks:
         scenarios.append((f"A{tasks}", lambda t, n=tasks: scenario_fanout(t, cpus, n)))
     scenarios.append(("B", lambda t: scenario_storm(t, cpus, args.events, args.window, args.debounce)))

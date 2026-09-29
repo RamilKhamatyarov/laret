@@ -12,6 +12,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Callable, Optional
 
 TARGET_ORDER = ["Cobra", "clap", "picocli", "Laret JVM", "Laret native"]
 # The Targets table labels a target by language; results.json names it by target.
@@ -33,15 +34,15 @@ BUILDS = [
 ]
 
 
-def ms(value: float | None) -> str:
+def ms(value: Optional[float]) -> str:
     return f"{value:.1f} ms" if value is not None else NOT_MEASURED
 
 
-def us(value: float | None) -> str:
+def us(value: Optional[float]) -> str:
     return f"{value:.2f} µs" if value is not None else NOT_MEASURED
 
 
-def mib(value: int | None) -> str:
+def mib(value: Optional[int]) -> str:
     return f"{value / 1024:.1f} MiB" if value is not None else NOT_MEASURED
 
 
@@ -55,7 +56,7 @@ def index(measurements: list[dict]) -> dict:
     return {(m["target"], m["scenario"], json.dumps(m["parameters"], sort_keys=True)): m for m in measurements}
 
 
-def find(measurements: list[dict], target: str, scenario: str, **params) -> dict | None:
+def find(measurements: list[dict], target: str, scenario: str, **params) -> Optional[dict]:
     for m in measurements:
         if m["target"] != target or m["scenario"] != scenario:
             continue
@@ -80,14 +81,14 @@ WALL_TARGET = 2.0
 RSS_TARGET = 5.0
 
 
-def target_metrics(measurements: list[dict]) -> list[tuple[str, str, callable]]:
+def target_metrics(measurements: list[dict]) -> list[tuple[str, str, Callable[[str], Optional[float]]]]:
     """(label, kind, value-of-measurement-set) for every metric the ADR targets."""
     rows = []
     for tasks in sorted({m["parameters"].get("tasks") for m in measurements if m["scenario"] == "A-fanout"} - {None}):
         rows.append((f"A fan-out N={tasks:,} wall", "wall",
                      lambda target, n=tasks: (find(measurements, target, "A-fanout", tasks=n) or {}).get("wall_clock_ms")))
 
-    def settle_excess(target: str) -> float | None:
+    def settle_excess(target: str) -> Optional[float]:
         m = find(measurements, target, "B-storm")
         if not m or m.get("settle_ms") is None:
             return None
@@ -100,7 +101,7 @@ def target_metrics(measurements: list[dict]) -> list[tuple[str, str, callable]]:
         rows.append((f"D {signal_name} latency", "wall",
                      lambda target, s=signal_name: (find(measurements, target, f"D-cancel-{s}") or {}).get("cancellation_latency_ms")))
     for scenario, label in (("A-fanout", "A"), ("B-storm", "B"), ("C-pipeline", "C"), ("D-cancel-SIGTERM", "D")):
-        def rss(target: str, sc=scenario) -> float | None:
+        def rss(target: str, sc=scenario) -> Optional[float]:
             values = [m["peak_rss_kb"] for m in measurements
                       if m["target"] == target and m["scenario"] == sc and m.get("peak_rss_kb")]
             return max(values) / 1024 if values else None
@@ -395,6 +396,7 @@ def main() -> int:
         )
     if version != 2:
         sys.exit(f"Unsupported schema_version: {version!r}")
+    sys.stdout.reconfigure(encoding="utf-8")
     sys.stdout.write(render(document))
     return 0
 

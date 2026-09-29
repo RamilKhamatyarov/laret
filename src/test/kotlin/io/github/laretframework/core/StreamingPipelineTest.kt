@@ -129,9 +129,10 @@ class StreamingPipelineTest {
         peakLiveStages.set(0)
 
         run(
-            arrayOf("gen", "lines", "--count", "2000"),
+            arrayOf("gen", "lines", "--count", "50000"),
             arrayOf("text", "grep", "--pattern", "line"),
             arrayOf("text", "count"),
+            capacityChunks = 1,
         )
 
         assertThat(peakLiveStages.get()).isEqualTo(3)
