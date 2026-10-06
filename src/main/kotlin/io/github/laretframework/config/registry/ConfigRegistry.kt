@@ -170,7 +170,7 @@ class DefaultLayer(values: Map<String, Any?>) : ConfigLayer {
 
 class EnvLayer(
     private val prefix: String = "LARET",
-    private val bindings: Map<String, String> = emptyMap(),
+    bindings: Map<String, String> = emptyMap(),
     private val envProvider: () -> Map<String, String> = { System.getenv() },
 ) : ConfigLayer {
     override val priority = 20
@@ -191,7 +191,7 @@ class EnvLayer(
     }
 }
 
-class FlagLayer(values: Map<String, String>, private val bindings: Map<String, String> = emptyMap()) : ConfigLayer {
+class FlagLayer(values: Map<String, String>, bindings: Map<String, String> = emptyMap()) : ConfigLayer {
     override val priority = 30
 
     private val normalizedValues = values.entries.associate { (k, v) ->
@@ -222,7 +222,8 @@ class FileLayer(
     private val homeDir: File = File(System.getProperty("user.home")),
 ) : ConfigLayer {
     override val priority = 10
-    private val file = resolveConfigFile(configPath, profile)
+
+    private val file by lazy { resolveConfigFile(configPath, profile) }
     private val values by lazy {
         file?.let { ConfigRegistry.flatten(reader.load(it)) }.orEmpty()
     }
