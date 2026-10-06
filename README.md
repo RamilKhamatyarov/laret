@@ -979,10 +979,9 @@ memory from the kernel.
 
 - **Laret native is ahead of picocli on every scenario.**
 - **Against Cobra and clap**, Laret native coalesces the event storm as fast as
-  either, and stays within 5x of Cobra's peak memory on three of the four
-  scenarios. It is slower on start-up-bound runs and uses more memory than clap,
-  because a GraalVM native image carries a runtime that a Go or Rust binary does
-  not.
+  either, and stays within 5x of Cobra's peak memory on all four scenarios. It
+  is slower on start-up-bound runs and uses more memory than clap, because a
+  GraalVM native image carries a runtime that a Go or Rust binary does not.
 
 The full tables, the targets Laret native is held to, and how to reproduce every
 number are in [docs/benchmarks.md](docs/benchmarks.md).

@@ -10,12 +10,18 @@ import io.github.laretframework.config.model.AppConfig
 import java.io.File
 
 class ConfigLoader {
-    private val jsonMapper: ObjectMapper = jacksonObjectMapper()
-        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-    private val yamlMapper: ObjectMapper = YAMLMapper()
-        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-    private val tomlMapper: ObjectMapper = TomlMapper()
-        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+    private val jsonMapper: ObjectMapper by lazy {
+        jacksonObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+    }
+    private val yamlMapper: ObjectMapper by lazy {
+        YAMLMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+    }
+    private val tomlMapper: ObjectMapper by lazy {
+        TomlMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+    }
 
     fun load(configPath: String? = null, profile: String? = null): AppConfig {
         val file = resolveConfigFile(configPath, profile)
