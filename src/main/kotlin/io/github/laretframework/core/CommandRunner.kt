@@ -51,6 +51,10 @@ object CommandRunner {
     }
 
     internal suspend fun executeCommand(command: Command, args: Array<String>, app: CliApp, groupName: String): Int {
+        if (command.wantsHelp(args)) {
+            HelpFormatter.showCommandHelp(command)
+            return 0
+        }
         val executionArgs = dryRunArgs(args)
         val fs = fileSystemFor(executionArgs.isDryRun)
         if (groupName == "completion" && command.name in setOf("bash", "zsh", "powershell", "install", "interactive")) {
@@ -82,7 +86,7 @@ object CommandRunner {
         )
         command.parseArgumentsAndOptions(executionArgs.args, ctx, groupName)
 
-        val positionalCount = executionArgs.args.count { !it.startsWith("-") }
+        val positionalCount = command.positionalTokens(executionArgs.args).size
         val missingRequired = command.arguments.filterIndexed { idx, arg ->
             arg.required && !arg.optional && idx >= positionalCount
         }

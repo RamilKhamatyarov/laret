@@ -61,6 +61,7 @@ class CancellationScope(
      * Cancel running work and run cleanups LIFO within the grace budget.
      * Idempotent: only the first call performs teardown; later calls return
      * immediately. Blocking, so it is safe to call from the shutdown-hook thread.
+     * Cleanups run on the calling thread; a watchdog calls [onForceHalt] past the budget.
      *
      * @param exitCode passed to [onForceHalt] if the grace budget is exceeded.
      */
@@ -76,22 +77,34 @@ class CancellationScope(
         }
         if (pending.isEmpty()) return
 
-        val worker = thread(start = true, isDaemon = true, name = "laret-shutdown") {
-            runBlocking {
-                for (registration in pending) {
-                    try {
-                        registration.block()
-                    } catch (_: CancellationException) {
-                    } catch (t: Throwable) {
-                        System.err.println("Shutdown cleanup failed: ${t.message}")
-                    }
-                }
+        val finished = AtomicBoolean(false)
+        val watchdog = thread(isDaemon = true, name = "laret-shutdown-watchdog") {
+            try {
+                Thread.sleep(gracePeriodMillis)
+            } catch (_: InterruptedException) {
+                return@thread
+            }
+            if (!finished.get()) {
+                System.err.println("Graceful shutdown exceeded ${gracePeriodMillis}ms; forcing exit")
+                onForceHalt(exitCode)
             }
         }
-        worker.join(gracePeriodMillis)
-        if (worker.isAlive) {
-            System.err.println("Graceful shutdown exceeded ${gracePeriodMillis}ms; forcing exit")
-            onForceHalt(exitCode)
+        try {
+            runCleanups(pending)
+        } finally {
+            finished.set(true)
+            watchdog.interrupt()
+        }
+    }
+
+    private fun runCleanups(pending: List<Registration>) = runBlocking {
+        for (registration in pending) {
+            try {
+                registration.block()
+            } catch (_: CancellationException) {
+            } catch (t: Throwable) {
+                System.err.println("Shutdown cleanup failed: ${t.message}")
+            }
         }
     }
 

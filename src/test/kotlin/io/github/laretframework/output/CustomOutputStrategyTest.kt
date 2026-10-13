@@ -4,14 +4,6 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Compile-checks the custom `OutputStrategy` example published in README.md.
- *
- * The `CsvOutput` implementation below is byte-for-byte the one documented in
- * the "Creating Custom Output Formats" section. If the `OutputStrategy`
- * signature changes, this test stops compiling and the README is caught before
- * it ships a snippet that does not build.
- */
 class CustomOutputStrategyTest {
 
     private object CsvOutput : OutputStrategy {
@@ -52,7 +44,6 @@ class CustomOutputStrategyTest {
 
     @Test
     fun `the documented when-dispatch compiles and selects a strategy`() {
-        // Mirrors the README's dispatch snippet.
         fun formatterFor(format: String): OutputStrategy = when (format) {
             "csv" -> CsvOutput
             "json" -> JsonOutput

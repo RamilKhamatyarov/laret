@@ -5,6 +5,7 @@ import io.github.laretframework.core.CommandContext
 import io.github.laretframework.core.Middleware
 import io.github.laretframework.model.Argument
 import io.github.laretframework.model.Command
+import io.github.laretframework.model.Constraint
 import io.github.laretframework.model.Option
 import io.github.laretframework.model.ValidationBuilder
 import io.github.laretframework.model.buildValidators
@@ -14,6 +15,7 @@ class CommandBuilder(val name: String, val description: String = "") {
     private val options = mutableListOf<Option>()
     private val aliases = mutableListOf<String>()
     private val exclusiveGroups = mutableListOf<Set<String>>()
+    private val constraints = mutableListOf<Constraint>()
     private var hidden = false
     private var actionBlock: (CommandContext) -> Unit = {}
 
@@ -102,13 +104,52 @@ class CommandBuilder(val name: String, val description: String = "") {
         if (longNames.size >= 2) exclusiveGroups.add(longNames.toSet())
     }
 
+    /** When [name] is set, every name in [required] must have a value. */
+    fun requires(name: String, vararg required: String) {
+        require(required.isNotEmpty()) { "requires(\"$name\") needs at least one required name" }
+        constraints += Constraint.Requires(name, required.toList())
+    }
+
+    /** Exactly one of [names] must be set. */
+    fun oneOf(vararg names: String) {
+        require(names.size >= 2) { "oneOf needs at least two names" }
+        constraints += Constraint.OneOf(names.toList())
+    }
+
+    /** Either every one of [names] is set, or none is. */
+    fun allOrNone(vararg names: String) {
+        require(names.size >= 2) { "allOrNone needs at least two names" }
+        constraints += Constraint.AllOrNone(names.toList())
+    }
+
+    /** When [name] resolves to [equals], every name in [required] must have a value. */
+    fun requiredWhen(name: String, equals: String, vararg required: String) {
+        require(required.isNotEmpty()) { "requiredWhen(\"$name\") needs at least one required name" }
+        constraints += Constraint.RequiredWhen(name, equals, required.toList())
+    }
+
     fun action(block: (CommandContext) -> Unit) {
         actionBlock = block
     }
 
-    fun build(): Command = Command(
-        name, description, arguments, options, aliases.toList(),
-        actionBlock, preExecute, postExecute, onError, hidden,
-        exclusiveGroups.toList(),
-    )
+    fun build(): Command {
+        checkConstraintNames()
+        return Command(
+            name, description, arguments, options, aliases.toList(),
+            actionBlock, preExecute, postExecute, onError, hidden,
+            exclusiveGroups.toList(), constraints.toList(),
+        )
+    }
+
+    private fun checkConstraintNames() {
+        val referenced = constraints.flatMap { it.names }.toSet()
+        val argumentNames = arguments.map { it.name }.toSet()
+        val optionNames = options.map { it.long }.toSet()
+        val unknown = referenced - argumentNames - optionNames
+        require(unknown.isEmpty()) { "Command '$name': constraints refer to unknown names: ${unknown.sorted()}" }
+        val ambiguous = referenced.filter { it in argumentNames && it in optionNames }
+        require(ambiguous.isEmpty()) {
+            "Command '$name': constraint names match both an argument and an option: ${ambiguous.sorted()}"
+        }
+    }
 }

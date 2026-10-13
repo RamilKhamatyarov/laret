@@ -118,8 +118,6 @@ object BenchCommands {
                     session.run(stormFlow(events, windowMillis, debounceMillis, emitted, lastEmitNanos))
                 }
 
-                // From the last event to the coalesced run: at least the debounce
-                // window, plus whatever the framework adds on top of it.
                 val settleMillis = if (firstRunNanos.get() == 0L) {
                     -1.0
                 } else {

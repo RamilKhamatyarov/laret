@@ -81,6 +81,12 @@ object HelpFormatter {
                 System.err.println("  $flags ${opt.description}")
             }
         }
+
+        val constraints = ConstraintChecker.describe(command)
+        if (constraints.isNotEmpty()) {
+            System.err.println("\n${Localization.t("help.constraints")}")
+            constraints.forEach { System.err.println("  $it") }
+        }
     }
 
     /** Format command groups for display in help text */
@@ -103,6 +109,10 @@ object HelpFormatter {
 
     /** Display a single validation failure for an argument or option. */
     fun showValidationError(error: io.github.laretframework.model.ValidationError) {
+        if (error.isConstraint) {
+            println(redBold(Localization.t("validation.failed.constraint", error.message)))
+            return
+        }
         val key = if (error.isOption) "validation.failed.option" else "validation.failed.argument"
         println(redBold(Localization.t(key, error.field, error.message)))
     }

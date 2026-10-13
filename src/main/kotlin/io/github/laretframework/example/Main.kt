@@ -90,8 +90,6 @@ fun buildLaretApp(): CliApp = cli(
     version = BuildInfo.VERSION,
     description = "Laret - A Cobra-like CLI framework for Kotlin",
 ) {
-    // The demo ships `update check` / `update apply`, so it owns the cleanup
-    // of the binary a previous self-update left behind.
     selfUpdate = true
 
     use(LoggingMiddleware())
@@ -1495,6 +1493,29 @@ fun buildLaretApp(): CliApp = cli(
 
             action { ctx ->
                 println("check ok: port=${ctx.argument("port")}")
+            }
+        }
+
+        command(name = "connect", description = "Argument dependency demo: requires, oneOf, allOrNone, requiredWhen") {
+            argument("file", "Read the target from a file", required = false, optional = true)
+            option("u", "url", "Target URL", "", true)
+            option("s", "stdin", "Read the target from stdin", "", false)
+            option("t", "tls", "Enable TLS", "", false)
+            option("c", "cert", "TLS certificate", "", true)
+            option("k", "key", "TLS private key", "", true)
+            option("a", "user", "User name", "", true)
+            option("p", "password", "Password", "", true)
+            option("m", "mode", "Connection mode (local, remote)", "local", true)
+            option("o", "host", "Remote host", "", true)
+            option("r", "port", "Remote port", "", true)
+            oneOf("file", "url", "stdin")
+            requires("tls", "cert", "key")
+            allOrNone("user", "password")
+            requiredWhen("mode", equals = "remote", "host", "port")
+
+            action { ctx ->
+                val target = ctx.argument("file").ifBlank { ctx.option("url").ifBlank { "stdin" } }
+                println("connect ok: target=$target mode=${ctx.option("mode")}")
             }
         }
     }

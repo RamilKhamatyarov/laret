@@ -27,6 +27,7 @@ object CommandValidator {
         }
 
         errors += exclusiveErrors(command, ctx)
+        errors += ConstraintChecker.errors(command, ctx)
         return errors
     }
 
