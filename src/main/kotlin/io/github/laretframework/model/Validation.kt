@@ -9,8 +9,14 @@ import java.io.File
  * @param field    argument name or option long name.
  * @param isOption true when [field] names an option rather than an argument.
  * @param message  human-readable reason, already localized.
+ * @param isConstraint true when the failure is a rule relating several names.
  */
-data class ValidationError(val field: String, val isOption: Boolean, val message: String)
+data class ValidationError(
+    val field: String,
+    val isOption: Boolean,
+    val message: String,
+    val isConstraint: Boolean = false,
+)
 
 /**
  * Validates one resolved value.

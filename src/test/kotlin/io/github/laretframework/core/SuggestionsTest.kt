@@ -17,7 +17,6 @@ class SuggestionsTest {
     @Test
     fun `several close matches format a list hint`() {
         val hint = Suggestions.didYouMean("cot", listOf("cat", "cut", "dog"))
-        // cat and cut are both one edit away from cot.
         assertEquals("Did you mean one of: cat, cut?", hint)
     }
 

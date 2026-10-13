@@ -126,4 +126,27 @@ class CancellationScopeTest {
 
         assertFalse(halted.get())
     }
+
+    @Test
+    fun `cleanups run on the thread that calls shutdown`() {
+        val scope = CancellationScope(onForceHalt = { })
+        var cleanupThread: Thread? = null
+        scope.onShutdown { cleanupThread = Thread.currentThread() }
+
+        scope.shutdown(0)
+
+        assertEquals(Thread.currentThread(), cleanupThread)
+    }
+
+    @Test
+    fun `cleanups finishing within the grace period never force a halt`() {
+        val halted = AtomicBoolean(false)
+        val scope = CancellationScope(gracePeriodMillis = 500, onForceHalt = { halted.set(true) })
+        scope.onShutdown { }
+
+        scope.shutdown(0)
+        Thread.sleep(800)
+
+        assertFalse(halted.get())
+    }
 }

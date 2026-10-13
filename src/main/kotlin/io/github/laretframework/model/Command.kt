@@ -27,12 +27,23 @@ data class Command(
     val onError: suspend (CommandContext, Exception) -> Unit = { _, _ -> },
     val hidden: Boolean = false,
     val exclusiveGroups: List<Set<String>> = emptyList(),
+    val constraints: List<Constraint> = emptyList(),
 ) {
     /** True when [input] equals the primary name or any alias. */
     fun matches(input: String): Boolean = input == name || input in aliases
 
+    /** Positional tokens, skipping flags and the values of options that take one. */
+    internal fun positionalTokens(args: Array<String>): List<String> {
+        val valueFlags = options.filter { it.takesValue }.flatMap { listOf("-${it.short}", "--${it.long}") }.toSet()
+        return args.filterIndexed { i, token -> !token.startsWith("-") && args.getOrNull(i - 1) !in valueFlags }
+    }
+
+    /** True when [args] ask for this command's help and the command has not claimed the flag itself. */
+    internal fun wantsHelp(args: Array<String>): Boolean = ("--help" in args && options.none { it.long == "help" }) ||
+        ("-h" in args && options.none { it.short == "h" })
+
     internal fun parseArgumentsAndOptions(args: Array<String>, ctx: CommandContext, groupName: String) {
-        val positional = args.filter { !it.startsWith("-") }
+        val positional = positionalTokens(args)
         arguments.forEachIndexed { idx, arg ->
             ctx.arguments[arg.name] = positional.getOrElse(idx) { arg.default }
         }
