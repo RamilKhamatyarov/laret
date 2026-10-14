@@ -1,9 +1,9 @@
 plugins {
-    kotlin("jvm") version "2.4.20"
+    kotlin("jvm") version "2.4.21"
     id("org.graalvm.buildtools.native") version "1.1.14"
     id("com.gradleup.shadow") version "9.6.1"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
-    id("com.diffplug.spotless") version "8.10.3"
+    id("com.diffplug.spotless") version "8.10.4"
     id("pmd")
     `maven-publish`
     signing
@@ -27,7 +27,7 @@ repositories {
 dependencies {
     implementation(kotlin("stdlib"))
 
-    implementation("org.jline:jline:4.4.6")
+    implementation("org.jline:jline:4.4.7")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.22.3")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.22.3")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.22.3")
