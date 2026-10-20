@@ -3,7 +3,6 @@ package io.github.laretframework.core
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -54,9 +53,12 @@ object ParallelDispatcher {
         if (blocks.isEmpty()) return emptyList()
 
         if (maxJobs == UNBOUNDED) {
-            return coroutineScope {
-                blocks.map { block -> async(Dispatchers.Default) { block() } }.awaitAll()
+            val results = arrayOfNulls<Any>(blocks.size)
+            coroutineScope {
+                blocks.forEachIndexed { index, block -> launch(Dispatchers.Default) { results[index] = block() } }
             }
+            @Suppress("UNCHECKED_CAST")
+            return results.asList() as List<T>
         }
         return pooled(blocks.size, maxJobs, Dispatchers.Default) { index -> blocks[index]() }
     }

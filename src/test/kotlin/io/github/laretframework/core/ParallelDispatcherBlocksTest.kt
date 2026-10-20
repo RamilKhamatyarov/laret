@@ -125,6 +125,24 @@ class ParallelDispatcherBlocksTest {
     }
 
     @Test
+    fun aFailingBlockCancelsTheBlocksStillRunning() = runTest {
+        val finished = AtomicInteger(0)
+        val blocks = listOf<suspend () -> Int>(
+            {
+                delay(10_000.toDuration(DurationUnit.MILLISECONDS))
+                finished.incrementAndGet()
+            },
+            {
+                yield()
+                throw IllegalStateException("boom")
+            },
+        )
+
+        assertThat(catching { ParallelDispatcher.executeBlocks(blocks) }).hasMessage("boom")
+        assertThat(finished.get()).isZero()
+    }
+
+    @Test
     fun rejectsNegativeMaxJobs() = runTest {
         val thrown = catching { ParallelDispatcher.executeBlocks(listOf<suspend () -> Int>({ 1 }), -1) }
 

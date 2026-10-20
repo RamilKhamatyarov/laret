@@ -162,7 +162,7 @@ class CommandPipeline(private val app: CliApp) {
         val stageOut = if (isLast) {
             PrintStream(target, true, Charsets.UTF_8)
         } else {
-            PrintStream(BufferedOutputStream(pipes[index].sink, STAGE_BUFFER_BYTES), false, Charsets.UTF_8)
+            BatchingPrintStream(BufferedOutputStream(pipes[index].sink, STAGE_BUFFER_BYTES))
         }
 
         router.bind(stageOut)

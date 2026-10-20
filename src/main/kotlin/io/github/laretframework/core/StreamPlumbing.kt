@@ -196,3 +196,120 @@ internal class ThreadRoutedInputStream(private val fallback: InputStream) : Inpu
 
     override fun available(): Int = current().available()
 }
+
+/**
+ * A [PrintStream] for output passed between pipeline stages that collects text
+ * and encodes it in blocks of [batchChars], instead of running the charset
+ * encoder twice for every `println` as [PrintStream] does. Raw byte writes
+ * drain pending text first, so output keeps its order. Nothing reaches [sink]
+ * before a block fills or the stream is flushed.
+ */
+internal class BatchingPrintStream(private val sink: OutputStream, private val batchChars: Int = BATCH_CHARS) :
+    PrintStream(sink, false, Charsets.UTF_8) {
+
+    private val pending = StringBuilder(batchChars)
+    private val newline = System.lineSeparator()
+
+    private fun text(s: String?, endLine: Boolean = false) = synchronized(this) {
+        pending.append(s)
+        if (endLine) pending.append(newline)
+        if (pending.length >= batchChars) drain(keepHighSurrogate = true)
+    }
+
+    private fun drain(keepHighSurrogate: Boolean = false) {
+        if (pending.isEmpty()) return
+        val end = if (keepHighSurrogate && pending.last().isHighSurrogate()) pending.length - 1 else pending.length
+        try {
+            sink.write(pending.substring(0, end).toByteArray(Charsets.UTF_8))
+        } catch (_: java.io.IOException) {
+            setError()
+        }
+        pending.delete(0, end)
+    }
+
+    override fun print(b: Boolean) = text(b.toString())
+
+    override fun print(c: Char) = text(c.toString())
+
+    override fun print(i: Int) = text(i.toString())
+
+    override fun print(l: Long) = text(l.toString())
+
+    override fun print(f: Float) = text(f.toString())
+
+    override fun print(d: Double) = text(d.toString())
+
+    override fun print(s: CharArray) = text(String(s))
+
+    override fun print(s: String?) = text(s ?: "null")
+
+    override fun print(obj: Any?) = text(obj.toString())
+
+    override fun println() = text("", endLine = true)
+
+    override fun println(x: Boolean) = text(x.toString(), endLine = true)
+
+    override fun println(x: Char) = text(x.toString(), endLine = true)
+
+    override fun println(x: Int) = text(x.toString(), endLine = true)
+
+    override fun println(x: Long) = text(x.toString(), endLine = true)
+
+    override fun println(x: Float) = text(x.toString(), endLine = true)
+
+    override fun println(x: Double) = text(x.toString(), endLine = true)
+
+    override fun println(x: CharArray) = text(String(x), endLine = true)
+
+    override fun println(x: String?) = text(x ?: "null", endLine = true)
+
+    override fun println(x: Any?) = text(x.toString(), endLine = true)
+
+    override fun append(csq: CharSequence?): PrintStream = also { text(csq.toString()) }
+
+    override fun append(csq: CharSequence?, start: Int, end: Int): PrintStream = also {
+        text((csq ?: "null").subSequence(start, end).toString())
+    }
+
+    override fun append(c: Char): PrintStream = also { text(c.toString()) }
+
+    override fun write(b: Int) = synchronized(this) {
+        drain()
+        try {
+            sink.write(b)
+        } catch (_: java.io.IOException) {
+            setError()
+        }
+    }
+
+    override fun write(buf: ByteArray, off: Int, len: Int) = synchronized(this) {
+        drain()
+        try {
+            sink.write(buf, off, len)
+        } catch (_: java.io.IOException) {
+            setError()
+        }
+    }
+
+    override fun flush() = synchronized(this) {
+        drain()
+        try {
+            sink.flush()
+        } catch (_: java.io.IOException) {
+            setError()
+        }
+    }
+
+    override fun close() = synchronized(this) {
+        flush()
+        try {
+            sink.close()
+        } catch (_: java.io.IOException) {
+            setError()
+        }
+    }
+
+    companion object {
+        const val BATCH_CHARS = 8 * 1024
+    }
+}
