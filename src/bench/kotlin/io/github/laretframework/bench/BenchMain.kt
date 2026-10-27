@@ -9,6 +9,7 @@ fun buildBenchApp(): CliApp = cli(
     version = "bench",
     description = "Laret concurrency benchmark payloads",
 ) {
+    fastSignals()
     group(name = "bench", description = "Concurrency benchmark payloads") {
         BenchCommands.register(this)
     }

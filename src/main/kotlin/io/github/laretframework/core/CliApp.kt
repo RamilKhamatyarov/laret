@@ -57,10 +57,11 @@ data class CliApp(
      * without a self-update feature has no reason to pay for.
      */
     var cleansUpAfterSelfUpdate: Boolean = false
+    var fastSignals: Boolean = false
         internal set
 
     internal var onInitHook: suspend (CliApp) -> Unit = {}
-    internal var onShutdownHook: suspend (CliApp) -> Unit = {}
+    internal var onShutdownHook: (suspend (CliApp) -> Unit)? = null
 
     /**
      * The current run's cancellation scope. Recreated per run so cancelling its
@@ -74,8 +75,9 @@ data class CliApp(
     private fun startScope(includeAppHooks: Boolean): CancellationScope {
         val scope = CancellationScope()
 
-        if (includeAppHooks) scope.onShutdown { onShutdownHook(this@CliApp) }
-        scope.onShutdown { shutdownPlugins() }
+        val appHook = onShutdownHook
+        if (includeAppHooks && appHook != null) scope.onShutdown { appHook(this@CliApp) }
+        if (hasPlugins()) scope.onShutdown { shutdownPlugins() }
         cancellationScope = scope
         return scope
     }
@@ -165,15 +167,22 @@ data class CliApp(
         logManager.disableLogging()
         if (cleansUpAfterSelfUpdate) OldBinaryCleaner.cleanupSilently()
         val scope = startScope(includeAppHooks = true)
-        val hook = Thread({ scope.shutdown(CancellationScope.INTERRUPT_EXIT_CODE) }, "laret-signal")
-        Runtime.getRuntime().addShutdownHook(hook)
+        val signals = if (fastSignals) FastSignals(scope).install() else null
+        val hook = if (signals == null) {
+            Thread({ scope.shutdown(CancellationScope.INTERRUPT_EXIT_CODE) }, "laret-signal")
+                .also { Runtime.getRuntime().addShutdownHook(it) }
+        } else {
+            null
+        }
         return try {
             runBlocking(scope.coroutineContext) { dispatch(args) }
         } catch (_: CancellationException) {
             CancellationScope.INTERRUPT_EXIT_CODE
         } finally {
+            signals?.awaitIfSignalled()
             scope.shutdown(0)
-            runCatching { Runtime.getRuntime().removeShutdownHook(hook) }
+            signals?.uninstall()
+            hook?.let { runCatching { Runtime.getRuntime().removeShutdownHook(it) } }
         }
     }
 
@@ -326,13 +335,12 @@ data class CliApp(
         return this
     }
 
-    fun registerPlugin(plugin: LaretPlugin): CliApp {
-        pluginManager.register(plugin)
-        return this
-    }
+    fun registerPlugin(plugin: LaretPlugin): CliApp = registerPlugins(plugin)
 
     fun registerPlugins(vararg plugins: LaretPlugin): CliApp {
+        val hadPlugins = hasPlugins()
         plugins.forEach { pluginManager.register(it) }
+        if (!hadPlugins && hasPlugins()) cancellationScope.onShutdown { shutdownPlugins() }
         return this
     }
 
@@ -341,7 +349,7 @@ data class CliApp(
     }
 
     fun shutdown() {
-        runBlocking { onShutdownHook(this@CliApp) }
+        runBlocking { onShutdownHook?.invoke(this@CliApp) }
         shutdownPlugins()
     }
 

@@ -57,6 +57,8 @@ class CancellationScope(
 
     val isShuttingDown: Boolean get() = shuttingDown.get()
 
+    internal val pendingCleanups: Int get() = synchronized(lock) { cleanups.size }
+
     /**
      * Cancel running work and run cleanups LIFO within the grace budget.
      * Idempotent: only the first call performs teardown; later calls return

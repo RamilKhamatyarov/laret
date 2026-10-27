@@ -78,7 +78,13 @@ class Measurement:
     overhead_us_per_unit: Optional[float] = None
     peak_rss_kb: Optional[int] = None
     cancellation_latency_ms: Optional[float] = None
+
+    cancellation_latency_samples_ms: list = field(default_factory=list)
     settle_ms: Optional[float] = None
+
+    rss_anon_kb: Optional[int] = None
+    rss_file_kb: Optional[int] = None
+    anon_huge_pages_kb: Optional[int] = None
     exit_code: Optional[int] = None
     checks: dict = field(default_factory=dict)
     passed: bool = True
@@ -330,6 +336,7 @@ def scenario_cancel(target: Target, cpus: set[int], workers: int, sig: signal.Si
             )
 
         time.sleep(SIGNAL_DELAY_SECONDS)
+        memory = resident_memory_kb(ready_line)
         signalled_at = time.perf_counter()
         os.killpg(process.pid, sig)
 
@@ -360,12 +367,48 @@ def scenario_cancel(target: Target, cpus: set[int], workers: int, sig: signal.Si
         scenario=f"D-cancel-{sig.name}",
         parameters={**params, "expected_exit_code": expected_code},
         cancellation_latency_ms=latency_ms,
+        rss_anon_kb=memory.get("RssAnon"),
+        rss_file_kb=memory.get("RssFile"),
+        anon_huge_pages_kb=memory.get("AnonHugePages"),
         peak_rss_kb=result["rss"],
         exit_code=result["code"],
         checks=checks,
         passed=passed,
         error=None if passed else (stderr.strip()[-400:] or None),
     )
+
+
+def resident_memory_kb(ready_line: str) -> dict:
+    """RssAnon, RssFile and AnonHugePages of the pid a ready line reports.
+
+    Keys that cannot be read are left out.
+    """
+    fields = dict(pair.split("=", 1) for pair in ready_line.split() if "=" in pair)
+    wanted = ("RssAnon:", "RssFile:", "AnonHugePages:")
+    memory: dict = {}
+    try:
+        pid = int(fields["pid"])
+    except (KeyError, ValueError):
+        return memory
+    for source in (f"/proc/{pid}/status", f"/proc/{pid}/smaps_rollup"):
+        try:
+            lines = Path(source).read_text().splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            if line.startswith(wanted):
+                memory.setdefault(line.split(":", 1)[0], int(line.split()[1]))
+    return memory
+
+
+def transparent_hugepage_mode() -> Optional[str]:
+    """The selected value of the kernel's THP mode, such as "always" or "madvise"."""
+    try:
+        text = Path("/sys/kernel/mm/transparent_hugepage/enabled").read_text()
+    except OSError:
+        return None
+    start, end = text.find("["), text.find("]")
+    return text[start + 1:end] if 0 <= start < end else text.strip() or None
 
 
 def combine(runs: list[Measurement]) -> Measurement:
@@ -390,7 +433,13 @@ def combine(runs: list[Measurement]) -> Measurement:
         overhead_us_per_unit=median("overhead_us_per_unit"),
         peak_rss_kb=median("peak_rss_kb"),
         cancellation_latency_ms=median("cancellation_latency_ms"),
+        cancellation_latency_samples_ms=[
+            r.cancellation_latency_ms for r in runs if r.cancellation_latency_ms is not None
+        ],
         settle_ms=median("settle_ms"),
+        rss_anon_kb=median("rss_anon_kb"),
+        rss_file_kb=median("rss_file_kb"),
+        anon_huge_pages_kb=median("anon_huge_pages_kb"),
         exit_code=first.exit_code if all(r.exit_code == first.exit_code for r in runs) else None,
         checks=checks,
         passed=all(r.passed for r in runs),
@@ -430,6 +479,7 @@ def provenance(cpus: str, targets: list[Target]) -> dict:
         "kernel": platform.release(),
         "cpu": capture("bash", "-c", "grep -m1 'model name' /proc/cpuinfo | cut -d: -f2-"),
         "pinned_cpus": cpus,
+        "transparent_hugepage": transparent_hugepage_mode(),
         # The toolchain that built the Cobra binary, which go.mod may have
         # switched away from whatever `go` is on the PATH.
         "go": capture("go", "version", str(BENCHMARKS / "cobra" / "bench-cobra")) or capture("go", "version"),
@@ -470,6 +520,9 @@ def main() -> int:
     parser.add_argument("--no-warmup", action="store_true", help="skip the discarded warm-up run")
     parser.add_argument("--repeat", type=int, default=None,
                         help="runs per scenario, reported as the median (default 3, or 1 with --quick)")
+    parser.add_argument("--repeat-cancel", type=int, default=None,
+                        help="runs per Scenario D signal, whose night-to-night spread is wide "
+                             "(default 9, or 1 with --quick)")
     args = parser.parse_args()
 
     require_linux()
@@ -482,6 +535,10 @@ def main() -> int:
         args.repeat = 1 if args.quick else 3
     if args.repeat < 1:
         sys.exit("--repeat must be at least 1")
+    if args.repeat_cancel is None:
+        args.repeat_cancel = 1 if args.quick else 9
+    if args.repeat_cancel < 1:
+        sys.exit("--repeat-cancel must be at least 1")
 
     if args.quick:
         args.tasks = [100]
@@ -529,7 +586,8 @@ def main() -> int:
     for key, run in scenarios:
         print(f"== scenario {key}", file=sys.stderr)
         samples: dict[str, list[Measurement]] = {t.name: [] for t in targets}
-        for repeat in range(args.repeat):
+        repeats = args.repeat_cancel if key.startswith("D-") else args.repeat
+        for repeat in range(repeats):
             shift = repeat % len(targets)
             for target in targets[shift:] + targets[:shift]:
                 samples[target.name].append(run(target))
@@ -546,6 +604,7 @@ def main() -> int:
         "skipped_targets": missing,
         "quick": args.quick,
         "repeats": args.repeat,
+        "repeats_cancel": args.repeat_cancel,
         "measurements": [asdict(m) for m in measurements],
     }
     Path(args.out).write_text(json.dumps(document, indent=2) + "\n")

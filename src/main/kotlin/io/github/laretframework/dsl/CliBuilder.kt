@@ -17,7 +17,7 @@ class CliBuilder(val name: String, val version: String, val description: String)
     private val commandRegistrations = mutableListOf<MiddlewareRegistration>()
 
     var onAppInit: suspend (CliApp) -> Unit = {}
-    var onAppShutdown: suspend (CliApp) -> Unit = {}
+    var onAppShutdown: suspend (CliApp) -> Unit = NO_SHUTDOWN_HOOK
 
     /**
      * Set when the application updates its own binary. The previous binary is
@@ -26,6 +26,17 @@ class CliBuilder(val name: String, val version: String, val description: String)
      * otherwise: the cleanup touches the filesystem on every invocation.
      */
     var selfUpdate: Boolean = false
+
+    private var fastSignals = false
+
+    /**
+     * Handle `SIGTERM` and `SIGINT` directly: run Laret's cleanups, then halt
+     * with `128 + signal`; a second signal halts at once. JVM shutdown hooks
+     * registered outside Laret do not run on those signals.
+     */
+    fun fastSignals() {
+        fastSignals = true
+    }
 
     fun group(name: String, description: String = "", block: GroupBuilder.() -> Unit) {
         val groupBuilder = GroupBuilder(name, description)
@@ -68,8 +79,9 @@ class CliBuilder(val name: String, val version: String, val description: String)
 
         val app = CliApp(name, version, description, groups, registry)
         app.onInitHook = onAppInit
-        app.onShutdownHook = onAppShutdown
+        app.onShutdownHook = onAppShutdown.takeUnless { it === NO_SHUTDOWN_HOOK }
         app.cleansUpAfterSelfUpdate = selfUpdate
+        app.fastSignals = fastSignals
         return app
     }
 
@@ -102,5 +114,7 @@ class CliBuilder(val name: String, val version: String, val description: String)
 
     companion object {
         const val MIDDLEWARE_GROUP = "middleware"
+
+        private val NO_SHUTDOWN_HOOK: suspend (CliApp) -> Unit = {}
     }
 }
