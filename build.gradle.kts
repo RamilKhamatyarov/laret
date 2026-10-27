@@ -28,9 +28,9 @@ dependencies {
     implementation(kotlin("stdlib"))
 
     implementation("org.jline:jline:4.4.8")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.22.3")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.22.3")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.22.3")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.22.4")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.22.4")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.22.4")
     implementation("com.github.ajalt.mordant:mordant:3.1.0")
     implementation("com.github.ajalt.mordant:mordant-coroutines:3.1.0")
     implementation("com.github.ajalt.mordant:mordant-markdown:3.1.0")
