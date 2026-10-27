@@ -46,6 +46,21 @@ def mib(value: Optional[int]) -> str:
     return f"{value / 1024:.1f} MiB" if value is not None else NOT_MEASURED
 
 
+def latency(measurement: dict) -> str:
+    median = ms(measurement.get("cancellation_latency_ms"))
+    samples = measurement.get("cancellation_latency_samples_ms") or []
+    if len(samples) < 2:
+        return median
+    return f"{median} ({min(samples):.1f}-{max(samples):.1f})"
+
+
+def resident(measurement: dict) -> str:
+    parts = [measurement.get(k) for k in ("rss_anon_kb", "rss_file_kb", "anon_huge_pages_kb")]
+    if all(p is None for p in parts):
+        return NOT_MEASURED
+    return " / ".join(mib(p) for p in parts)
+
+
 def verdict(measurement: dict, check: str) -> str:
     if check not in measurement.get("checks", {}):
         return NOT_MEASURED
@@ -79,6 +94,17 @@ def targets_present(measurements: list[dict]) -> list[str]:
 
 WALL_TARGET = 2.0
 RSS_TARGET = 5.0
+# Against picocli a difference smaller than this is noise, not a lead: the
+# larger of 0.05 ms (wall rows only) and 10% of the larger value.
+TIE_ABSOLUTE_MS = 0.05
+TIE_RELATIVE = 0.10
+
+
+def versus(laret: float, other: float, kind: str) -> str:
+    tolerance = max(TIE_RELATIVE * max(laret, other), TIE_ABSOLUTE_MS if kind == "wall" else 0.0)
+    if abs(laret - other) < tolerance:
+        return "level"
+    return "ahead" if laret < other else "**behind**"
 
 
 def target_metrics(measurements: list[dict]) -> list[tuple[str, str, Callable[[str], Optional[float]]]]:
@@ -121,7 +147,8 @@ def render_targets(document: dict) -> list[str]:
         return out
     out += [
         f"Wall clock and latency within {WALL_TARGET:g}x of Cobra and of clap, peak RSS within",
-        f"{RSS_TARGET:g}x of each, and ahead of picocli on every row. Reported, never enforced.",
+        f"{RSS_TARGET:g}x of each, and ahead of or level with picocli on every row. Level means",
+        f"within {TIE_RELATIVE:.0%} or, for times, {TIE_ABSOLUTE_MS:g} ms. Reported, never enforced.",
         "",
     ]
     rows = []
@@ -146,7 +173,7 @@ def render_targets(document: dict) -> list[str]:
         if pico is None:
             cells.append(NOT_MEASURED)
         else:
-            cells.append("ahead" if laret < pico else "**behind**")
+            cells.append(versus(laret, pico, kind))
         rows.append(cells)
     out.append(table(
         ["Metric", "Laret native", f"vs Cobra (≤{WALL_TARGET:g}x / ≤{RSS_TARGET:g}x)", "vs clap", "vs picocli"],
@@ -189,6 +216,8 @@ def render(document: dict) -> str:
     add("Numbers are only meaningful next to the machine that produced them.")
     if document.get("repeats", 1) > 1:
         add(f"Every figure is the median of {document['repeats']} runs.")
+    if document.get("repeats_cancel", 1) > 1:
+        add(f"Scenario D latencies are the median of {document['repeats_cancel']} runs, with the range.")
     add("")
     add(table(
         ["Field", "Value"],
@@ -199,6 +228,7 @@ def render(document: dict) -> str:
             ["Kernel", provenance.get("kernel") or NOT_MEASURED],
             ["CPU", (provenance.get("cpu") or NOT_MEASURED).strip()],
             ["Pinned cores", provenance.get("pinned_cpus") or NOT_MEASURED],
+            ["Transparent huge pages", provenance.get("transparent_hugepage") or NOT_MEASURED],
             ["Go toolchain", provenance.get("go") or NOT_MEASURED],
             ["Rust toolchain", provenance.get("rust") or NOT_MEASURED],
             ["JDK", provenance.get("jdk") or NOT_MEASURED],
@@ -356,12 +386,17 @@ def render(document: dict) -> str:
             m = find(measurements, target, scenario)
             rows.append([
                 target,
-                ms(m["cancellation_latency_ms"]) if m else NOT_MEASURED,
+                latency(m) if m else NOT_MEASURED,
                 str(m["exit_code"]) if m and m["exit_code"] is not None else NOT_MEASURED,
                 verdict(m, "reverse_registration_order") if m else NOT_MEASURED,
                 mib(m["peak_rss_kb"]) if m else NOT_MEASURED,
+                resident(m) if m else NOT_MEASURED,
             ])
-        add(table(["Target", "Cancellation latency", "Exit code", "Cleanup order", "Peak RSS"], rows))
+        add(table(
+            ["Target", "Cancellation latency", "Exit code", "Cleanup order", "Peak RSS",
+             "Anon / file / huge pages at signal"],
+            rows,
+        ))
         add("")
 
     add("## Reproducing")

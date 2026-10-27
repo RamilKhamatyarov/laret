@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# Build every benchmark target. Missing toolchains are reported and skipped
-# rather than failing the script, so a partial comparison is still possible;
-# harness.py records which targets were skipped.
+
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

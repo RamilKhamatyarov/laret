@@ -3294,6 +3294,9 @@ jobs:
             || { echo "ERROR: no C compiler; the harness cannot build rusage_exec"; exit 1; }
           echo "cc available"
 
+      - name: Harness unit tests
+        run: python3 -m unittest discover benchmarks/harness -v
+
       - name: All five targets at reduced scale
         run: |
           set -euo pipefail
