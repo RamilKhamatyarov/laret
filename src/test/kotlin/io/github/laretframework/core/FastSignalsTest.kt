@@ -78,14 +78,20 @@ class FastSignalsTest {
     @Test
     fun uninstallRestoresThePreviousHandler() {
         val signal = Signal("INT")
-        val before = current(signal)
-        val signals = FastSignals(CancellationScope()) { halts += it }
+        val custom = SignalHandler { }
+        val original = runCatching { Signal.handle(signal, custom) }.getOrNull()
+        assumeTrue(original != null && current(signal) === custom, "this JVM does not hand SIGINT to applications")
+        try {
+            val signals = FastSignals(CancellationScope()) { halts += it }
 
-        signals.install()
-        assumeTrue(current(signal).toString() != before.toString(), "this JVM does not hand SIGINT to applications")
-        signals.uninstall()
+            signals.install()
+            assertThat(current(signal)).isNotSameAs(custom)
+            signals.uninstall()
 
-        assertThat(current(signal)).hasToString(before.toString())
+            assertThat(current(signal)).isSameAs(custom)
+        } finally {
+            Signal.handle(signal, original)
+        }
     }
 
     @Test
@@ -95,7 +101,7 @@ class FastSignalsTest {
     }
 
     private fun current(signal: Signal): SignalHandler {
-        val handler = Signal.handle(signal, SignalHandler.SIG_IGN)
+        val handler = Signal.handle(signal) { }
         Signal.handle(signal, handler)
         return handler
     }
