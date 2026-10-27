@@ -314,7 +314,21 @@ jobs:
           zsh -c "source /tmp/laret_zsh.sh && echo 'Zsh completion sourced successfully'"
 
       - name: Install PowerShell
-        run: sudo apt-get install -y powershell
+        run: |
+          set -euo pipefail
+          if ! command -v pwsh > /dev/null; then
+            version=7.5.0
+            curl -fsSL -o /tmp/pwsh.tar.gz               "https://github.com/PowerShell/PowerShell/releases/download/v${version}/powershell-${version}-linux-x64.tar.gz"
+            sudo mkdir -p /opt/microsoft/powershell/7
+            sudo tar -xzf /tmp/pwsh.tar.gz -C /opt/microsoft/powershell/7
+            sudo chmod +x /opt/microsoft/powershell/7/pwsh
+            sudo ln -sf /opt/microsoft/powershell/7/pwsh /usr/local/bin/pwsh
+          fi
+          if ! ldconfig -p | grep -q libicuuc; then
+            echo "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1" >> "$GITHUB_ENV"
+            export DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+          fi
+          pwsh --version
 
       - name: Test PowerShell completion generation
         run: |
