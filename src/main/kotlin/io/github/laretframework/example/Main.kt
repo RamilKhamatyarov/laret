@@ -931,38 +931,84 @@ fun buildLaretApp(): CliApp = cli(
                 }
             }
         }
-        command(
-            name = "replay",
-            description = "Replay a command (default: last). Use index from 'history show'.",
-        ) {
+        command(name = "save", description = "Save a recent command under a reusable alias") {
+            argument("name", "Lowercase alias name")
             argument(
                 "index",
-                "Entry index to replay (0 = last)",
+                "History index to save (0 = most recent)",
                 required = false,
                 optional = true,
                 default = "0",
             )
             action { ctx ->
+                val name = ctx.argument("name")
+                val app = ctx.app
+                if (app?.groups?.any { it.matches(name) } == true) {
+                    println("Alias '$name' conflicts with a command group.")
+                    return@action
+                }
                 val index = ctx.argument("index").toIntOrNull() ?: 0
                 val entry = if (index <= 0) CommandHistory.last() else CommandHistory.get(index)
                 if (entry == null) {
+                    println("No command history to save.")
+                    return@action
+                }
+                if (!CommandHistory.saveAlias(name, entry.args)) {
+                    println("Invalid alias name. Use lowercase letters, numbers, and hyphens; start with a letter.")
+                    return@action
+                }
+                println("Saved '${entry.args.joinToString(" ")}' as '$name'. Run it with 'laret $name'.")
+            }
+        }
+        command(name = "aliases", description = "List saved command aliases") {
+            action { _ ->
+                val aliases = CommandHistory.listAliases()
+                if (aliases.isEmpty()) {
+                    println("No saved command aliases.")
+                    return@action
+                }
+                aliases.forEach { alias ->
+                    println("  ${alias.name}: ${alias.args.joinToString(" ")}")
+                }
+            }
+        }
+        command(
+            name = "replay",
+            description = "Replay a saved alias or history entry (default: last).",
+        ) {
+            argument(
+                "alias_or_index",
+                "Saved alias or history index (0 = last)",
+                required = false,
+                optional = true,
+                default = "0",
+            )
+            action { ctx ->
+                val selector = ctx.argument("alias_or_index")
+                val replayArgs = CommandHistory.alias(selector)?.args
+                    ?: run {
+                        val index = selector.toIntOrNull() ?: 0
+                        val entry = if (index <= 0) CommandHistory.last() else CommandHistory.get(index)
+                        entry?.let(CommandHistory::replayArgs)
+                    }
+                if (replayArgs == null) {
                     println("No command history.")
                     return@action
                 }
                 val app = ctx.app ?: return@action
-                println("Replaying: ${entry.args.joinToString(" ")}")
-                val replayArgs = CommandHistory.replayArgs(entry).toTypedArray()
-                if (replayArgs.size >= 2 && replayArgs[0] == "pipe" && replayArgs[1] == "run") {
-                    pipeCommandArgs.set(replayArgs.copyOfRange(2, replayArgs.size))
+                println("Replaying: ${replayArgs.joinToString(" ")}")
+                val replayArgArray = replayArgs.toTypedArray()
+                if (replayArgArray.size >= 2 && replayArgArray[0] == "pipe" && replayArgArray[1] == "run") {
+                    pipeCommandArgs.set(replayArgArray.copyOfRange(2, replayArgArray.size))
                 }
-                if (replayArgs.size >= 2 && replayArgs[0] == "parallel" && replayArgs[1] == "run") {
-                    parallelCommandArgs.set(replayArgs.copyOfRange(2, replayArgs.size))
+                if (replayArgArray.size >= 2 && replayArgArray[0] == "parallel" && replayArgArray[1] == "run") {
+                    parallelCommandArgs.set(replayArgArray.copyOfRange(2, replayArgArray.size))
                 }
-                if (replayArgs.size >= 2 && replayArgs[0] == "watch" && replayArgs[1] == "run") {
-                    watchCommandArgs.set(replayArgs.copyOfRange(2, replayArgs.size))
+                if (replayArgArray.size >= 2 && replayArgArray[0] == "watch" && replayArgArray[1] == "run") {
+                    watchCommandArgs.set(replayArgArray.copyOfRange(2, replayArgArray.size))
                 }
                 val exitCode = CommandHistory.withSuppressedRecording {
-                    app.runForTest(replayArgs)
+                    app.runForTest(replayArgArray)
                 }
                 if (exitCode != 0) {
                     System.err.println("Replay failed (exit $exitCode)")
@@ -1580,13 +1626,9 @@ fun main(args: Array<String>) {
     UndoManager.load()
     CommandHistory.load()
 
-    val resolvedArgs = if (strippedArgs.size == 1 && strippedArgs[0] == "!!") {
-        arrayOf(
-            "history",
-            "replay",
-        )
-    } else {
-        strippedArgs
+    val resolvedArgs = when {
+        strippedArgs.size == 1 && strippedArgs[0] == "!!" -> arrayOf("history", "replay")
+        else -> CommandHistory.resolveAliasInvocation(strippedArgs) { name -> app.groups.any { it.matches(name) } }
     }
 
     if (resolvedArgs.size >= 2 && resolvedArgs[0] == "pipe" && resolvedArgs[1] == "run") {

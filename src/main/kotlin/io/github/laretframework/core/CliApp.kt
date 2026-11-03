@@ -13,7 +13,6 @@ import io.github.laretframework.plugin.model.LaretPlugin
 import io.github.laretframework.plugin.runtime.PluginCatalog
 import io.github.laretframework.plugin.runtime.PluginExecutor
 import io.github.laretframework.plugin.runtime.PluginManager
-import io.github.laretframework.update.OldBinaryCleaner
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
@@ -37,6 +36,7 @@ data class CliApp(
     val groups: List<CommandGroup> = emptyList(),
     val middlewares: MiddlewareRegistry = MiddlewareRegistry.EMPTY,
 ) {
+    private val features = FeatureRegistry()
     private val pluginManager = PluginManager()
     private val logManager = LogManager()
     private val configLoader = ConfigLoader()
@@ -165,7 +165,7 @@ data class CliApp(
      */
     fun run(args: Array<String>): Int {
         logManager.disableLogging()
-        if (cleansUpAfterSelfUpdate) OldBinaryCleaner.cleanupSilently()
+        features.beforeRun(this)
         val scope = startScope(includeAppHooks = true)
         val signals = if (fastSignals) FastSignals(scope).install() else null
         val hook = if (signals == null) {
@@ -215,6 +215,7 @@ data class CliApp(
     }
 
     private suspend fun dispatch(rawArgs: Array<String>): Int {
+        features.interceptDispatch(this, rawArgs)?.let { return it }
         if (rawArgs.firstOrNull() == CompletionEngine.COMPLETE_COMMAND) {
             print(CompletionEngine(this).complete(rawArgs.drop(1)))
             return 0
@@ -270,6 +271,10 @@ data class CliApp(
     private fun applyConfiguration(@Suppress("UNUSED_PARAMETER") config: AppConfig) = Unit
 
     fun getAppConfig(): AppConfig = appConfig
+
+    internal fun installFeature(installer: FeatureInstaller) {
+        features.install(installer)
+    }
 
     internal fun createConfigRegistry(
         command: Command,

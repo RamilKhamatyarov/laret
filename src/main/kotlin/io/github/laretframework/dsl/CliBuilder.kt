@@ -7,6 +7,7 @@ import io.github.laretframework.core.MiddlewareRegistration
 import io.github.laretframework.core.MiddlewareRegistry
 import io.github.laretframework.core.MiddlewareScope
 import io.github.laretframework.model.CommandGroup
+import io.github.laretframework.update.SelfUpdateFeatureInstaller
 
 /** Builds CLI application */
 class CliBuilder(val name: String, val version: String, val description: String) {
@@ -81,6 +82,7 @@ class CliBuilder(val name: String, val version: String, val description: String)
         app.onInitHook = onAppInit
         app.onShutdownHook = onAppShutdown.takeUnless { it === NO_SHUTDOWN_HOOK }
         app.cleansUpAfterSelfUpdate = selfUpdate
+        if (selfUpdate) app.installFeature(SelfUpdateFeatureInstaller())
         app.fastSignals = fastSignals
         return app
     }
