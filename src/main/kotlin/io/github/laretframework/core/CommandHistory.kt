@@ -10,9 +10,12 @@ object CommandHistory {
 
     data class CommandEntry(val id: String, val args: List<String>, val timestamp: Long)
 
+    data class CommandAlias(val name: String, val args: List<String>)
+
     const val MAX_SIZE = 100
 
     private val entries = ArrayDeque<CommandEntry>()
+    private val aliases = linkedMapOf<String, List<String>>()
 
     @Volatile
     private var suppressDepth: Int = 0
@@ -22,11 +25,13 @@ object CommandHistory {
     fun configureForTest(path: Path) {
         historyFile = path
         entries.clear()
+        aliases.clear()
     }
 
     fun resetForTest() {
         historyFile = defaultHistoryFile()
         entries.clear()
+        aliases.clear()
     }
 
     /**
@@ -56,6 +61,23 @@ object CommandHistory {
     }
 
     fun list(): List<CommandEntry> = entries.toList()
+
+    fun saveAlias(name: String, args: List<String>): Boolean {
+        if (!name.matches(Regex("[a-z][a-z0-9-]*")) || args.isEmpty()) return false
+        aliases[name] = args.toList()
+        persist()
+        return true
+    }
+
+    fun alias(name: String): CommandAlias? = aliases[name]?.let { CommandAlias(name, it) }
+
+    fun listAliases(): List<CommandAlias> = aliases.map { (name, args) -> CommandAlias(name, args) }
+
+    fun resolveAliasInvocation(args: Array<String>, isReservedCommand: (String) -> Boolean): Array<String> {
+        val name = args.singleOrNull() ?: return args
+        if (isReservedCommand(name)) return args
+        return alias(name)?.args?.toTypedArray() ?: args
+    }
 
     fun clear() {
         entries.clear()
@@ -104,6 +126,13 @@ object CommandHistory {
         e.args.forEach { add(b64(it)) }
     }.joinToString("\t")
 
+    private fun encodeAlias(name: String, args: List<String>): String = buildList {
+        add("@alias")
+        add(b64(name))
+        add(args.size.toString())
+        args.forEach { add(b64(it)) }
+    }.joinToString("\t")
+
     private fun decodeEntry(encoded: String): CommandEntry? = runCatching {
         val parts = encoded.split("\t")
         var i = 0
@@ -116,17 +145,36 @@ object CommandHistory {
 
     private fun serialize(): String = buildString {
         entries.forEach { appendLine(encodeEntry(it)) }
+        aliases.forEach { (name, args) -> appendLine(encodeAlias(name, args)) }
     }
 
     private fun deserialize(text: String) {
         val parsed = mutableListOf<CommandEntry>()
+        val parsedAliases = linkedMapOf<String, List<String>>()
         for (line in text.lines()) {
             if (line.isBlank()) continue
-            decodeEntry(line)?.let { parsed.add(it) }
+            if (line.startsWith("@alias\t")) {
+                decodeAlias(line)?.let { parsedAliases[it.name] = it.args }
+            } else {
+                decodeEntry(line)?.let { parsed.add(it) }
+            }
         }
         entries.clear()
         parsed.forEach { entries.addLast(it) }
+        aliases.clear()
+        aliases.putAll(parsedAliases)
     }
+
+    private fun decodeAlias(encoded: String): CommandAlias? = runCatching {
+        val parts = encoded.split("\t")
+        val name = unb64(parts[1])
+        val count = parts[2].toInt()
+        val args = (0 until count).map { unb64(parts[it + 3]) }
+        if (parts.size != count + 3 || !name.matches(Regex("[a-z][a-z0-9-]*")) || args.isEmpty()) {
+            return null
+        }
+        CommandAlias(name, args)
+    }.getOrNull()
 
     private fun defaultHistoryFile(): Path = Paths.get(
         System.getProperty("user.home") ?: ".",

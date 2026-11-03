@@ -197,4 +197,57 @@ class CommandHistoryTest {
         assertTrue(entry.id.isNotBlank())
         assertTrue(entry.timestamp > 0)
     }
+
+    @Test
+    fun `saved alias preserves exact arguments across reload`() {
+        val args = listOf("file", "create", "notes.txt", "--content", "two words and \"quotes\"")
+        assertTrue(CommandHistory.saveAlias("make-notes", args))
+
+        CommandHistory.configureForTest(tempDir.toPath().resolve("cmd_history.txt"))
+        CommandHistory.load()
+
+        assertEquals(args, CommandHistory.alias("make-notes")?.args)
+    }
+
+    @Test
+    fun `saved alias rejects invalid names and empty commands`() {
+        assertTrue(!CommandHistory.saveAlias("Make_Notes", listOf("file", "list")))
+        assertTrue(!CommandHistory.saveAlias("empty", emptyList()))
+        assertEquals(CommandHistory.listAliases(), emptyList())
+    }
+
+    @Test
+    fun `clearing history preserves saved aliases`() {
+        CommandHistory.saveAlias("show-files", listOf("file", "list"))
+        CommandHistory.record(arrayOf("file", "read", "notes.txt"))
+
+        CommandHistory.clear()
+
+        assertEquals(0, CommandHistory.size())
+        assertEquals(listOf("file", "list"), CommandHistory.alias("show-files")?.args)
+    }
+
+    @Test
+    fun `direct alias invocation expands to the exact saved arguments`() {
+        val savedArgs = listOf("file", "create", "notes.txt", "--content", "two words")
+        CommandHistory.saveAlias("make-notes", savedArgs)
+
+        val resolved = CommandHistory.resolveAliasInvocation(arrayOf("make-notes")) { false }
+
+        assertEquals(savedArgs, resolved.toList())
+    }
+
+    @Test
+    fun `direct alias invocation does not override commands or extra arguments`() {
+        CommandHistory.saveAlias("file", listOf("dir", "list"))
+
+        assertEquals(
+            listOf("file"),
+            CommandHistory.resolveAliasInvocation(arrayOf("file")) { true }.toList(),
+        )
+        assertEquals(
+            listOf("make-notes", "extra"),
+            CommandHistory.resolveAliasInvocation(arrayOf("make-notes", "extra")) { false }.toList(),
+        )
+    }
 }
