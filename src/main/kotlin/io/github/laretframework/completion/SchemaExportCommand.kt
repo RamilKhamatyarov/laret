@@ -1,6 +1,7 @@
 package io.github.laretframework.completion
 
 import io.github.laretframework.completion.generators.AnthropicSchemaExporter
+import io.github.laretframework.completion.generators.LaretContractExporter
 import io.github.laretframework.completion.generators.OpenAiSchemaExporter
 import io.github.laretframework.core.CliApp
 import java.io.File
@@ -27,5 +28,6 @@ class SchemaExportCommand(private val app: CliApp) {
     private fun exporterFor(format: SchemaFormat): SchemaExporter = when (format) {
         SchemaFormat.OPENAI -> OpenAiSchemaExporter()
         SchemaFormat.ANTHROPIC -> AnthropicSchemaExporter()
+        SchemaFormat.LARET -> LaretContractExporter()
     }
 }

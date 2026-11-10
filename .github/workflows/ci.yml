@@ -3136,11 +3136,22 @@ jobs:
       - name: MCP - tools/list exposes tools with valid schemas
         run: |
           set -euo pipefail
-          printf '%s\n' '{"jsonrpc":"2.0","method":"tools/list","id":2}' \
-            | ./bin/laret mcp serve > /tmp/mcp_tools.out 2>/tmp/mcp_tools.err
+          if ! printf '%s\n' '{"jsonrpc":"2.0","method":"tools/list","id":2}' \
+            | ./bin/laret mcp serve > /tmp/mcp_tools.out 2>/tmp/mcp_tools.err; then
+            echo "MCP server exited unsuccessfully; stdout and stderr follow:" >&2
+            cat /tmp/mcp_tools.out /tmp/mcp_tools.err >&2
+            exit 1
+          fi
           python3 - << 'PYEOF'
           import json
-          data = json.loads(open('/tmp/mcp_tools.out').read().strip())
+          from pathlib import Path
+          raw = Path('/tmp/mcp_tools.out').read_text().strip()
+          try:
+            data = json.loads(raw)
+          except json.JSONDecodeError as error:
+            print(f"Invalid MCP JSON response: {error}\nstdout: {raw!r}")
+            print(f"stderr: {Path('/tmp/mcp_tools.err').read_text()!r}")
+            raise
           assert 'error' not in data, f"tools/list returned an error: {data}"
           tools = data['result']['tools']
           assert tools, "tools/list returned an empty tool list"
@@ -3164,6 +3175,30 @@ jobs:
           print("all inputSchema blocks are well formed")
           PYEOF
           echo "MCP tools/list succeeded"
+
+      - name: Contract - schema export and MCP profiles expose SI-1 metadata
+        run: |
+          set -euo pipefail
+          ./bin/laret schema export --format laret > /tmp/laret-contract.json
+          printf '%s\n' '{"jsonrpc":"2.0","method":"tools/list","id":8}' \
+            | ./bin/laret mcp serve > /tmp/mcp-contract-tools.json 2>/dev/null
+          python3 - << 'PYEOF'
+          import json
+          contract = json.load(open('/tmp/laret-contract.json'))
+          tools = json.load(open('/tmp/mcp-contract-tools.json'))['result']['tools']
+          commands = {item['name']: item for item in contract['commands']}
+          by_name = {item['name']: item for item in tools}
+          for listing in (commands, by_name):
+            assert listing['laret.file.create']['impactProfile']['category'] == 'local_mutation'
+            assert listing['laret.file.read']['impactProfile']['category'] == 'read_only'
+            for item in listing.values():
+              profile = item['impactProfile']
+              assert isinstance(profile['capabilityNeeds'], list)
+              assert profile['capabilityNeeds'] == [], 'SI-2 placeholder must remain inert in v1'
+          assert commands['laret.file.create']['inputSchema']['properties']['path']['type'] == 'string'
+          assert 'laret.schema.export' in commands
+          print('neutral contract and MCP SI-1 profiles verified')
+          PYEOF
 
       - name: MCP - tools/call creates and reads a file
         run: |

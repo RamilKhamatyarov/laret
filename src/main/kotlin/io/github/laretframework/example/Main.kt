@@ -31,6 +31,7 @@ import io.github.laretframework.doc.DocIndexCommand
 import io.github.laretframework.doc.DocScaffoldCommand
 import io.github.laretframework.doc.DocValidationException
 import io.github.laretframework.dsl.cli
+import io.github.laretframework.model.ImpactCategory
 import io.github.laretframework.output.OutputStrategy
 import io.github.laretframework.scaffold.generator.ProjectGenerator
 import io.github.laretframework.scaffold.model.Module
@@ -318,7 +319,7 @@ fun buildLaretApp(): CliApp = cli(
     }
     group(name = "schema", description = "LLM schema export") {
         command(name = "export", description = "Export commands as an LLM function-calling schema") {
-            option("f", "format", "Schema dialect: openai or anthropic", "openai", true)
+            option("f", "format", "Schema dialect: openai, anthropic, or laret", "openai", true)
             option("o", "output", "Write schema to file instead of stdout", "", true)
 
             action { ctx ->
@@ -457,6 +458,7 @@ fun buildLaretApp(): CliApp = cli(
 
     group(name = "update", description = "Self-update the laret binary") {
         command(name = "check", description = "Check whether a newer release is available") {
+            impact(ImpactCategory.EXTERNAL_INTERACTION)
             action { ctx ->
                 val result = UpdateCommand(ctx.app!!).check()
                 result.fold(
@@ -478,6 +480,7 @@ fun buildLaretApp(): CliApp = cli(
         }
 
         command(name = "run", description = "Download and install the latest release") {
+            impact(ImpactCategory.EXTERNAL_INTERACTION)
             option("f", "force", "Install even when not newer than current", "", false)
             action { ctx ->
                 val result = UpdateCommand(ctx.app!!).execute(force = ctx.optionBool("force"))
@@ -1092,6 +1095,7 @@ fun buildLaretApp(): CliApp = cli(
         aliases("f")
         use(AuditMiddleware())
         command(name = "create", description = "Create a new file") {
+            impact(ImpactCategory.LOCAL_MUTATION)
             aliases("c")
             argument("path", "File path", required = true)
             option("c", "content", "File content", "", true)
@@ -1143,6 +1147,7 @@ fun buildLaretApp(): CliApp = cli(
         }
 
         command(name = "delete", description = "Delete a file") {
+            impact(ImpactCategory.LOCAL_MUTATION)
             aliases("rm")
             use(DeleteGuardMiddleware())
             argument("path", "File path", required = true)
@@ -1171,6 +1176,7 @@ fun buildLaretApp(): CliApp = cli(
         }
 
         command(name = "read", description = "Read file contents") {
+            impact(ImpactCategory.READ_ONLY)
             argument("path", "File path", required = true)
             action { ctx ->
                 val path = ctx.argument("path")
@@ -1190,6 +1196,7 @@ fun buildLaretApp(): CliApp = cli(
     group(name = "dir", description = "Directory operations") {
         aliases("d")
         command(name = "list", description = "List directory contents") {
+            impact(ImpactCategory.READ_ONLY)
             aliases("ls")
             argument("path", "Directory path", required = false, optional = true, default = ".")
             option("l", "long", "Long format", "", false)
