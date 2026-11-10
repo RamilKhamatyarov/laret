@@ -1,9 +1,11 @@
 package io.github.laretframework.core
 
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicInteger
 
 class ParallelDispatcherTest {
 
@@ -40,6 +42,52 @@ class ParallelDispatcherTest {
         val results = ParallelDispatcher.execute(emptyList(), maxJobs = 4) { _, _, _ -> }
 
         assertThat(results).isEmpty()
+    }
+
+    @Test
+    fun indexedBlocksReturnResultsInIndexOrder() = runTest {
+        val results = ParallelDispatcher.executeBlocks(128) { index ->
+            yield()
+            index * 2
+        }
+
+        assertThat(results).containsExactlyElementsOf((0 until 128).map { it * 2 })
+    }
+
+    @Test
+    fun indexedBlocksRespectConcurrencyLimitAndPreserveOrder() = runTest {
+        val active = AtomicInteger()
+        val peakActive = AtomicInteger()
+
+        val results = ParallelDispatcher.executeBlocks(taskCount = 64, maxJobs = 3) { index ->
+            val current = active.incrementAndGet()
+            peakActive.updateAndGet { maxOf(it, current) }
+            try {
+                yield()
+                index
+            } finally {
+                active.decrementAndGet()
+            }
+        }
+
+        assertThat(peakActive.get()).isLessThanOrEqualTo(3)
+        assertThat(results).containsExactlyElementsOf((0 until 64).toList())
+    }
+
+    @Test
+    fun indexedBlocksFailFastWhenAChildFails() = runTest {
+        val failure = try {
+            ParallelDispatcher.executeBlocks(32) { index ->
+                if (index == 4) throw IllegalArgumentException("task failed")
+                yield()
+                index
+            }
+            null
+        } catch (exception: IllegalArgumentException) {
+            exception
+        }
+
+        assertThat(failure).hasMessage("task failed")
     }
 
     @Test

@@ -18,4 +18,5 @@ data class Argument(
     val completer: Completer? = null,
     /** Rules applied to the resolved value; see the validation DSL. */
     val validators: List<Validator> = emptyList(),
+    val valueType: CommandValueType = CommandValueType.STRING,
 )

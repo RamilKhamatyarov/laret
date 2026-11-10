@@ -5,7 +5,10 @@ import io.github.laretframework.core.CommandContext
 import io.github.laretframework.core.Middleware
 import io.github.laretframework.model.Argument
 import io.github.laretframework.model.Command
+import io.github.laretframework.model.CommandValueType
 import io.github.laretframework.model.Constraint
+import io.github.laretframework.model.ImpactCategory
+import io.github.laretframework.model.ImpactProfile
 import io.github.laretframework.model.Option
 import io.github.laretframework.model.ValidationBuilder
 import io.github.laretframework.model.buildValidators
@@ -17,6 +20,7 @@ class CommandBuilder(val name: String, val description: String = "") {
     private val exclusiveGroups = mutableListOf<Set<String>>()
     private val constraints = mutableListOf<Constraint>()
     private var hidden = false
+    private var impactProfile = ImpactProfile()
     private var actionBlock: (CommandContext) -> Unit = {}
 
     internal val middlewares = mutableListOf<Middleware>()
@@ -64,6 +68,21 @@ class CommandBuilder(val name: String, val description: String = "") {
         )
     }
 
+    fun argument(
+        name: String,
+        type: CommandValueType,
+        description: String = "",
+        required: Boolean = true,
+        optional: Boolean = false,
+        default: String = "",
+        completer: Completer? = null,
+        validate: (ValidationBuilder.() -> Unit)? = null,
+    ) {
+        arguments.add(
+            Argument(name, description, required, optional, default, completer, buildValidators(validate), type),
+        )
+    }
+
     /**
      * Declare a named option.
      *
@@ -94,6 +113,38 @@ class CommandBuilder(val name: String, val description: String = "") {
                 buildValidators(validate),
             ),
         )
+    }
+
+    fun option(
+        short: String,
+        long: String,
+        type: CommandValueType,
+        description: String = "",
+        default: String = "",
+        takesValue: Boolean = true,
+        persistent: Boolean = false,
+        configKey: String? = null,
+        completer: Completer? = null,
+        validate: (ValidationBuilder.() -> Unit)? = null,
+    ) {
+        options.add(
+            Option(
+                short,
+                long,
+                description,
+                default,
+                takesValue,
+                persistent,
+                configKey,
+                completer,
+                buildValidators(validate),
+                type,
+            ),
+        )
+    }
+
+    fun impact(category: ImpactCategory) {
+        impactProfile = ImpactProfile(category)
     }
 
     /**
@@ -137,7 +188,7 @@ class CommandBuilder(val name: String, val description: String = "") {
         return Command(
             name, description, arguments, options, aliases.toList(),
             actionBlock, preExecute, postExecute, onError, hidden,
-            exclusiveGroups.toList(), constraints.toList(),
+            exclusiveGroups.toList(), constraints.toList(), impactProfile,
         )
     }
 

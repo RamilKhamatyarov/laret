@@ -28,6 +28,7 @@ data class Command(
     val hidden: Boolean = false,
     val exclusiveGroups: List<Set<String>> = emptyList(),
     val constraints: List<Constraint> = emptyList(),
+    val impactProfile: ImpactProfile = ImpactProfile(),
 ) {
     /** True when [input] equals the primary name or any alias. */
     fun matches(input: String): Boolean = input == name || input in aliases

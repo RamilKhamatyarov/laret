@@ -31,4 +31,5 @@ data class Option(
     val configKey: String? = null,
     val completer: Completer? = null,
     val validators: List<Validator> = emptyList(),
+    val valueType: CommandValueType = CommandValueType.STRING,
 )

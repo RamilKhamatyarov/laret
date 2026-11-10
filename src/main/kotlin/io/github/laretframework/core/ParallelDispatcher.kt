@@ -1,5 +1,6 @@
 package io.github.laretframework.core
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -64,6 +65,33 @@ object ParallelDispatcher {
     }
 
     /**
+     * Run [taskCount] indexed blocks without first materializing one suspend
+     * lambda per task. With [maxJobs] set to [UNBOUNDED], one coroutine is
+     * launched per index; a positive limit uses the ordered worker pool.
+     */
+    suspend fun <T : Any> executeBlocks(
+        taskCount: Int,
+        maxJobs: Int = UNBOUNDED,
+        block: suspend (index: Int) -> T,
+    ): List<T> {
+        require(maxJobs >= UNBOUNDED) { "maxJobs must not be negative" }
+        require(taskCount >= 0) { "taskCount must not be negative" }
+        if (taskCount == 0) return emptyList()
+
+        if (maxJobs == UNBOUNDED) {
+            val results = arrayOfNulls<Any>(taskCount)
+            coroutineScope {
+                repeat(taskCount) { index ->
+                    launch(Dispatchers.Default) { results[index] = block(index) }
+                }
+            }
+            @Suppress("UNCHECKED_CAST")
+            return results.asList() as List<T>
+        }
+        return pooled(taskCount, maxJobs, Dispatchers.Default, block)
+    }
+
+    /**
      * A worker pool rather than one coroutine per unit of work.
      *
      * Bounding concurrency needs the limit to cover the whole unit, including
@@ -106,9 +134,13 @@ object ParallelDispatcher {
         val stderr = mutableListOf<String>()
 
         val process = try {
-            ProcessBuilder(listOf(task.command) + task.args)
-                .redirectErrorStream(false)
-                .start()
+            withContext(Dispatchers.IO) {
+                ProcessBuilder(listOf(task.command) + task.args)
+                    .redirectErrorStream(false)
+                    .start()
+            }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             return@coroutineScope ParallelResult(
                 task = task,

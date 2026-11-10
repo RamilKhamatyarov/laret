@@ -638,6 +638,17 @@ Jar-based configuration:
 
 Tools are named with the app, group, and command path, for example `laret.file.create`.
 
+Each tool includes an `impactProfile` with a broad category:
+`no_effect`, `read_only`, `local_mutation`, `external_interaction`, or
+`undeclared` when the command author has not classified it.
+This is descriptive metadata, not an execution policy.
+The reserved `capabilityNeeds` list is empty in v1 and has no runtime effect.
+
+Export the provider-neutral command contract as JSON with
+`laret schema export --format laret`.
+It includes declared input types and impact profiles.
+The existing `openai` and `anthropic` formats retain their provider-specific shapes.
+
 Manual protocol check:
 
 ```bash

@@ -73,17 +73,18 @@ object BenchCommands {
                 val tasks = ctx.optionInt("tasks").coerceAtLeast(0)
                 val jobs = ctx.optionInt("jobs").coerceAtLeast(0)
 
-                val blocks = (0 until tasks).map { index ->
-                    suspend {
-                        yield()
-                        index.toLong() + 1L
-                    }
+                val results = runBlocking {
+                    ParallelDispatcher.executeBlocks(tasks, maxJobs = jobs, block = ::fanoutTask)
                 }
-                val results = runBlocking { ParallelDispatcher.executeBlocks(blocks, maxJobs = jobs) }
 
                 println("fanout tasks=$tasks jobs=$jobs completed=${results.size} sum=${results.sum()}")
             }
         }
+    }
+
+    private suspend fun fanoutTask(index: Int): Long {
+        yield()
+        return index + 1L
     }
 
     /** Scenario B: flood the debouncer and verify it coalesces to a single run. */
