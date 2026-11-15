@@ -9,7 +9,11 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.github.laretframework.config.model.AppConfig
 import java.io.File
 
-class ConfigLoader {
+class ConfigLoader internal constructor(
+    private val envProvider: (String) -> String?,
+    private val fileResolver: ConfigFileResolver,
+) {
+    constructor() : this(System::getenv, ConfigFileResolver())
     private val jsonMapper: ObjectMapper by lazy {
         jacksonObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
@@ -29,7 +33,7 @@ class ConfigLoader {
         return if (file?.exists() == true) {
             loadFromFile(file)
         } else {
-            AppConfig()
+            applyEnvironmentOverrides(AppConfig())
         }
     }
 
@@ -79,39 +83,13 @@ class ConfigLoader {
         }
     }
 
-    private fun resolveConfigFile(configPath: String?, profile: String? = null): File? {
-        val profileCandidates =
-            profile
-                ?.takeIf { it.isNotBlank() }
-                ?.let { activeProfile ->
-                    listOf(
-                        File(".laret.$activeProfile.yml"),
-                        File(".laret.$activeProfile.yaml"),
-                        File(".laret.$activeProfile.toml"),
-                        File(".laret.$activeProfile.json"),
-                        File(System.getProperty("user.home"), ".laret.$activeProfile.yml"),
-                        File(System.getProperty("user.home"), ".laret.$activeProfile.toml"),
-                        File(System.getProperty("user.home"), ".laret.$activeProfile.json"),
-                    )
-                }
-                .orEmpty()
+    private fun resolveConfigFile(configPath: String?, profile: String? = null): File? =
+        fileResolver.resolve(configPath, profile)
 
-        val candidates =
-            listOfNotNull(
-                configPath?.let { File(it) },
-            ) + profileCandidates +
-                listOf(
-                    File(".laret.yml"),
-                    File(".laret.yaml"),
-                    File(".laret.toml"),
-                    File(".laret.json"),
-                    File(System.getProperty("user.home"), ".laret.yml"),
-                    File(System.getProperty("user.home"), ".laret.toml"),
-                    File(System.getProperty("user.home"), ".laret.json"),
-                )
+    internal fun selectedFile(configPath: String?, profile: String?): File? = resolveConfigFile(configPath, profile)
 
-        return candidates.firstOrNull { it.exists() }
-    }
+    internal fun unresolvedSelection(configPath: String?, profile: String?): UnresolvedConfigSelection? =
+        fileResolver.unresolved(configPath, profile)
 
     private fun getMapper(format: ConfigFormat): ObjectMapper = when (format) {
         ConfigFormat.YAML -> yamlMapper
@@ -122,14 +100,14 @@ class ConfigLoader {
     private fun applyEnvironmentOverrides(config: AppConfig): AppConfig = config.copy(
         output =
         config.output.copy(
-            colorized = System.getenv("LARET_COLORIZED")?.toBoolean() ?: config.output.colorized,
-            verbose = System.getenv("LARET_VERBOSE")?.toBoolean() ?: config.output.verbose,
-            format = System.getenv("LARET_OUTPUT_FORMAT") ?: config.output.format,
+            colorized = envProvider("LARET_COLORIZED")?.toBoolean() ?: config.output.colorized,
+            verbose = envProvider("LARET_VERBOSE")?.toBoolean() ?: config.output.verbose,
+            format = envProvider("LARET_OUTPUT_FORMAT") ?: config.output.format,
         ),
         logging =
         config.logging.copy(
-            level = System.getenv("LARET_LOG_LEVEL") ?: config.logging.level,
-            file = System.getenv("LARET_LOG_FILE") ?: config.logging.file,
+            level = envProvider("LARET_LOGGING_LEVEL") ?: envProvider("LARET_LOG_LEVEL") ?: config.logging.level,
+            file = envProvider("LARET_LOGGING_FILE") ?: envProvider("LARET_LOG_FILE") ?: config.logging.file,
         ),
     )
 }

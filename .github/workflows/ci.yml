@@ -134,13 +134,13 @@ jobs:
       - name: Build and test
         run: ./gradlew build
 
-      - name: Build fat JAR
-        run: ./gradlew shadowJar
+      - name: Install the application distribution
+        run: ./gradlew installDist
 
       - name: Smoke - version and file roundtrip
         run: |
           set -euo pipefail
-          LARET="java -jar build/libs/laret-fat.jar"
+          LARET="build/install/laret/bin/laret"
           $LARET --version
           WORK=$(mktemp -d)
           $LARET file create "$WORK/smoke.txt" --content "hello-${{ matrix.os }}"
@@ -153,7 +153,7 @@ jobs:
       - name: Smoke - bash completion is syntactically valid
         run: |
           set -euo pipefail
-          java -jar build/libs/laret-fat.jar completion bash > laret_completion.sh
+          build/install/laret/bin/laret completion bash > laret_completion.sh
           bash -n laret_completion.sh
           echo "bash completion parses on ${{ matrix.os }}"
 
@@ -161,7 +161,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          java -jar build/libs/laret-fat.jar completion powershell > laret_completion.ps1
+          .\build\install\laret\bin\laret.bat completion powershell > laret_completion.ps1
           $errors = $null
           [System.Management.Automation.Language.Parser]::ParseFile(
             (Resolve-Path .\laret_completion.ps1).Path, [ref]$null, [ref]$errors) | Out-Null
@@ -233,8 +233,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      # Java 25 to match the project's jvmToolchain(25): the fat JAR is compiled
-      # to Java 25 bytecode and must run on a 25 runtime.
+      # Java 25 to match the project's jvmToolchain(25): the application is
+      # compiled to Java 25 bytecode and must run on a 25 runtime.
       - name: Set up Java 25
         uses: actions/setup-java@v6
         with:
@@ -245,10 +245,10 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # Use the fat JAR rather than nativeCompile: it builds in seconds and keeps
-      # the PR feedback loop fast (native image is reserved for release.yml).
-      - name: Build fat JAR
-        run: ./gradlew shadowJar
+      # Use the JVM distribution rather than nativeCompile: it builds in seconds
+      # and keeps the PR feedback loop fast.
+      - name: Install the application distribution
+        run: ./gradlew installDist
 
       # Advisory for now: most commands still lack prose .md files, so strict mode
       # reports many "missing prose" findings. Kept non-blocking until prose
@@ -256,7 +256,7 @@ jobs:
       - name: Validate documentation (strict, advisory)
         continue-on-error: true
         run: |
-          java -jar build/libs/laret-fat.jar \
+          build/install/laret/bin/laret \
             doc generate --format md --lang all --output-dir site/docs --strict
 
   integration-completions:
@@ -3403,23 +3403,20 @@ jobs:
   integration-config-precedence:
     name: Integration - Config Precedence
     runs-on: ubuntu-latest
+    needs: [ build ]
     strategy:
       matrix:
         profile: [dev, prod]
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Set up Java 25
-        uses: actions/setup-java@v6
+      - name: Download native binary
+        uses: actions/download-artifact@v8
         with:
-          java-version: '25'
-          distribution: 'temurin'
-          cache: gradle
+          name: laret-native
+          path: ./bin
 
-      - name: Build fat jar
-        run: ./gradlew shadowJar
+      - name: Make binary executable
+        run: chmod +x ./bin/laret
 
       - name: Test precedence file < env < cli
         shell: bash
@@ -3439,21 +3436,115 @@ jobs:
             format: plain
           EOF
 
-          java -jar build/libs/laret-fat.jar --profile "PROFILE" \
+          ./bin/laret --profile "PROFILE" \
             dir list /tmp/laret_config_precedence > /tmp/laret_profile.out
           grep -q "name:" /tmp/laret_profile.out
 
-          LARET_DIR_FORMAT=json java -jar build/libs/laret-fat.jar --profile "PROFILE" \
+          LARET_DIR_FORMAT=json ./bin/laret --profile "PROFILE" \
             dir list /tmp/laret_config_precedence > /tmp/laret_env.out
           grep -q '"name"' /tmp/laret_env.out
 
-          LARET_DIR_FORMAT=json java -jar build/libs/laret-fat.jar --profile "PROFILE" \
+          LARET_DIR_FORMAT=json ./bin/laret --profile "PROFILE" \
             dir list /tmp/laret_config_precedence --format plain > /tmp/laret_flag.out
           grep -q "Directory:" /tmp/laret_flag.out
           SCRIPT
 
           sed -i 's/PROFILE/${{ matrix.profile }}/g' /tmp/laret_config_precedence_test.sh
           bash /tmp/laret_config_precedence_test.sh
+
+  integration-config-provenance:
+    name: Integration - Config Provenance & Diagnostics
+    runs-on: ubuntu-latest
+    needs: [ build ]
+
+    steps:
+      - name: Download native binary
+        uses: actions/download-artifact@v8
+        with:
+          name: laret-native
+          path: ./bin
+
+      - name: Make binary executable
+        run: chmod +x ./bin/laret
+
+      - name: Verify application defaults and legacy environment provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          laret="$GITHUB_WORKSPACE/bin/laret"
+          temp_dir="$(mktemp -d)"
+          cd "$temp_dir"
+
+          "$laret" config explain --key logging.level --format json > default.json
+          python3 - <<'PY'
+          import json
+          report = json.load(open('default.json', encoding='utf-8'))
+          assert report['winner']['value'] == 'INFO', report
+          assert report['winner']['source'] == 'default', report
+          PY
+
+          LARET_LOG_LEVEL=DEBUG "$laret" config explain \
+            --key logging.level --format json > legacy-env.json
+          python3 - <<'PY'
+          import json
+          report = json.load(open('legacy-env.json', encoding='utf-8'))
+          assert report['winner']['value'] == 'DEBUG', report
+          assert report['winner']['source'] == 'LARET_LOG_LEVEL', report
+          PY
+
+      - name: Verify config check selectors and invocation-scoped diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          laret="$GITHUB_WORKSPACE/bin/laret"
+          temp_dir="$(mktemp -d)"
+          printf 'output:\n  format: xml\n' > "$temp_dir/invalid.yml"
+
+          set +e
+          "$laret" --fix config check -p ci -c "$temp_dir/invalid.yml" \
+            > "$temp_dir/short.out" 2> "$temp_dir/short.err"
+          short_status=$?
+          set -e
+          test "$short_status" -eq 1
+          grep -q 'output.format' "$temp_dir/short.out"
+
+          set +e
+          "$laret" config check --profile=ci --config="$temp_dir/invalid.yml" \
+            > "$temp_dir/equals.out" 2> "$temp_dir/equals.err"
+          equals_status=$?
+          set -e
+          test "$equals_status" -eq 1
+          grep -q 'output.format' "$temp_dir/equals.out"
+
+      - name: Config check fails on an unresolved file or profile
+        shell: bash
+        run: |
+          set +e
+          set -uo pipefail
+          laret="$GITHUB_WORKSPACE/bin/laret"
+          temp_dir="$(mktemp -d)"
+          cd "$temp_dir"
+
+          "$laret" config check --config "$temp_dir/typo.yml" > missing.out 2> missing.err
+          status=$?
+          cat missing.out
+          [ "$status" -eq 1 ] || { echo "ERROR: a missing --config must exit 1, got $status"; exit 1; }
+          grep -q "valid=false" missing.out || { echo "ERROR: report is not invalid"; exit 1; }
+          grep -q "Configuration file not found" missing.out \
+            || { echo "ERROR: missing file not reported"; exit 1; }
+
+          "$laret" config check -p no-such-profile > profile.out 2> profile.err
+          status=$?
+          cat profile.out
+          [ "$status" -eq 1 ] || { echo "ERROR: an unknown profile must exit 1, got $status"; exit 1; }
+          grep -q "No configuration file found for profile: no-such-profile" profile.out \
+            || { echo "ERROR: unknown profile not reported"; exit 1; }
+
+          # Only the check is strict: other commands keep falling back.
+          "$laret" --config "$temp_dir/typo.yml" config explain --key logging.level > fallback.out
+          status=$?
+          [ "$status" -eq 0 ] || { echo "ERROR: fallback for ordinary commands broke"; exit 1; }
+          echo "Unresolved selectors OK"
 
   summary:
     name: Build Summary
@@ -3483,6 +3574,7 @@ jobs:
       - integration-dry-run
       - integration-mcp-server
       - integration-config-precedence
+      - integration-config-provenance
       - integration-argument-dependencies
       - benchmarks-concurrency
     if: always()
@@ -3516,6 +3608,7 @@ jobs:
           echo " integration-dry-run:        ${{ needs.integration-dry-run.result }}"
           echo " integration-mcp-server:     ${{ needs.integration-mcp-server.result }}"
           echo " integration-config-precedence: ${{ needs.integration-config-precedence.result }}"
+          echo " integration-config-provenance: ${{ needs.integration-config-provenance.result }}"
           echo " integration-argument-deps:  ${{ needs.integration-argument-dependencies.result }}"
           echo " benchmarks-concurrency:   ${{ needs.benchmarks-concurrency.result }}"
           echo "=========================================="

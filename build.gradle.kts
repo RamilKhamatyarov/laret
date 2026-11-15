@@ -1,3 +1,5 @@
+import java.io.ByteArrayOutputStream
+
 plugins {
     kotlin("jvm") version "2.4.21"
     id("org.graalvm.buildtools.native") version "1.1.18"
@@ -233,6 +235,38 @@ tasks {
         useJUnitPlatform()
     }
 
+    // The fixture is passed as an explicit path and the report is asserted, so a
+    // renamed or deleted fixture fails the gate instead of validating defaults.
+    fun JavaExec.checkProfile(profile: String) {
+        val fixture = layout.projectDirectory.file("config/profiles/.laret.$profile.yml").asFile
+        val report = ByteArrayOutputStream()
+        classpath = sourceSets["main"].runtimeClasspath
+        mainClass.set(application.mainClass)
+        args("config", "check", "--config", fixture.absolutePath, "--profile", profile)
+        workingDir = fixture.parentFile
+        environment = System.getenv().filterKeys { !it.uppercase().startsWith("LARET_") }
+        standardOutput = report
+        isIgnoreExitValue = true
+        doLast {
+            val text = report.toString(Charsets.UTF_8).trim()
+            println(text)
+            val exit = executionResult.get().exitValue
+            check(exit == 0) { "config check failed for profile '$profile' (exit $exit)" }
+            listOf("config=${fixture.absolutePath},", "profile=$profile,", "valid=true").forEach {
+                check(it in text) { "config check report for profile '$profile' lacks '$it'" }
+            }
+        }
+    }
+
+    val profileConfigCheck = register<JavaExec>("configCheckProd") { checkProfile("prod") }
+
+    register<JavaExec>("configCheck") {
+        description = "Validate the committed dev and prod configuration profiles"
+        group = "verification"
+        dependsOn(profileConfigCheck)
+        checkProfile("dev")
+    }
+
     register("checkAll") {
         description = "Run all code quality checks in correct order"
         group = "verification"
@@ -244,11 +278,12 @@ tasks {
             "pmdMain",
             "pmdTest",
             "test",
+            "configCheck",
         )
     }
 
     named("check") {
-        dependsOn("spotlessCheck", "ktlintCheck", "pmdMain", "pmdTest")
+        dependsOn("spotlessCheck", "ktlintCheck", "pmdMain", "pmdTest", "configCheck")
     }
 }
 

@@ -2,9 +2,12 @@ package io.github.laretframework.core
 
 import io.github.laretframework.completion.CompletionEngine
 import io.github.laretframework.config.ConfigLoader
+import io.github.laretframework.config.UnresolvedConfigSelection
 import io.github.laretframework.config.model.AppConfig
+import io.github.laretframework.config.registry.ConfigExplanation
 import io.github.laretframework.config.registry.ConfigRegistry
 import io.github.laretframework.config.validator.ConfigValidator
+import io.github.laretframework.config.validator.ValidationResult
 import io.github.laretframework.model.Command
 import io.github.laretframework.model.CommandGroup
 import io.github.laretframework.plugin.install.PluginInstaller
@@ -46,6 +49,10 @@ data class CliApp(
     private var appConfig: AppConfig = AppConfig()
     private var configPath: String? = null
     private var configProfile: String? = null
+    private var configInitialized = false
+    private var configLoadError: String? = null
+    private var unresolvedConfigSelection: UnresolvedConfigSelection? = null
+    private var configValidation = ValidationResult(isValid = false, isKnown = false)
 
     /** Whether the global `--fix` flag enabled opt-in interactive typo correction. */
     private var fixMode: Boolean = false
@@ -86,12 +93,35 @@ data class CliApp(
     fun init(configPath: String? = null, profile: String? = null): CliApp =
         runBlocking { initSuspending(configPath, profile) }
 
-    internal suspend fun initSuspending(configPath: String? = null, profile: String? = null): CliApp {
+    internal suspend fun initSuspending(
+        configPath: String? = null,
+        profile: String? = null,
+        diagnosticMode: Boolean = false,
+    ): CliApp {
         this.configPath = configPath
         this.configProfile = profile
-        appConfig = configLoader.load(configPath, profile)
+        configInitialized = false
+        configLoadError = null
+        unresolvedConfigSelection =
+            if (diagnosticMode) configLoader.unresolvedSelection(configPath, profile) else null
+        appConfig = try {
+            configLoader.load(this.configPath, this.configProfile)
+        } catch (error: RuntimeException) {
+            if (!diagnosticMode) throw error
+            configLoadError = error.message ?: "Configuration loading failed"
+            AppConfig()
+        }
         val result = configValidator.validate(appConfig)
+        configValidation = result
+        if (diagnosticMode && configLoadError != null) {
+            configInitialized = true
+            return this
+        }
         if (!result.isValid) {
+            if (diagnosticMode) {
+                configInitialized = true
+                return this
+            }
             result.errors.forEach { System.err.println("ERROR: $it") }
             throw RuntimeException("Configuration validation failed")
         }
@@ -100,6 +130,7 @@ data class CliApp(
         refreshSidecarPlugins()
         initializePlugins()
         onInitHook(this@CliApp)
+        configInitialized = true
         return this
     }
 
@@ -165,6 +196,7 @@ data class CliApp(
      */
     fun run(args: Array<String>): Int {
         logManager.disableLogging()
+        val commandArgs = runBlocking { prepareDispatch(args) }
         features.beforeRun(this)
         val scope = startScope(includeAppHooks = true)
         val signals = if (fastSignals) FastSignals(scope).install() else null
@@ -175,7 +207,7 @@ data class CliApp(
             null
         }
         return try {
-            runBlocking(scope.coroutineContext) { dispatch(args) }
+            runBlocking(scope.coroutineContext) { dispatchPrepared(commandArgs) }
         } catch (_: CancellationException) {
             CancellationScope.INTERRUPT_EXIT_CODE
         } finally {
@@ -214,56 +246,61 @@ data class CliApp(
         }
     }
 
-    private suspend fun dispatch(rawArgs: Array<String>): Int {
-        features.interceptDispatch(this, rawArgs)?.let { return it }
-        if (rawArgs.firstOrNull() == CompletionEngine.COMPLETE_COMMAND) {
-            print(CompletionEngine(this).complete(rawArgs.drop(1)))
+    private suspend fun dispatch(rawArgs: Array<String>): Int = dispatchPrepared(prepareDispatch(rawArgs))
+
+    private suspend fun prepareDispatch(rawArgs: Array<String>): Array<String> {
+        if (rawArgs.any { it == FIX_FLAG }) fixMode = true
+        val args = if (fixMode) rawArgs.filterNot { it == FIX_FLAG }.toTypedArray() else rawArgs
+        val global = extractGlobalOptions(args)
+        val parsedCheckOptions = extractConfigCheckOptions(global.remaining)
+        val isConfigCheck = parsedCheckOptions.remaining.take(2) == listOf("config", "check")
+        val checkOptions = if (isConfigCheck) parsedCheckOptions else global
+        val commandArgs = checkOptions.remaining
+        val selectedConfig = global.configPath ?: checkOptions.configPath
+        val selectedProfile = global.profile ?: checkOptions.profile
+        val mustInitialize = !configInitialized || selectedConfig != null || selectedProfile != null ||
+            !configValidation.isKnown || !configValidation.isValid || configLoadError != null
+        if (mustInitialize) {
+            initSuspending(
+                selectedConfig ?: configPath,
+                selectedProfile ?: configProfile,
+                diagnosticMode = isConfigCheck,
+            )
+        }
+        return commandArgs
+    }
+
+    private suspend fun dispatchPrepared(commandArgs: Array<String>): Int {
+        features.interceptDispatch(this, commandArgs)?.let { return it }
+        if (commandArgs.firstOrNull() == CompletionEngine.COMPLETE_COMMAND) {
+            print(CompletionEngine(this).complete(commandArgs.drop(1)))
             return 0
         }
 
-        if (rawArgs.any { it == FIX_FLAG }) fixMode = true
-        val args = if (fixMode) rawArgs.filterNot { it == FIX_FLAG }.toTypedArray() else rawArgs
-
-        val global = extractGlobalOptions(args)
-        if (global.configPath != null || global.profile != null) {
-            initSuspending(global.configPath ?: configPath, global.profile ?: configProfile)
-            return dispatch(global.remaining)
-        }
-
         when {
-            args.isEmpty() -> {
+            commandArgs.isEmpty() -> {
                 HelpFormatter.showApplicationHelp(this)
                 return 0
             }
 
-            args[0] == "--help" || args[0] == "-h" -> {
+            commandArgs[0] == "--help" || commandArgs[0] == "-h" -> {
                 HelpFormatter.showApplicationHelp(this)
                 return 0
             }
 
-            args[0] == "--version" || args[0] == "-v" -> {
+            commandArgs[0] == "--version" || commandArgs[0] == "-v" -> {
                 println("$name version $version")
                 if (appConfig.app.description.isNotEmpty()) println(appConfig.app.description)
                 return 0
             }
 
-            args[0].contains(":") -> {
-                val parts = args[0].split(":", limit = 2)
-                return executeCommand((parts + args.drop(1)).toTypedArray())
-            }
-
-            args[0] == "--config" && args.size > 1 -> {
-                initSuspending(args[1])
-                val remaining = args.drop(2).toTypedArray()
-                return if (remaining.isNotEmpty()) {
-                    executeCommand(remaining)
-                } else {
-                    0
-                }
+            commandArgs[0].contains(":") -> {
+                val parts = commandArgs[0].split(":", limit = 2)
+                return executeCommand((parts + commandArgs.drop(1)).toTypedArray())
             }
 
             else -> {
-                return executeCommand(args)
+                return executeCommand(commandArgs)
             }
         }
     }
@@ -271,6 +308,91 @@ data class CliApp(
     private fun applyConfiguration(@Suppress("UNUSED_PARAMETER") config: AppConfig) = Unit
 
     fun getAppConfig(): AppConfig = appConfig
+
+    fun getConfigValidationResult(): ValidationResult = configValidation
+
+    fun getConfigLoadError(): String? = configLoadError
+
+    /** The file discovery selected for the stored path and profile, even if it could not be loaded. */
+    fun getSelectedConfigFile(): String? = configLoader.selectedFile(configPath, configProfile)?.absolutePath
+
+    /** Set only for a diagnostic check: other invocations fall back to the next candidate file. */
+    fun getUnresolvedConfigSelection(): UnresolvedConfigSelection? = unresolvedConfigSelection
+
+    fun getConfigPath(): String? = configPath
+
+    fun getConfigProfile(): String? = configProfile
+
+    /** Explains a configuration key for the application or a selected group command. */
+    fun explainConfig(
+        key: String,
+        commandPath: String? = null,
+        providedOptions: Map<String, String> = emptyMap(),
+    ): ConfigExplanation {
+        val selected = commandPath?.trim()?.takeIf { it.isNotEmpty() }?.split(Regex("\\s+"))
+        val registry = if (selected == null) {
+            applicationConfigRegistry(System::getenv)
+        } else {
+            require(selected.size == 2) { "Command must be specified as 'group command'" }
+            val group = groups.find { it.matches(selected[0]) }
+                ?: throw IllegalArgumentException("Unknown command group: ${selected[0]}")
+            val command = group.commands.find { it.matches(selected[1]) }
+                ?: throw IllegalArgumentException("Unknown command: ${selected[0]} ${selected[1]}")
+            createConfigRegistry(command, group.name, providedOptions)
+        }
+        return registry.explain(key)
+    }
+
+    internal fun explainConfigWithEnvironment(key: String, envProvider: () -> Map<String, String>): ConfigExplanation =
+        applicationConfigRegistry(envProvider).explain(key)
+
+    private fun applicationConfigRegistry(envProvider: () -> Map<String, String>): ConfigRegistry = ConfigRegistry()
+        .defaults(applicationDefaults())
+        .files(configPath = configPath, profile = configProfile)
+        .env(
+            bindings = mapOf(
+                "log-level" to "logging.level",
+                "log-file" to "logging.file",
+            ),
+            envProvider = envProvider,
+        )
+
+    private fun applicationDefaults(): Map<String, Any?> {
+        val defaults = AppConfig()
+        return mapOf(
+            "app" to mapOf(
+                "name" to defaults.app.name,
+                "version" to defaults.app.version,
+                "description" to defaults.app.description,
+                "author" to defaults.app.author,
+            ),
+            "output" to mapOf(
+                "format" to defaults.output.format,
+                "colorized" to defaults.output.colorized,
+                "verbose" to defaults.output.verbose,
+                "prettify" to defaults.output.prettify,
+            ),
+            "plugins" to mapOf(
+                "enabled" to defaults.plugins.enabled,
+                "disabled" to defaults.plugins.disabled,
+                "paths" to defaults.plugins.paths,
+                "auto-load" to defaults.plugins.autoLoad,
+            ),
+            "logging" to mapOf(
+                "level" to defaults.logging.level,
+                "file" to defaults.logging.file,
+                "format" to defaults.logging.format,
+                "max-size" to defaults.logging.maxSize,
+                "max-history" to defaults.logging.maxHistory,
+            ),
+            "watch" to mapOf(
+                "debounce-ms" to defaults.watch.debounceMs,
+                "patterns" to defaults.watch.patterns,
+                "max-restarts" to defaults.watch.maxRestarts,
+                "max-consecutive-failures" to defaults.watch.maxConsecutiveFailures,
+            ),
+        )
+    }
 
     internal fun installFeature(installer: FeatureInstaller) {
         features.install(installer)
@@ -290,9 +412,11 @@ data class CliApp(
                 (option.configKey ?: ConfigRegistry.defaultBindingKey(groupName, option.long)) to option.default
             }
 
-        return ConfigRegistry()
-            .defaults(defaults)
-            .files(configPath = configPath, profile = configProfile)
+        val registry = ConfigRegistry().defaults(defaults)
+        if (groupName != "config" || command.name != "check") {
+            registry.files(configPath = configPath, profile = configProfile)
+        }
+        return registry
             .env(prefix = "LARET", bindings = bindings)
             .flags(values = providedOptions, bindings = bindings)
     }
@@ -403,9 +527,19 @@ data class CliApp(
                     index += 2
                 }
 
+                args[index].startsWith("--config=") -> {
+                    nextConfigPath = args[index].substringAfter('=')
+                    index++
+                }
+
                 args[index] == "--profile" && index + 1 < args.size -> {
                     nextProfile = args[index + 1]
                     index += 2
+                }
+
+                args[index].startsWith("--profile=") -> {
+                    nextProfile = args[index].substringAfter('=')
+                    index++
                 }
 
                 else -> {
@@ -416,6 +550,39 @@ data class CliApp(
         }
 
         return GlobalOptions(nextConfigPath, nextProfile, remaining.toTypedArray())
+    }
+
+    private fun extractConfigCheckOptions(args: Array<String>): GlobalOptions {
+        var config: String? = null
+        var profile: String? = null
+        val remaining = mutableListOf<String>()
+        var index = 0
+        while (index < args.size) {
+            when {
+                args[index] in setOf("-c", "--config") && index + 1 < args.size -> {
+                    config = args[index + 1]
+                    index += 2
+                }
+
+                args[index].startsWith("--config=") -> {
+                    config = args[index].substringAfter('=')
+                    index++
+                }
+
+                args[index] in setOf("-p", "--profile") && index + 1 < args.size -> {
+                    profile = args[index + 1]
+                    index += 2
+                }
+
+                args[index].startsWith("--profile=") -> {
+                    profile = args[index].substringAfter('=')
+                    index++
+                }
+
+                else -> remaining += args[index++]
+            }
+        }
+        return GlobalOptions(config, profile, remaining.toTypedArray())
     }
 
     private companion object {
