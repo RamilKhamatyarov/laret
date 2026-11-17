@@ -3505,16 +3505,22 @@ jobs:
             > "$temp_dir/short.out" 2> "$temp_dir/short.err"
           short_status=$?
           set -e
-          test "$short_status" -eq 1
-          grep -q 'output.format' "$temp_dir/short.out"
+          if [ "$short_status" -ne 1 ] || ! grep -q 'output.format' "$temp_dir/short.out"; then
+            echo "Short-selector check returned $short_status or omitted output.format" >&2
+            cat "$temp_dir/short.out" "$temp_dir/short.err" >&2
+            exit 1
+          fi
 
           set +e
           "$laret" config check --profile=ci --config="$temp_dir/invalid.yml" \
             > "$temp_dir/equals.out" 2> "$temp_dir/equals.err"
           equals_status=$?
           set -e
-          test "$equals_status" -eq 1
-          grep -q 'output.format' "$temp_dir/equals.out"
+          if [ "$equals_status" -ne 1 ] || ! grep -q 'output.format' "$temp_dir/equals.out"; then
+            echo "Equals-selector check returned $equals_status or omitted output.format" >&2
+            cat "$temp_dir/equals.out" "$temp_dir/equals.err" >&2
+            exit 1
+          fi
 
       - name: Config check fails on an unresolved file or profile
         shell: bash
