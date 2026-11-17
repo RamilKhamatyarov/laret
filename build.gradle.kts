@@ -27,7 +27,7 @@ repositories {
 dependencies {
     implementation(kotlin("stdlib"))
 
-    implementation("org.jline:jline:4.5.0")
+    implementation("org.jline:jline:4.7.0")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.22.4")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.22.4")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.22.4")
@@ -38,7 +38,7 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation("org.assertj:assertj-core:3.27.7")
-    testImplementation("io.mockk:mockk:1.14.11")
+    testImplementation("io.mockk:mockk:1.14.12")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.3")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:6.1.3")
