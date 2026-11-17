@@ -14,6 +14,85 @@ import kotlin.test.assertNull
 class ConfigRegistryTest {
 
     @Test
+    fun test_explain_reports_all_layers_and_exact_sources_in_precedence_order() {
+        val registry = ConfigRegistry()
+            .defaults(mapOf("server.port" to 3000))
+            .files(reader = ConfigFileReader { mapOf("server" to mapOf("port" to 7000)) })
+            .env(
+                bindings = mapOf("port" to "server.port"),
+                envProvider = { mapOf("LARET_PORT" to "8080") },
+            )
+            .flags(values = mapOf("--port" to "9090"), bindings = mapOf("--port" to "server.port"))
+
+        val explanation = registry.explain("SERVER_PORT")
+
+        assertEquals("server.port", explanation.key)
+        assertEquals("9090", explanation.winner?.value)
+        assertEquals(listOf(30, 20, 10, 0), explanation.candidates.map { it.priority })
+        assertEquals("LARET_PORT", explanation.candidates[1].source)
+        assertEquals("--port", explanation.candidates[0].source)
+    }
+
+    @Test
+    fun test_explain_missing_key_has_no_winner() {
+        val explanation = ConfigRegistry().defaults(mapOf("present" to "yes")).explain("absent")
+        assertNull(explanation.winner)
+        assertEquals(null, explanation.candidates.single().value)
+    }
+
+    @Test
+    fun test_explain_custom_layers_keep_compatibility_and_insertion_order_for_ties() {
+        val first = object : ConfigLayer {
+            override val priority = 5
+            override fun get(key: String): Any = "first"
+        }
+        val second = object : ConfigLayer {
+            override val priority = 5
+            override fun get(key: String): Any = "second"
+        }
+
+        val explanation = ConfigRegistry(mutableListOf(first, second)).explain("key")
+        assertEquals("first", explanation.winner?.value)
+        assertEquals(listOf("layer", "layer"), explanation.candidates.map { it.source })
+    }
+
+    @Test
+    fun test_get_short_circuits_while_explain_matches_the_effective_winner() {
+        var lowerReads = 0
+        val registry = ConfigRegistry(
+            mutableListOf(
+                object : ConfigLayer {
+                    override val priority = 20
+                    override fun get(key: String): Any = "high"
+                },
+                object : ConfigLayer {
+                    override val priority = 10
+                    override fun get(key: String): Any {
+                        lowerReads++
+                        return "low"
+                    }
+                },
+            ),
+        )
+
+        assertEquals("high", registry.get("key"))
+        assertEquals(0, lowerReads)
+        assertEquals(registry.get("key"), registry.explain("key").winner?.value)
+    }
+
+    @Test
+    fun test_file_provenance_identifies_selected_path() {
+        val directory = File("/work")
+        val layer = FileLayer(
+            reader = ConfigFileReader { mapOf("server.port" to 80) },
+            exists = { it.name == ".laret.yml" },
+            workDir = directory,
+            homeDir = File("/home"),
+        )
+        assertEquals(directory.resolve(".laret.yml").absolutePath, layer.describe("server.port").source)
+    }
+
+    @Test
     fun test_cliFlag_overrides_env_file_and_default_for_key_server_port() {
         val registry = ConfigRegistry()
             .defaults(mapOf("server.port" to 3000))

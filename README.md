@@ -945,6 +945,26 @@ LARET_DIR_FORMAT=json laret --profile dev dir list /tmp --format plain
 Command actions can read resolved values from `ctx.config`, for example
 `ctx.config.getString("dir.format")`.
 
+Library consumers can inspect value provenance with `app.explainConfig("dir.format")`.
+The result includes the normalized key, winning value, and candidates ordered from
+CLI flags through environment and file values to defaults. Sources identify the
+selected file, exact environment variable, flag, or default. Explanations are explicit
+and can include sensitive configuration values; avoid logging or sharing them.
+
+File discovery is consistent for application and command configuration: an explicit
+path is considered first, then profile files, then base files. Within each group the
+working directory precedes the home directory, and extensions are checked in the order
+`.yml`, `.yaml`, `.toml`, `.json`. A profile file replaces the base file; values are
+not merged.
+
+Use `config explain --key watch.debounce-ms` to see the winning value and every
+available source, or add `--format json` for structured output. Use `config check
+--profile dev` to validate a profile without starting with invalid settings.
+Unlike other commands, which fall back to the next candidate file, `config check`
+fails when the `--config` file or the `--profile` it was asked for does not exist.
+Committed development and production profiles are checked by `gradle check`.
+Configuration reports can contain sensitive values and should not be shared publicly.
+
 #### Programmatic API
 
 ```kt

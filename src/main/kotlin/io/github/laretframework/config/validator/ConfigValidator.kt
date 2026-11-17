@@ -29,6 +29,12 @@ class ConfigValidator {
                     result.copy(
                         isValid = false,
                         errors = result.errors + "Validation rule failed: ${e.message}",
+                        diagnostics = result.diagnostics + ValidationDiagnostic(
+                            key = null,
+                            effectiveValue = null,
+                            constraint = "config.constraint.unavailable",
+                            suggestedFix = "config.fix.unavailable",
+                        ),
                     )
             }
         }
@@ -46,6 +52,14 @@ private class AppNameRule : ValidationRule {
             ValidationResult(
                 isValid = false,
                 errors = listOf("App name must be non-empty and max 100 characters"),
+                diagnostics = listOf(
+                    ValidationDiagnostic(
+                        "app.name",
+                        config.app.name,
+                        "config.constraint.app.name",
+                        "config.fix.app.name",
+                    ),
+                ),
             )
         }
     }
@@ -61,6 +75,14 @@ private class OutputFormatRule : ValidationRule {
             ValidationResult(
                 isValid = false,
                 errors = listOf("Invalid output format: ${config.output.format}. Valid: $validFormats"),
+                diagnostics = listOf(
+                    ValidationDiagnostic(
+                        "output.format",
+                        config.output.format,
+                        "config.constraint.output.format",
+                        "config.fix.output.format",
+                    ),
+                ),
             )
         }
     }
@@ -76,6 +98,14 @@ private class LoggingLevelRule : ValidationRule {
             ValidationResult(
                 isValid = false,
                 errors = listOf("Invalid log level: ${config.logging.level}. Valid: $validLevels"),
+                diagnostics = listOf(
+                    ValidationDiagnostic(
+                        "logging.level",
+                        config.logging.level,
+                        "config.constraint.logging.level",
+                        "config.fix.logging.level",
+                    ),
+                ),
             )
         }
     }
@@ -88,7 +118,18 @@ private class PluginPathsRule : ValidationRule {
         return if (invalidPaths.isEmpty()) {
             ValidationResult(isValid = true)
         } else {
-            ValidationResult(isValid = false, errors = listOf("Plugin paths cannot be empty"))
+            ValidationResult(
+                isValid = false,
+                errors = listOf("Plugin paths cannot be empty"),
+                diagnostics = listOf(
+                    ValidationDiagnostic(
+                        "plugins.paths",
+                        invalidPaths,
+                        "config.constraint.plugins.paths",
+                        "config.fix.plugins.paths",
+                    ),
+                ),
+            )
         }
     }
 }

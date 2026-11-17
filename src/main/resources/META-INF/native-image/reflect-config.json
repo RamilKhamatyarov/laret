@@ -77,12 +77,20 @@
   {
     "name": "io.github.laretframework.config.model.AppMetadata",
     "allDeclaredConstructors": true,
-    "allPublicConstructors": true
+    "allPublicConstructors": true,
+    "allDeclaredFields": true,
+    "allPublicFields": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true
   },
   {
     "name": "io.github.laretframework.config.model.OutputConfig",
     "allDeclaredConstructors": true,
-    "allPublicConstructors": true
+    "allPublicConstructors": true,
+    "allDeclaredFields": true,
+    "allPublicFields": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true
   },
   {
     "name": "io.github.laretframework.plugin.model.PluginConfig",
@@ -105,12 +113,20 @@
   {
     "name": "io.github.laretframework.config.model.LoggingConfig",
     "allDeclaredConstructors": true,
-    "allPublicConstructors": true
+    "allPublicConstructors": true,
+    "allDeclaredFields": true,
+    "allPublicFields": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true
   },
   {
     "name": "io.github.laretframework.config.model.WatchConfig",
     "allDeclaredConstructors": true,
-    "allPublicConstructors": true
+    "allPublicConstructors": true,
+    "allDeclaredFields": true,
+    "allPublicFields": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true
   },
   {
     "name": "io.github.laretframework.stats.PersistedStats",

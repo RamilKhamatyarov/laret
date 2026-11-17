@@ -1,5 +1,6 @@
 package io.github.laretframework.config.registry
 
+import io.github.laretframework.config.ConfigFileResolver
 import io.github.laretframework.config.ConfigLoader
 import java.io.File
 import java.math.BigDecimal
@@ -10,7 +11,12 @@ import java.util.logging.Logger
 interface ConfigLayer {
     val priority: Int get() = 0
     fun get(key: String): Any?
+    fun describe(key: String): ConfigCandidate = ConfigCandidate("layer", priority, get(key))
 }
+
+data class ConfigCandidate(val source: String, val priority: Int, val value: Any?)
+
+data class ConfigExplanation(val key: String, val winner: ConfigCandidate?, val candidates: List<ConfigCandidate>)
 
 fun interface ConfigFileReader {
     fun load(file: File): Map<String, Any?>
@@ -47,6 +53,12 @@ class ConfigRegistry(
     fun get(key: String): Any? {
         val normalized = normalizeKey(key)
         return layers.sortedByDescending { it.priority }.firstNotNullOfOrNull { it.get(normalized) }
+    }
+
+    fun explain(key: String): ConfigExplanation {
+        val normalized = normalizeKey(key)
+        val candidates = layers.sortedByDescending { it.priority }.map { it.describe(normalized) }
+        return ConfigExplanation(normalized, candidates.firstOrNull { it.value != null }, candidates)
     }
 
     fun getString(key: String, default: String? = null): String? = get(key)?.toString() ?: default
@@ -166,6 +178,7 @@ class DefaultLayer(values: Map<String, Any?>) : ConfigLayer {
     private val values = values.mapKeys { ConfigRegistry.normalizeKey(it.key) }
 
     override fun get(key: String): Any? = values[ConfigRegistry.normalizeKey(key)]
+    override fun describe(key: String): ConfigCandidate = ConfigCandidate("default", priority, get(key))
 }
 
 class EnvLayer(
@@ -176,40 +189,48 @@ class EnvLayer(
     override val priority = 20
     private val normalizedBindings = bindings.mapValues { ConfigRegistry.normalizeKey(it.value) }
 
-    override fun get(key: String): Any? {
+    override fun get(key: String): Any? = describe(key).value
+
+    override fun describe(key: String): ConfigCandidate {
         val normalizedKey = ConfigRegistry.normalizeKey(key)
         val env = envProvider()
-        val direct = env[ConfigRegistry.envName(prefix, normalizedKey)]
-        if (direct != null) return direct
+        val directName = ConfigRegistry.envName(prefix, normalizedKey)
+        if (env[directName] != null) return ConfigCandidate(directName, priority, env[directName])
 
-        return normalizedBindings
+        val boundName = normalizedBindings
             .filterValues { it == normalizedKey }
             .keys
             .firstNotNullOfOrNull { optionName ->
-                env[ConfigRegistry.envName(prefix, optionName)]
+                val name = ConfigRegistry.envName(prefix, optionName)
+                if (env[name] != null) name else null
             }
+        return ConfigCandidate(boundName ?: directName, priority, boundName?.let(env::get))
     }
 }
 
 class FlagLayer(values: Map<String, String>, bindings: Map<String, String> = emptyMap()) : ConfigLayer {
     override val priority = 30
 
-    private val normalizedValues = values.entries.associate { (k, v) ->
-        ConfigRegistry.normalizeKey(k) to v
+    private val normalizedValues = values.entries.associate { (key, value) ->
+        ConfigRegistry.normalizeKey(key) to (key to value)
     }
     private val normalizedBindings = bindings.mapValues { ConfigRegistry.normalizeKey(it.value) }
 
-    override fun get(key: String): Any? {
+    override fun get(key: String): Any? = describe(key).value
+
+    override fun describe(key: String): ConfigCandidate {
         val normalizedKey = ConfigRegistry.normalizeKey(key)
         val direct = normalizedValues[normalizedKey]
-        if (direct != null) return direct
+        if (direct != null) return ConfigCandidate(direct.first, priority, direct.second)
 
-        return normalizedBindings
+        val boundName = normalizedBindings
             .filterValues { it == normalizedKey }
             .keys
             .firstNotNullOfOrNull { optionName ->
-                normalizedValues[ConfigRegistry.normalizeKey(optionName)]
+                if (normalizedValues[ConfigRegistry.normalizeKey(optionName)] != null) optionName else null
             }
+        val bound = boundName?.let { normalizedValues[ConfigRegistry.normalizeKey(it)] }
+        return ConfigCandidate(bound?.first ?: normalizedKey, priority, bound?.second)
     }
 }
 
@@ -223,39 +244,15 @@ class FileLayer(
 ) : ConfigLayer {
     override val priority = 10
 
-    private val file by lazy { resolveConfigFile(configPath, profile) }
+    private val file by lazy { ConfigFileResolver(workDir, homeDir, exists).resolve(configPath, profile) }
     private val values by lazy {
         file?.let { ConfigRegistry.flatten(reader.load(it)) }.orEmpty()
     }
 
     override fun get(key: String): Any? = values[ConfigRegistry.normalizeKey(key)]
 
+    override fun describe(key: String): ConfigCandidate =
+        ConfigCandidate(file?.absolutePath ?: "file", priority, get(key))
+
     internal fun selectedFile(): File? = file
-
-    private fun resolveConfigFile(configPath: String?, profile: String?): File? {
-        val extensions = listOf("yml", "yaml", "toml", "json")
-        val profileCandidates = profile
-            ?.takeIf { it.isNotBlank() }
-            ?.let { activeProfile ->
-                extensions.flatMap { extension ->
-                    listOf(
-                        File(workDir, ".laret.$activeProfile.$extension"),
-                        File(homeDir, ".laret.$activeProfile.$extension"),
-                    )
-                }
-            }
-            .orEmpty()
-
-        val baseCandidates = extensions.flatMap { extension ->
-            listOf(
-                File(workDir, ".laret.$extension"),
-                File(homeDir, ".laret.$extension"),
-            )
-        }
-
-        return listOfNotNull(configPath?.let { File(it) })
-            .plus(profileCandidates)
-            .plus(baseCandidates)
-            .firstOrNull(exists)
-    }
 }

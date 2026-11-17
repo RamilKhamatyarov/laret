@@ -9,6 +9,7 @@ import io.github.laretframework.completion.SchemaExportCommand
 import io.github.laretframework.completion.SchemaFormat
 import io.github.laretframework.completion.ShellType
 import io.github.laretframework.completion.completers.StaticCompleter
+import io.github.laretframework.config.UnresolvedConfigSelection
 import io.github.laretframework.core.CliApp
 import io.github.laretframework.core.CommandContext
 import io.github.laretframework.core.CommandHistory
@@ -97,6 +98,124 @@ fun buildLaretApp(): CliApp = cli(
     use(StatsMiddleware())
 
     onAppShutdown = { System.err.println(Localization.t("app.shutting.down")) }
+
+    group(name = "config", description = Localization.t("config.group.description")) {
+        command(name = "explain", description = Localization.t("config.explain.description")) {
+            option("k", "key", Localization.t("config.explain.key"))
+            option("c", "command", Localization.t("config.explain.command"))
+            option("f", "format", Localization.t("config.explain.format"), default = "plain")
+            impact(ImpactCategory.READ_ONLY)
+            action { ctx ->
+                val key = ctx.option("key")
+                val format = ctx.option("format")
+                if (key.isBlank()) {
+                    System.err.println(Localization.t("config.explain.key.required"))
+                    ctx.exit(2)
+                    return@action
+                }
+                if (format !in setOf("plain", "json")) {
+                    System.err.println(Localization.t("config.explain.format.invalid"))
+                    ctx.exit(2)
+                    return@action
+                }
+                try {
+                    val explanation = ctx.app!!.explainConfig(
+                        key,
+                        ctx.option("command").ifBlank { null },
+                    )
+                    val candidates = explanation.candidates.map {
+                        mapOf("source" to it.source, "priority" to it.priority, "value" to it.value)
+                    }
+                    val report = linkedMapOf<String, Any?>(
+                        "key" to explanation.key,
+                        "winner" to explanation.winner?.let {
+                            mapOf("source" to it.source, "priority" to it.priority, "value" to it.value)
+                        },
+                        "candidates" to candidates,
+                    )
+                    if (format == "json") {
+                        println(OutputStrategy.byName("json").render(report))
+                    } else if (explanation.winner == null) {
+                        println(Localization.t("config.explain.missing", explanation.key))
+                    } else {
+                        println(
+                            Localization.t(
+                                "config.explain.winner",
+                                explanation.key,
+                                explanation.winner.value,
+                                explanation.winner.source,
+                                explanation.winner.priority,
+                            ),
+                        )
+                        explanation.candidates.filter { it != explanation.winner }.forEach {
+                            println(Localization.t("config.explain.candidate", it.source, it.priority, it.value))
+                        }
+                    }
+                } catch (error: IllegalArgumentException) {
+                    System.err.println(Localization.t("config.explain.command.invalid", error.message ?: ""))
+                    ctx.exit(2)
+                }
+            }
+        }
+
+        command(name = "check", description = Localization.t("config.check.description")) {
+            option("p", "profile", Localization.t("config.check.profile"))
+            option("c", "config", Localization.t("config.check.path"))
+            action { ctx ->
+                val app = ctx.app!!
+                val validation = app.getConfigValidationResult()
+                val diagnostics = validation.diagnostics.map { diagnostic ->
+                    val source = diagnostic.key?.let { app.explainConfig(it).winner?.source }
+                        ?: Localization.t("config.value.unavailable")
+                    val message = Localization.t(
+                        "config.validation.detail",
+                        diagnostic.key ?: Localization.t("config.value.unavailable"),
+                        diagnostic.effectiveValue ?: Localization.t("config.value.unavailable"),
+                        source,
+                        Localization.t(diagnostic.constraint),
+                        Localization.t(diagnostic.suggestedFix),
+                    )
+                    mapOf(
+                        "message" to message,
+                        "key" to diagnostic.key,
+                        "effectiveValue" to diagnostic.effectiveValue,
+                        "source" to source,
+                        "constraint" to Localization.t(diagnostic.constraint),
+                        "suggestedFix" to Localization.t(diagnostic.suggestedFix),
+                    )
+                }
+                val selectionError = app.getUnresolvedConfigSelection()?.let {
+                    val key = when (it.selector) {
+                        UnresolvedConfigSelection.Selector.CONFIG -> "config.check.config.not.found"
+                        UnresolvedConfigSelection.Selector.PROFILE -> "config.check.profile.not.found"
+                    }
+                    Localization.t(key, it.value)
+                }
+                val errors = diagnostics.mapNotNull { it["message"] as? String } +
+                    validation.errors.drop(validation.diagnostics.size) +
+                    listOfNotNull(
+                        app.getConfigLoadError()?.let { Localization.t("config.load.error", it) },
+                        selectionError,
+                    )
+                val report = linkedMapOf<String, Any?>(
+                    "config" to app.getSelectedConfigFile(),
+                    "profile" to app.getConfigProfile(),
+                    "valid" to (
+                        validation.isKnown && validation.isValid &&
+                            app.getConfigLoadError() == null && selectionError == null
+                        ),
+                    "errors" to errors,
+                    "diagnostics" to diagnostics,
+                    "warnings" to validation.warnings,
+                )
+                validation.warnings.forEach {
+                    System.err.println(Localization.t("config.check.warning", it))
+                }
+                println(ctx.render(report))
+                if (report["valid"] != true) ctx.exit(1)
+            }
+        }
+    }
 
     group(name = "completion", description = "Shell completion") {
         command(name = "bash", description = "Generate bash completion script") {
@@ -1616,9 +1735,19 @@ fun main(args: Array<String>) {
                 idx += 2
             }
 
+            args[idx].startsWith("--config=") -> {
+                configPath = args[idx].substringAfter('=')
+                idx++
+            }
+
             args[idx] == "--profile" && idx + 1 < args.size -> {
                 profile = args[idx + 1]
                 idx += 2
+            }
+
+            args[idx].startsWith("--profile=") -> {
+                profile = args[idx].substringAfter('=')
+                idx++
             }
 
             else -> {
@@ -1628,8 +1757,6 @@ fun main(args: Array<String>) {
         }
     }
     val strippedArgs = stripped.toTypedArray()
-
-    app.init(configPath, profile)
     UndoManager.load()
     CommandHistory.load()
 
@@ -1651,7 +1778,12 @@ fun main(args: Array<String>) {
         watchLiveCommandArgs.set(resolvedArgs.copyOfRange(2, resolvedArgs.size))
     }
 
-    val exitCode = app.run(resolvedArgs)
+    val invocationArgs = buildList {
+        addAll(resolvedArgs)
+        configPath?.let { addAll(listOf("--config", it)) }
+        profile?.let { addAll(listOf("--profile", it)) }
+    }.toTypedArray()
+    val exitCode = app.run(invocationArgs)
 
     val group = resolvedArgs.firstOrNull()
     val skipHistory =
