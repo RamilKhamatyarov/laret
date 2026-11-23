@@ -60,7 +60,8 @@ class RenderTest(unittest.TestCase):
         ]))
 
         self.assertEqual(picocli_cell(rendered, "B settle above debounce"), "level")
-        self.assertIn("ahead of or level with picocli", rendered)
+        self.assertIn("level on 1", rendered)
+        self.assertIn("meets it on 1 of 1 measured rows", rendered)
 
     def test_cancellation_latency_shows_the_range_of_its_runs(self):
         rendered = render.render(document([

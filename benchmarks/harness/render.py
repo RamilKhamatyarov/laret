@@ -145,13 +145,10 @@ def render_targets(document: dict) -> list[str]:
     if "Laret native" not in present:
         out += ["Laret native was not measured in this run.", ""]
         return out
-    out += [
-        f"Wall clock and latency within {WALL_TARGET:g}x of Cobra and of clap, peak RSS within",
-        f"{RSS_TARGET:g}x of each, and ahead of or level with picocli on every row. Level means",
-        f"within {TIE_RELATIVE:.0%} or, for times, {TIE_ABSOLUTE_MS:g} ms. Reported, never enforced.",
-        "",
-    ]
     rows = []
+    met_rows = 0
+    measured_rows = 0
+    picocli_verdicts: list[str] = []
     for label, kind, value in target_metrics(measurements):
         laret = value("Laret native")
         if laret is None:
@@ -173,8 +170,34 @@ def render_targets(document: dict) -> list[str]:
         if pico is None:
             cells.append(NOT_MEASURED)
         else:
-            cells.append(versus(laret, pico, kind))
+            verdict = versus(laret, pico, kind)
+            picocli_verdicts.append(verdict)
+            cells.append(verdict)
         rows.append(cells)
+        if verdicts:
+            measured_rows += 1
+            if all(verdicts):
+                met_rows += 1
+    out += [
+        f"Target: wall clock and latency within {WALL_TARGET:g}x of Cobra and of clap, and peak",
+        f"RSS within {RSS_TARGET:g}x of each. A row counts as met only when both references pass,",
+        f"so Laret native meets it on {met_rows} of {measured_rows} measured rows and the table",
+        "marks every row that misses. Level means within "
+        f"{TIE_RELATIVE:.0%} or, for times, {TIE_ABSOLUTE_MS:g} ms. Reported, never enforced.",
+        "",
+    ]
+    if picocli_verdicts:
+        ahead = picocli_verdicts.count("ahead")
+        level = picocli_verdicts.count("level")
+        behind = picocli_verdicts.count("**behind**")
+        if behind == 0 and level == 0:
+            out += ["Against picocli, Laret native is ahead on every measured row.", ""]
+        else:
+            out += [
+                f"Against picocli: ahead on {ahead} of {len(picocli_verdicts)} measured rows, level on "
+                f"{level}, behind on {behind}.",
+                "",
+            ]
     out.append(table(
         ["Metric", "Laret native", f"vs Cobra (≤{WALL_TARGET:g}x / ≤{RSS_TARGET:g}x)", "vs clap", "vs picocli"],
         rows,

@@ -1,7 +1,12 @@
 package io.github.laretframework.plugin.install
 
 import com.fasterxml.jackson.dataformat.toml.TomlMapper
+import io.github.laretframework.plugin.model.ManagedPluginManifest
+import io.github.laretframework.plugin.model.ManagedPluginMetadata
+import io.github.laretframework.plugin.model.PluginArtifactKind
+import io.github.laretframework.plugin.model.PluginInstallShape
 import io.github.laretframework.plugin.model.PluginMetadata
+import io.github.laretframework.plugin.model.PluginPlatform
 import java.io.IOException
 import java.net.URI
 import java.net.http.HttpClient
@@ -16,6 +21,7 @@ import java.security.MessageDigest
 import java.time.Duration
 import java.time.Instant
 import java.util.HexFormat
+import java.util.UUID
 
 private val REDIRECT_STATUS_CODES = setOf(301, 302, 303, 307, 308)
 private const val MAX_REDIRECTS = 5
@@ -67,7 +73,97 @@ class HttpPluginDownloadClient(
 class PluginInstaller(
     private val downloadClient: PluginDownloadClient = HttpPluginDownloadClient(),
     private val now: () -> Instant = Instant::now,
+    private val archiveExtractor: PluginArchiveExtractor = PluginArchiveExtractor(),
+    private val metadataCodec: ManagedPluginMetadataCodec = ManagedPluginMetadataCodec(),
 ) {
+    fun installManaged(
+        manifest: ManagedPluginManifest,
+        version: String,
+        platform: PluginPlatform,
+        directory: Path,
+        force: Boolean = false,
+    ): Result<Path> = runCatching {
+        validateName(manifest.name)
+        val artifact = manifest.select(version, platform)
+        val root = prepareDirectory(directory)
+        val binaryTarget = root.resolve(platformFileName(manifest.name))
+        val directoryTarget = root.resolve(manifest.name)
+        val metadataTarget = root.resolve("${manifest.name}.toml")
+        require(!(Files.exists(binaryTarget) || Files.exists(directoryTarget) || Files.exists(metadataTarget))) {
+            if (force) {
+                "Managed replacement requires lifecycle checks; use the managed lifecycle service"
+            } else {
+                "Plugin '${manifest.name}' already exists"
+            }
+        }
+
+        val downloaded = Files.createTempFile(root, ".${manifest.name}.", ".artifact")
+        val stagedPayload = Files.createTempDirectory(root, ".${manifest.name}.payload-")
+        val stagedMetadata = Files.createTempFile(root, ".${manifest.name}.", ".metadata")
+        var publishedPayload: Path? = null
+        try {
+            downloadClient.download(URI(artifact.url), downloaded).getOrThrow()
+            val actual = sha256(downloaded)
+            val expected = artifact.sha256.lowercase()
+            require(actual == expected) {
+                "SHA-256 mismatch for plugin '${manifest.name}': expected $expected, got $actual"
+            }
+
+            val inventory: Map<String, String>
+            val finalPayload: Path
+            if (artifact.kind == PluginArtifactKind.BINARY) {
+                require(artifact.shape == PluginInstallShape.SINGLE_FILE) {
+                    "Binary artifact must use SINGLE_FILE shape"
+                }
+                val entry = stagedPayload.resolve(artifact.start.executable)
+                Files.createDirectories(entry.parent)
+                Files.copy(downloaded, entry)
+                setExecutablePermissions(entry)
+                inventory = mapOf(artifact.start.executable to sha256(entry))
+                finalPayload = binaryTarget
+            } else {
+                require(artifact.shape == PluginInstallShape.DIRECTORY) { "Archive artifact must use DIRECTORY shape" }
+                inventory = archiveExtractor.extract(downloaded, artifact.kind, stagedPayload.resolve("contents"))
+                finalPayload = directoryTarget
+            }
+
+            val metadata = ManagedPluginMetadata(
+                schemaVersion = 1,
+                manifest = manifest,
+                platform = platform,
+                installedAt = now().toString(),
+                instance = UUID.randomUUID().toString(),
+                inventory = inventory,
+            )
+            Files.writeString(stagedMetadata, metadataCodec.write(metadata))
+            setMetadataPermissions(stagedMetadata)
+
+            if (artifact.shape == PluginInstallShape.SINGLE_FILE) {
+                move(stagedPayload.resolve(artifact.start.executable), finalPayload)
+                publishedPayload = finalPayload
+            } else {
+                val contents = stagedPayload.resolve("contents")
+                move(contents, finalPayload)
+                publishedPayload = finalPayload
+            }
+            move(stagedMetadata, metadataTarget)
+            metadataTarget
+        } catch (error: Exception) {
+            publishedPayload?.let { deleteTree(it) }
+            Files.deleteIfExists(metadataTarget)
+            throw error
+        } finally {
+            Files.deleteIfExists(downloaded)
+            deleteTree(stagedPayload)
+            Files.deleteIfExists(stagedMetadata)
+        }
+    }
+
+    private fun deleteTree(path: Path) {
+        if (!Files.exists(path)) return
+        Files.walk(path).use { paths -> paths.sorted(Comparator.reverseOrder()).forEach(Files::deleteIfExists) }
+    }
+
     fun install(
         name: String,
         url: String,

@@ -11,19 +11,21 @@ into `site/docs`, because `laret doc generate` overwrites that tree.
 ## Provenance
 
 Numbers are only meaningful next to the machine that produced them.
-Every figure is the median of 5 runs.
+Every figure is the median of 3 runs.
+Scenario D latencies are the median of 9 runs, with the range.
 
 | Field | Value |
 |---|---|
-| Laret commit | v0.2.0-62-gc7696526a66e0970c526753ad1c1e9e4d3324c00-dirty |
-| Date | 2026-10-06 13:50:56 +0000 |
-| Host | 75173a8153e5 |
-| Kernel | 5.10.104-linuxkit |
-| CPU | Intel(R) Core(TM) i7-10510U CPU @ 1.80GHz |
-| Pinned cores | 0-1 |
-| Go toolchain | /work/benchmarks/cobra/bench-cobra: go1.23.0 |
-| Rust toolchain | cargo 1.98.1 (797e8a9bc 2026-08-05) |
-| JDK | openjdk version "25.0.4.1" 2026-08-18 LTS |
+| Laret commit | bf3ce3bc9783595c4e8a306a48b579e93ae41120 |
+| Date | 2026-11-22 11:20:12 +0000 |
+| Host | runnervm0hi8g |
+| Kernel | 7.0.0-1020-azure |
+| CPU | AMD EPYC 9V74 80-Core Processor |
+| Pinned cores | 0-3 |
+| Transparent huge pages | madvise |
+| Go toolchain | /home/runner/work/laret/laret/benchmarks/cobra/bench-cobra: go1.23.12 |
+| Rust toolchain | cargo 1.100.0 (3acc79c0c 2026-11-05) |
+| JDK | openjdk version "25.0.2" 2026-01-20 |
 | GraalVM | GraalVM CE 25.0.2+10.1 |
 
 ## Targets
@@ -41,21 +43,25 @@ stdout contract, so the harness invokes them identically.
 
 ## Laret native against its targets
 
-Wall clock and latency within 2x of Cobra and of clap, peak RSS within
-5x of each, and ahead of picocli on every row. Reported, never enforced.
+Target: wall clock and latency within 2x of Cobra and of clap, and peak
+RSS within 5x of each. A row counts as met only when both references pass,
+so Laret native meets it on 2 of 10 measured rows and the table
+marks every row that misses. Level means within 10% or, for times, 0.05 ms. Reported, never enforced.
+
+Against picocli: ahead on 9 of 10 measured rows, level on 1, behind on 0.
 
 | Metric | Laret native | vs Cobra (≤2x / ≤5x) | vs clap | vs picocli |
 |---|---|---|---|---|
-| A fan-out N=1,000 wall | 10.49 ms | 4.18 ms (2.5x **missed**) | 2.52 ms (4.2x **missed**) | ahead |
-| A fan-out N=10,000 wall | 31.64 ms | 9.54 ms (3.3x **missed**) | 12.60 ms (2.5x **missed**) | ahead |
-| B settle above debounce | 0.41 ms | 0.99 ms (0.4x met) | 1.35 ms (0.3x met) | ahead |
-| C pipeline wall | 74.82 ms | 26.48 ms (2.8x **missed**) | 31.21 ms (2.4x **missed**) | ahead |
-| D SIGTERM latency | 24.69 ms | 5.99 ms (4.1x **missed**) | 4.96 ms (5.0x **missed**) | ahead |
-| D SIGINT latency | 24.49 ms | 5.85 ms (4.2x **missed**) | 4.84 ms (5.1x **missed**) | ahead |
-| A peak RSS | 24.7 MiB | 6.7 MiB (3.7x met) | 6.9 MiB (3.6x met) | ahead |
-| B peak RSS | 24.5 MiB | 5.6 MiB (4.4x met) | 3.8 MiB (6.4x **missed**) | ahead |
-| C peak RSS | 23.0 MiB | 7.5 MiB (3.0x met) | 3.7 MiB (6.1x **missed**) | ahead |
-| D peak RSS | 19.5 MiB | 6.7 MiB (2.9x met) | 3.8 MiB (5.1x **missed**) | ahead |
+| A fan-out N=1,000 wall | 7.01 ms | 2.97 ms (2.4x **missed**) | 2.23 ms (3.1x **missed**) | ahead |
+| A fan-out N=10,000 wall | 18.93 ms | 5.85 ms (3.2x **missed**) | 7.85 ms (2.4x **missed**) | ahead |
+| B settle above debounce | 0.21 ms | 0.46 ms (0.5x met) | 1.41 ms (0.1x met) | level |
+| C pipeline wall | 28.64 ms | 17.03 ms (1.7x met) | 26.06 ms (1.1x met) | ahead |
+| D SIGTERM latency | 4.78 ms | 1.17 ms (4.1x **missed**) | 3.13 ms (1.5x met) | ahead |
+| D SIGINT latency | 4.86 ms | 1.13 ms (4.3x **missed**) | 2.62 ms (1.9x met) | ahead |
+| A peak RSS | 35.5 MiB | 6.9 MiB (5.2x **missed**) | 6.9 MiB (5.1x **missed**) | ahead |
+| B peak RSS | 43.5 MiB | 5.8 MiB (7.5x **missed**) | 3.6 MiB (12.2x **missed**) | ahead |
+| C peak RSS | 41.6 MiB | 7.6 MiB (5.5x **missed**) | 3.6 MiB (11.6x **missed**) | ahead |
+| D peak RSS | 38.0 MiB | 6.7 MiB (5.6x **missed**) | 3.6 MiB (10.4x **missed**) | ahead |
 
 ## Rules
 
@@ -78,21 +84,21 @@ adds on top of the language's own concurrency model.
 
 | Target | Wall clock | Overhead per task | Peak RSS | Aggregate |
 |---|---|---|---|---|
-| Cobra | 4.2 ms | 4.18 µs | 5.6 MiB | pass |
-| clap | 2.5 ms | 2.52 µs | 3.9 MiB | pass |
-| picocli | 286.1 ms | 286.11 µs | 62.1 MiB | pass |
-| Laret JVM | 330.4 ms | 330.36 µs | 61.7 MiB | pass |
-| Laret native | 10.5 ms | 10.49 µs | 18.6 MiB | pass |
+| Cobra | 3.0 ms | 2.97 µs | 5.8 MiB | pass |
+| clap | 2.2 ms | 2.23 µs | 3.9 MiB | pass |
+| picocli | 210.2 ms | 210.18 µs | 128.5 MiB | pass |
+| Laret JVM | 229.0 ms | 229.01 µs | 134.6 MiB | pass |
+| Laret native | 7.0 ms | 7.01 µs | 29.1 MiB | pass |
 
 ### N = 10,000
 
 | Target | Wall clock | Overhead per task | Peak RSS | Aggregate |
 |---|---|---|---|---|
-| Cobra | 9.5 ms | 0.95 µs | 6.7 MiB | pass |
-| clap | 12.6 ms | 1.26 µs | 6.9 MiB | pass |
-| picocli | 405.4 ms | 40.54 µs | 83.9 MiB | pass |
-| Laret JVM | 460.1 ms | 46.01 µs | 74.8 MiB | pass |
-| Laret native | 31.6 ms | 3.16 µs | 24.7 MiB | pass |
+| Cobra | 5.8 ms | 0.58 µs | 6.9 MiB | pass |
+| clap | 7.8 ms | 0.78 µs | 6.9 MiB | pass |
+| picocli | 252.1 ms | 25.21 µs | 153.8 MiB | pass |
+| Laret JVM | 307.1 ms | 30.71 µs | 139.1 MiB | pass |
+| Laret native | 18.9 ms | 1.89 µs | 35.5 MiB | pass |
 
 ## Scenario B - Event storm
 
@@ -106,11 +112,11 @@ target. *Settle* is the time from the last event to the coalesced run, and
 
 | Target | Settle | Above debounce | Wall clock | Peak RSS | Coalescing |
 |---|---|---|---|---|---|
-| Cobra | 151.0 ms | 1.0 ms | 455.3 ms | 5.6 MiB | pass |
-| clap | 151.3 ms | 1.3 ms | 455.0 ms | 3.8 MiB | pass |
-| picocli | 150.5 ms | 0.5 ms | 656.2 ms | 61.1 MiB | pass |
-| Laret JVM | 152.1 ms | 2.1 ms | 977.9 ms | 78.1 MiB | pass |
-| Laret native | 150.4 ms | 0.4 ms | 521.8 ms | 24.5 MiB | pass |
+| Cobra | 150.5 ms | 0.5 ms | 453.7 ms | 5.8 MiB | pass |
+| clap | 151.4 ms | 1.4 ms | 454.4 ms | 3.6 MiB | pass |
+| picocli | 150.2 ms | 0.2 ms | 646.9 ms | 128.5 MiB | pass |
+| Laret JVM | 151.6 ms | 1.6 ms | 831.9 ms | 164.8 MiB | pass |
+| Laret native | 150.2 ms | 0.2 ms | 460.5 ms | 43.5 MiB | pass |
 
 ## Scenario C - Concurrent streaming pipeline
 
@@ -121,11 +127,11 @@ without deadlocking, dropping lines or exhausting memory.
 
 | Target | Wall clock | Overhead per line | Peak RSS | Lines correct |
 |---|---|---|---|---|
-| Cobra | 26.5 ms | 0.26 µs | 7.5 MiB | pass |
-| clap | 31.2 ms | 0.31 µs | 3.7 MiB | pass |
-| picocli | 345.5 ms | 3.45 µs | 66.6 MiB | pass |
-| Laret JVM | 456.9 ms | 4.57 µs | 74.6 MiB | pass |
-| Laret native | 74.8 ms | 0.75 µs | 23.0 MiB | pass |
+| Cobra | 17.0 ms | 0.17 µs | 7.6 MiB | pass |
+| clap | 26.1 ms | 0.26 µs | 3.6 MiB | pass |
+| picocli | 266.4 ms | 2.66 µs | 135.4 MiB | pass |
+| Laret JVM | 266.9 ms | 2.67 µs | 152.6 MiB | pass |
+| Laret native | 28.6 ms | 0.29 µs | 41.6 MiB | pass |
 
 ## Scenario D - Cancellation storm
 
@@ -135,23 +141,23 @@ cleanup hook in reverse registration order, and exit with `128 + signal`.
 
 ### SIGTERM
 
-| Target | Cancellation latency | Exit code | Cleanup order | Peak RSS |
-|---|---|---|---|---|
-| Cobra | 6.0 ms | 143 | pass | 6.7 MiB |
-| clap | 5.0 ms | 143 | pass | 3.8 MiB |
-| picocli | 62.0 ms | 143 | pass | 71.0 MiB |
-| Laret JVM | 74.3 ms | 143 | pass | 69.7 MiB |
-| Laret native | 24.7 ms | 143 | pass | 19.5 MiB |
+| Target | Cancellation latency | Exit code | Cleanup order | Peak RSS | Anon / file / huge pages at signal |
+|---|---|---|---|---|---|
+| Cobra | 1.2 ms (1.0-1.3) | 143 | pass | 6.7 MiB | 2.2 MiB / 4.8 MiB / 0.0 MiB |
+| clap | 3.1 ms (0.9-6.8) | 143 | pass | 3.6 MiB | 0.5 MiB / 3.3 MiB / 0.0 MiB |
+| picocli | 29.8 ms (25.0-32.8) | 143 | pass | 153.7 MiB | 88.6 MiB / 64.5 MiB / 0.0 MiB |
+| Laret JVM | 30.7 ms (26.6-50.1) | 143 | pass | 141.3 MiB | 75.7 MiB / 64.0 MiB / 0.0 MiB |
+| Laret native | 4.8 ms (2.9-7.5) | 143 | pass | 38.0 MiB | 3.8 MiB / 33.3 MiB / 0.0 MiB |
 
 ### SIGINT
 
-| Target | Cancellation latency | Exit code | Cleanup order | Peak RSS |
-|---|---|---|---|---|
-| Cobra | 5.8 ms | 130 | pass | 6.7 MiB |
-| clap | 4.8 ms | 130 | pass | 3.8 MiB |
-| picocli | 64.1 ms | 130 | pass | 71.0 MiB |
-| Laret JVM | 82.4 ms | 130 | pass | 67.5 MiB |
-| Laret native | 24.5 ms | 130 | pass | 19.4 MiB |
+| Target | Cancellation latency | Exit code | Cleanup order | Peak RSS | Anon / file / huge pages at signal |
+|---|---|---|---|---|---|
+| Cobra | 1.1 ms (1.0-3.3) | 130 | pass | 6.8 MiB | 2.1 MiB / 4.8 MiB / 0.0 MiB |
+| clap | 2.6 ms (0.9-3.5) | 130 | pass | 3.6 MiB | 0.5 MiB / 3.3 MiB / 0.0 MiB |
+| picocli | 30.8 ms (25.3-35.6) | 130 | pass | 154.6 MiB | 88.5 MiB / 64.5 MiB / 0.0 MiB |
+| Laret JVM | 31.9 ms (26.7-39.2) | 130 | pass | 140.5 MiB | 74.9 MiB / 64.0 MiB / 0.0 MiB |
+| Laret native | 4.9 ms (3.3-6.7) | 130 | pass | 38.0 MiB | 3.8 MiB / 33.3 MiB / 0.0 MiB |
 
 ## Reproducing
 
