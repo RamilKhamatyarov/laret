@@ -38,7 +38,6 @@ class PluginArchiveExtractor(
             require(budget.inventory.isNotEmpty()) { "Archive contains no regular files" }
             return budget.inventory.toMap()
         } catch (error: Exception) {
-            // Staging is newly created by this operation and never contains user-owned state.
             Files.walk(root).use { paths -> paths.sorted(Comparator.reverseOrder()).forEach(Files::delete) }
             throw error
         }
