@@ -2,10 +2,10 @@ import java.io.ByteArrayOutputStream
 
 plugins {
     kotlin("jvm") version "2.4.21"
-    id("org.graalvm.buildtools.native") version "1.1.18"
+    id("org.graalvm.buildtools.native") version "1.1.19"
     id("com.gradleup.shadow") version "9.6.1"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
-    id("com.diffplug.spotless") version "8.11.0"
+    id("com.diffplug.spotless") version "8.12.0"
     id("pmd")
     `maven-publish`
     signing
